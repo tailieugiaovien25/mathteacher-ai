@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Excel input files
+data/input/*.xlsx
+data/input/*.xlsm
+
+# VS Code
+.vscode/
