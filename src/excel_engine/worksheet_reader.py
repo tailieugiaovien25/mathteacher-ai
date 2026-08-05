@@ -11,10 +11,18 @@ class WorksheetReader:
             "column_count": worksheet.max_column,
         }
 
-    def get_cell_value(self, worksheet: Worksheet, cell: str):
+    def get_cell_value(
+        self,
+        worksheet: Worksheet,
+        cell: str,
+    ):
         """Đọc giá trị của một ô."""
         return worksheet[cell].value
 
-    def get_row_values(self, worksheet: Worksheet, row: int) -> list:
+    def get_row_values(
+        self,
+        worksheet: Worksheet,
+        row: int,
+    ) -> list:
         """Đọc toàn bộ giá trị của một dòng."""
         return [cell.value for cell in worksheet[row]]
