@@ -1,15 +1,14 @@
+from config.config_manager import ConfigManager
 from robots.robot01 import Robot01
 
 
-EXCEL_FILE = "data/input/LBG-TUYEN_chuan_VBA_macro.xlsm"
-REPORT_FILE = "output/reports/workbook_report.json"
-
-
 def main() -> None:
+    config = ConfigManager()
+
     robot = Robot01(
-        excel_file=EXCEL_FILE,
-        report_file=REPORT_FILE,
-        target_sheet="LuuBG",
+        excel_file=config.excel_file,
+        report_file=config.report_file,
+        target_sheet=config.target_sheet,
     )
 
     robot.execute()

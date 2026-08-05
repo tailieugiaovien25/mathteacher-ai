@@ -224,6 +224,7 @@ __pycache__/
 # Excel input files
 data/input/*.xlsx
 data/input/*.xlsm
-
+# Generated reports
+output/
 # VS Code
 .vscode/
