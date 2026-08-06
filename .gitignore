@@ -230,3 +230,5 @@ output/
 .vscode/
 # Audit files
 audit_*.txt
+# Source code audit files
+source_code_tree.txt
