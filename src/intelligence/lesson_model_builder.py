@@ -2,11 +2,9 @@ import re
 from typing import Any
 
 from openpyxl import load_workbook
-
+from intelligence.base_builder import BaseBuilder
 from models.lesson_model import LessonModel
-
-
-class LessonModelBuilder:
+class LessonModelBuilder(BaseBuilder):
     """Chuyển dữ liệu Excel thành LessonModel."""
 
     FIELD_ALIASES: dict[str, tuple[str, ...]] = {
@@ -56,7 +54,18 @@ class LessonModelBuilder:
             "learning resources",
         ),
     }
-
+    def build(
+        self,
+        file_path: str,
+        sheet_name: str,
+        data_row: int,
+    ) -> LessonModel:
+        """Tạo LessonModel theo schema LuuBG mặc định."""
+        return self.build_from_luubg_row(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            data_row=data_row,
+        )
     def build_from_excel_row(
         self,
         file_path: str,
