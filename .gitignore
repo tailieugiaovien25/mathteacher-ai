@@ -228,3 +228,5 @@ data/input/*.xlsm
 output/
 # VS Code
 .vscode/
+# Audit files
+audit_*.txt
