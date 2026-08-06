@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any
+
+from models.base_model import BaseModel
 
 
 @dataclass
@@ -16,7 +17,7 @@ class LessonActivity:
 
 
 @dataclass
-class LessonModel:
+class LessonModel(BaseModel):
     """Mô hình dữ liệu thống nhất của một bài học."""
 
     subject: str = ""
@@ -39,10 +40,3 @@ class LessonModel:
     activities: list[LessonActivity] = field(default_factory=list)
     learning_products: list[str] = field(default_factory=list)
     assessment_methods: list[str] = field(default_factory=list)
-
-    source_file: str = ""
-    source_sheet: str = ""
-    source_row: int | None = None
-
-    warnings: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
