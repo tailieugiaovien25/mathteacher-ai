@@ -1,4 +1,5 @@
 from .capability_request import CapabilityRequest
+from .collaboration_execution_plan import CollaborationExecutionPlan
 from .collaboration_plan import CollaborationPlan
 from .collaboration_role import CollaborationRole
 from .execution_plan import ExecutionPlan
@@ -9,6 +10,7 @@ from .provider_status import ProviderStatus
 
 __all__ = [
     "CapabilityRequest",
+    "CollaborationExecutionPlan",
     "CollaborationPlan",
     "CollaborationRole",
     "ExecutionPlan",
