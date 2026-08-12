@@ -1,0 +1,1487 @@
+{
+  "schema_version": 1,
+  "curriculum_ref": "CURRICULUM-MATH-2018",
+  "grade": 9,
+  "requirements": [
+    {
+      "canonical_id": "YCCD-MATH-09-0001",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-004",
+      "requirement_text_original": "Nhận biết được khái niệm về căn bậc hai của số thực không âm, căn bậc ba của một số thực.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Căn thức > Căn bậc hai và căn bậc ba của số thực",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0002",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-004",
+      "requirement_text_original": "Tính được giá trị (đúng hoặc gần đúng) căn bậc hai, căn bậc ba của một số hữu tỉ bằng máy tính cầm tay.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Căn thức > Căn bậc hai và căn bậc ba của số thực",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0003",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-004",
+      "requirement_text_original": "Thực hiện được một số phép tính đơn giản về căn bậc hai của số thực không âm (căn bậc hai của một bình phương, căn bậc hai của một tích, căn bậc hai của một thương, đưa thừa số ra ngoài dấu căn bậc hai, đưa thừa số vào trong dấu căn bậc hai).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Căn thức > Căn bậc hai và căn bậc ba của số thực",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0004",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-005",
+      "requirement_text_original": "Nhận biết được khái niệm về căn thức bậc hai và căn thức bậc ba của một biểu thức đại số.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Căn thức > Căn thức bậc hai và căn thức bậc ba của biểu thức đại số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0005",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-005",
+      "requirement_text_original": "Thực hiện được một số phép biến đổi đơn giản về căn thức bậc hai của biểu thức đại số (căn thức bậc hai của một bình phương, căn thức bậc hai của một tích, căn thức bậc hai của một thương, trục căn thức ở mẫu).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Căn thức > Căn thức bậc hai và căn thức bậc ba của biểu thức đại số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0006",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-007",
+      "requirement_text_original": "Thiết lập được bảng giá trị của hàm số y = ax² (a ≠ 0).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Hàm số và đồ thị > Hàm số y = ax² (a ≠ 0) và đồ thị",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0007",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-007",
+      "requirement_text_original": "Vẽ được đồ thị của hàm số y = ax² (a ≠ 0).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Hàm số và đồ thị > Hàm số y = ax² (a ≠ 0) và đồ thị",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0008",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-007",
+      "requirement_text_original": "Nhận biết được tính đối xứng (trục) và trục đối xứng của đồ thị hàm số y = ax² (a ≠ 0).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Hàm số và đồ thị > Hàm số y = ax² (a ≠ 0) và đồ thị",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0009",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-007",
+      "requirement_text_original": "Giải quyết được một số vấn đề thực tiễn gắn với hàm số y = ax² (a ≠ 0) và đồ thị (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Hàm số và đồ thị > Hàm số y = ax² (a ≠ 0) và đồ thị",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0010",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-009",
+      "requirement_text_original": "Giải được phương trình tích có dạng (a₁x + b₁).(a₂x + b₂) = 0.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình quy về phương trình bậc nhất một ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0011",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-009",
+      "requirement_text_original": "Giải được phương trình chứa ẩn ở mẫu quy về phương trình bậc nhất.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình quy về phương trình bậc nhất một ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0012",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-010",
+      "requirement_text_original": "Nhận biết được khái niệm phương trình bậc nhất hai ẩn, hệ hai phương trình bậc nhất hai ẩn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình và hệ phương trình bậc nhất hai ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0013",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-010",
+      "requirement_text_original": "Nhận biết được khái niệm nghiệm của hệ hai phương trình bậc nhất hai ẩn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình và hệ phương trình bậc nhất hai ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0014",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-010",
+      "requirement_text_original": "Giải được hệ hai phương trình bậc nhất hai ẩn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình và hệ phương trình bậc nhất hai ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0015",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-010",
+      "requirement_text_original": "Tính được nghiệm của hệ hai phương trình bậc nhất hai ẩn bằng máy tính cầm tay.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình và hệ phương trình bậc nhất hai ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0016",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-010",
+      "requirement_text_original": "Giải quyết được một số vấn đề thực tiễn gắn với hệ hai phương trình bậc nhất hai ẩn (ví dụ: các bài toán liên quan đến cân bằng phản ứng trong Hoá học,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình và hệ phương trình bậc nhất hai ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0017",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-011",
+      "requirement_text_original": "Nhận biết được khái niệm phương trình bậc hai một ẩn. Giải được phương trình bậc hai một ẩn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình bậc hai một ẩn. Định lí Viète",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0018",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-011",
+      "requirement_text_original": "Tính được nghiệm phương trình bậc hai một ẩn bằng máy tính cầm tay.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình bậc hai một ẩn. Định lí Viète",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0019",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-011",
+      "requirement_text_original": "Giải thích được định lí Viète và ứng dụng (ví dụ: tính nhẩm nghiệm của phương trình bậc hai, tìm hai số biết tổng và tích của chúng,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình bậc hai một ẩn. Định lí Viète",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0020",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-011",
+      "requirement_text_original": "Vận dụng được phương trình bậc hai vào giải quyết bài toán thực tiễn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Phương trình và hệ phương trình > Phương trình bậc hai một ẩn. Định lí Viète",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0021",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-013",
+      "requirement_text_original": "Nhận biết được thứ tự trên tập hợp các số thực.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Bất phương trình bậc nhất một ẩn > Bất đẳng thức. Bất phương trình bậc nhất một ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0022",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-013",
+      "requirement_text_original": "Nhận biết được bất đẳng thức và mô tả được một số tính chất cơ bản của bất đẳng thức (tính chất bắc cầu; liên hệ giữa thứ tự và phép cộng, phép nhân).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Bất phương trình bậc nhất một ẩn > Bất đẳng thức. Bất phương trình bậc nhất một ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0023",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-013",
+      "requirement_text_original": "Nhận biết được khái niệm bất phương trình bậc nhất một ẩn, nghiệm của bất phương trình bậc nhất một ẩn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Bất phương trình bậc nhất một ẩn > Bất đẳng thức. Bất phương trình bậc nhất một ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0024",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-013",
+      "requirement_text_original": "Giải được bất phương trình bậc nhất một ẩn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Số và Đại số > Đại số > Bất phương trình bậc nhất một ẩn > Bất đẳng thức. Bất phương trình bậc nhất một ẩn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0025",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-017",
+      "requirement_text_original": "Mô tả (đường sinh, chiều cao, bán kính đáy), tạo lập được hình trụ.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học trực quan > Các hình khối trong thực tiễn > Hình trụ. Hình nón. Hình cầu",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0026",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-017",
+      "requirement_text_original": "Mô tả (đỉnh, đường sinh, chiều cao, bán kính đáy), tạo lập được hình nón.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học trực quan > Các hình khối trong thực tiễn > Hình trụ. Hình nón. Hình cầu",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0027",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-017",
+      "requirement_text_original": "Mô tả (tâm, bán kính), tạo lập được hình cầu, mặt cầu. Nhận biết được phần chung của mặt phẳng và hình cầu.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học trực quan > Các hình khối trong thực tiễn > Hình trụ. Hình nón. Hình cầu",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0028",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-017",
+      "requirement_text_original": "Tính được diện tích xung quanh của hình trụ, hình nón, diện tích mặt cầu.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học trực quan > Các hình khối trong thực tiễn > Hình trụ. Hình nón. Hình cầu",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0029",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-017",
+      "requirement_text_original": "Tính được thể tích của hình trụ, hình nón, hình cầu.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học trực quan > Các hình khối trong thực tiễn > Hình trụ. Hình nón. Hình cầu",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0030",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-017",
+      "requirement_text_original": "Giải quyết được một số vấn đề thực tiễn gắn với việc tính diện tích xung quanh, thể tích của hình trụ, hình nón, hình cầu (ví dụ: tính thể tích hoặc diện tích xung quanh của một số đồ vật quen thuộc có dạng hình trụ, hình nón, hình cầu,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học trực quan > Các hình khối trong thực tiễn > Hình trụ. Hình nón. Hình cầu",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0031",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-020",
+      "requirement_text_original": "Nhận biết được các giá trị sin (sine), côsin (cosine), tang (tangent), côtang (cotangent) của góc nhọn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Hệ thức lượng trong tam giác vuông > Tỉ số lượng giác của góc nhọn. Một số hệ thức về cạnh và góc trong tam giác vuông",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0032",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-020",
+      "requirement_text_original": "Giải thích được tỉ số lượng giác của các góc nhọn đặc biệt (góc 30°, 45°, 60°) và của hai góc phụ nhau.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Hệ thức lượng trong tam giác vuông > Tỉ số lượng giác của góc nhọn. Một số hệ thức về cạnh và góc trong tam giác vuông",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0033",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-020",
+      "requirement_text_original": "Tính được giá trị (đúng hoặc gần đúng) tỉ số lượng giác của góc nhọn bằng máy tính cầm tay.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Hệ thức lượng trong tam giác vuông > Tỉ số lượng giác của góc nhọn. Một số hệ thức về cạnh và góc trong tam giác vuông",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0034",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-020",
+      "requirement_text_original": "Giải thích được một số hệ thức về cạnh và góc trong tam giác vuông (cạnh góc vuông bằng cạnh huyền nhân với sin góc đối hoặc nhân với côsin góc kề; cạnh góc vuông bằng cạnh góc vuông kia nhân với tang góc đối hoặc nhân với côtang góc kề).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Hệ thức lượng trong tam giác vuông > Tỉ số lượng giác của góc nhọn. Một số hệ thức về cạnh và góc trong tam giác vuông",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0035",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-020",
+      "requirement_text_original": "Giải quyết được một số vấn đề thực tiễn gắn với tỉ số lượng giác của góc nhọn (ví dụ: Tính độ dài đoạn thẳng, độ lớn góc và áp dụng giải tam giác vuông,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Hệ thức lượng trong tam giác vuông > Tỉ số lượng giác của góc nhọn. Một số hệ thức về cạnh và góc trong tam giác vuông",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0036",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-022",
+      "requirement_text_original": "Nhận biết được tâm đối xứng, trục đối xứng của đường tròn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Đường tròn. Vị trí tương đối của hai đường tròn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0037",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-022",
+      "requirement_text_original": "So sánh được độ dài của đường kính và dây.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Đường tròn. Vị trí tương đối của hai đường tròn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0038",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-022",
+      "requirement_text_original": "Mô tả được ba vị trí tương đối của hai đường tròn (hai đường tròn cắt nhau, hai đường tròn tiếp xúc nhau, hai đường tròn không giao nhau).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Đường tròn. Vị trí tương đối của hai đường tròn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0039",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-023",
+      "requirement_text_original": "Mô tả được ba vị trí tương đối của đường thẳng và đường tròn (đường thẳng và đường tròn cắt nhau, đường thẳng và đường tròn tiếp xúc nhau, đường thẳng và đường tròn không giao nhau).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Vị trí tương đối của đường thẳng và đường tròn. Tiếp tuyến của đường tròn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0040",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-023",
+      "requirement_text_original": "Giải thích được dấu hiệu nhận biết tiếp tuyến của đường tròn và tính chất của hai tiếp tuyến cắt nhau.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Vị trí tương đối của đường thẳng và đường tròn. Tiếp tuyến của đường tròn",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0041",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-024",
+      "requirement_text_original": "Nhận biết được góc ở tâm, góc nội tiếp.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Góc ở tâm, góc nội tiếp",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0042",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-024",
+      "requirement_text_original": "Giải thích được mối liên hệ giữa số đo của cung với số đo góc ở tâm, số đo góc nội tiếp.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Góc ở tâm, góc nội tiếp",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0043",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-024",
+      "requirement_text_original": "Giải thích được mối liên hệ giữa số đo góc nội tiếp và số đo góc ở tâm cùng chắn một cung.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Góc ở tâm, góc nội tiếp",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0044",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-025",
+      "requirement_text_original": "Nhận biết được định nghĩa đường tròn ngoại tiếp tam giác.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Đường tròn ngoại tiếp tam giác. Đường tròn nội tiếp tam giác",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0045",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-025",
+      "requirement_text_original": "Xác định được tâm và bán kính đường tròn ngoại tiếp tam giác, trong đó có tâm và bán kính đường tròn ngoại tiếp tam giác vuông, tam giác đều.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Đường tròn ngoại tiếp tam giác. Đường tròn nội tiếp tam giác",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0046",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-025",
+      "requirement_text_original": "Nhận biết được định nghĩa đường tròn nội tiếp tam giác.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Đường tròn ngoại tiếp tam giác. Đường tròn nội tiếp tam giác",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0047",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-025",
+      "requirement_text_original": "Xác định được tâm và bán kính đường tròn nội tiếp tam giác, trong đó có tâm và bán kính đường tròn nội tiếp tam giác đều.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Đường tròn ngoại tiếp tam giác. Đường tròn nội tiếp tam giác",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0048",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-026",
+      "requirement_text_original": "Nhận biết được tứ giác nội tiếp đường tròn và giải thích được định lí về tổng hai góc đối của tứ giác nội tiếp bằng 180°.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Tứ giác nội tiếp",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0049",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-026",
+      "requirement_text_original": "Xác định được tâm và bán kính đường tròn ngoại tiếp hình chữ nhật, hình vuông.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Tứ giác nội tiếp",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0050",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-026",
+      "requirement_text_original": "Tính được độ dài cung tròn, diện tích hình quạt tròn, diện tích hình vành khuyên (hình giới hạn bởi hai đường tròn đồng tâm).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Tứ giác nội tiếp",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0051",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-026",
+      "requirement_text_original": "Giải quyết được một số vấn đề thực tiễn gắn với đường tròn (ví dụ: một số bài toán liên quan đến chuyển động tròn trong Vật lí; tính được diện tích một số hình phẳng có thể đưa về những hình phẳng gắn với hình tròn, chẳng hạn hình viên phân,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đường tròn > Tứ giác nội tiếp",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0052",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-028",
+      "requirement_text_original": "Nhận dạng được đa giác đều.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đa giác đều > Đa giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0053",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-028",
+      "requirement_text_original": "Nhận biết được phép quay.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đa giác đều > Đa giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0054",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-028",
+      "requirement_text_original": "Mô tả được các phép quay giữ nguyên hình đa giác đều.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đa giác đều > Đa giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0055",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-028",
+      "requirement_text_original": "Nhận biết được những hình phẳng đều trong tự nhiên, nghệ thuật, kiến trúc, công nghệ chế tạo,...",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đa giác đều > Đa giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0056",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-028",
+      "requirement_text_original": "Nhận biết được vẻ đẹp của thế giới tự nhiên biểu hiện qua tính đều.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Đa giác đều > Đa giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0057",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-030",
+      "requirement_text_original": "Sử dụng phần mềm để hỗ trợ việc học các kiến thức hình học.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0058",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-030",
+      "requirement_text_original": "Thực hành sử dụng phần mềm để vẽ hình và thiết kế đồ hoạ liên quan đến đường tròn, tam giác vuông, đa giác đều.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Hình học và Đo lường > Hình học phẳng > Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0059",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-034",
+      "requirement_text_original": "Lí giải và thiết lập được dữ liệu vào bảng, biểu đồ thích hợp ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart), biểu đồ hình quạt tròn (pie chart); biểu đồ đoạn thẳng (line graph).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Thu thập và tổ chức dữ liệu > Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0060",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-034",
+      "requirement_text_original": "Phát hiện và lí giải được số liệu không chính xác dựa trên mối liên hệ toán học đơn giản giữa các số liệu đã được biểu diễn trong những ví dụ đơn giản.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Thu thập và tổ chức dữ liệu > Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0061",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-034",
+      "requirement_text_original": "Lí giải và thực hiện được cách chuyển dữ liệu từ dạng biểu diễn này sang dạng biểu diễn khác.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Thu thập và tổ chức dữ liệu > Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0062",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Xác định được tần số (frequency) của một giá trị.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0063",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Thiết lập được bảng tần số, biểu đồ tần số (biểu diễn các giá trị và tần số của chúng ở dạng biểu đồ cột hoặc biểu đồ đoạn thẳng).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0064",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Giải thích được ý nghĩa và vai trò của tần số trong thực tiễn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0065",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Xác định được tần số tương đối (relative frequency) của một giá trị.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0066",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Thiết lập được bảng tần số tương đối, biểu đồ tần số tương đối (biểu diễn các giá trị và tần số tương đối của chúng ở dạng biểu đồ cột hoặc biểu đồ hình quạt tròn).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0067",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Giải thích được ý nghĩa và vai trò của tần số tương đối trong thực tiễn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0068",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Thiết lập được bảng tần số ghép nhóm, bảng tần số tương đối ghép nhóm.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0069",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Thiết lập được biểu đồ tần số tương đối ghép nhóm (histogram) (ở dạng biểu đồ cột hoặc biểu đồ đoạn thẳng).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0070",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-036",
+      "requirement_text_original": "Nhận biết được mối liên hệ giữa thống kê với những kiến thức của các môn học khác trong Chương trình lớp 9 và trong thực tiễn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0071",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-039",
+      "requirement_text_original": "Nhận biết được phép thử ngẫu nhiên và không gian mẫu.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố xác suất > Phép thử ngẫu nhiên và không gian mẫu. Xác suất của biến cố trong một số mô hình xác suất đơn giản",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0072",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-039",
+      "requirement_text_original": "Tính được xác suất của biến cố bằng cách kiểm đếm số trường hợp có thể và số trường hợp thuận lợi trong một số mô hình xác suất đơn giản.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố xác suất > Phép thử ngẫu nhiên và không gian mẫu. Xác suất của biến cố trong một số mô hình xác suất đơn giản",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0073",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-041",
+      "requirement_text_original": "Sử dụng được phần mềm để vẽ bảng tần số, biểu đồ tần số, bảng tần số tương đối, biểu đồ tần số tương đối.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-09-0074",
+      "curriculum_node_ref": "CURR-NODE-MATH-G9-041",
+      "requirement_text_original": "Sử dụng được phần mềm mô tả thí nghiệm ngẫu nhiên.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 9 > Một số yếu tố Thống kê và Xác suất > Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    }
+  ]
+}

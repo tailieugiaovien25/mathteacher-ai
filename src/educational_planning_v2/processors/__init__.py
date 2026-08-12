@@ -1,0 +1,2 @@
+from educational_planning_v2.processors.educational_planning_processor import EducationalPlanningProcessor
+__all__ = ["EducationalPlanningProcessor"]

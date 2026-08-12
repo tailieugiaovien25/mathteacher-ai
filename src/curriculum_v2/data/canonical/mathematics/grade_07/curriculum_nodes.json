@@ -1,0 +1,376 @@
+{
+  "schema_version": 1,
+  "curriculum_ref": "CURRICULUM-MATH-2018",
+  "grade": 7,
+  "nodes": [
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-001",
+      "code": "G7-NUM-ALG",
+      "name": "Số và Đại số",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-002",
+      "code": "G7-NUM",
+      "name": "Số",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G7-001",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-003",
+      "code": "G7-RAT",
+      "name": "Số hữu tỉ",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-002",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-004",
+      "code": "G7-RAT-01",
+      "name": "Số hữu tỉ và tập hợp các số hữu tỉ. Thứ tự trong tập hợp các số hữu tỉ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-003",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-005",
+      "code": "G7-RAT-02",
+      "name": "Các phép tính với số hữu tỉ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-003",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-006",
+      "code": "G7-REAL",
+      "name": "Số thực",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-002",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-007",
+      "code": "G7-REAL-01",
+      "name": "Căn bậc hai số học",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-006",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-008",
+      "code": "G7-REAL-02",
+      "name": "Số vô tỉ. Số thực",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-006",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-009",
+      "code": "G7-REAL-03",
+      "name": "Tỉ lệ thức và dãy tỉ số bằng nhau",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-006",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-010",
+      "code": "G7-REAL-04",
+      "name": "Giải toán về đại lượng tỉ lệ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-006",
+      "sequence": 4,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-011",
+      "code": "G7-ALG",
+      "name": "Đại số",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G7-001",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-012",
+      "code": "G7-ALG-EXPR",
+      "name": "Biểu thức đại số",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-011",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-013",
+      "code": "G7-ALG-EXPR-01",
+      "name": "Biểu thức đại số",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-012",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-014",
+      "code": "G7-ALG-POLY-01",
+      "name": "Đa thức một biến",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-012",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-015",
+      "code": "G7-GEO-MEAS",
+      "name": "Hình học và Đo lường",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-016",
+      "code": "G7-VIS-GEO",
+      "name": "Hình học trực quan",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G7-015",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-017",
+      "code": "G7-SOLIDS",
+      "name": "Các hình khối trong thực tiễn",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-016",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-018",
+      "code": "G7-SOLIDS-01",
+      "name": "Hình hộp chữ nhật và hình lập phương",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-017",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-019",
+      "code": "G7-SOLIDS-02",
+      "name": "Lăng trụ đứng tam giác, lăng trụ đứng tứ giác",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-017",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-020",
+      "code": "G7-PLANE-GEO",
+      "name": "Hình học phẳng",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G7-015",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-021",
+      "code": "G7-BASIC-GEO",
+      "name": "Các hình hình học cơ bản",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-020",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-022",
+      "code": "G7-BASIC-GEO-01",
+      "name": "Góc ở vị trí đặc biệt. Tia phân giác của một góc",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-021",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-023",
+      "code": "G7-BASIC-GEO-02",
+      "name": "Hai đường thẳng song song. Tiên đề Euclid về đường thẳng song song",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-021",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-024",
+      "code": "G7-BASIC-GEO-03",
+      "name": "Khái niệm định lí, chứng minh một định lí",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-021",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-025",
+      "code": "G7-BASIC-GEO-04",
+      "name": "Tam giác. Tam giác bằng nhau. Tam giác cân. Quan hệ giữa đường vuông góc và đường xiên. Các đường đồng quy của tam giác",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-021",
+      "sequence": 4,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-026",
+      "code": "G7-GEO-APPLY",
+      "name": "Giải bài toán có nội dung hình học và vận dụng giải quyết vấn đề thực tiễn liên quan đến hình học",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-020",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-027",
+      "code": "G7-GEO-APPLY-01",
+      "name": "Giải bài toán có nội dung hình học và vận dụng giải quyết vấn đề thực tiễn liên quan đến hình học",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-026",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-028",
+      "code": "G7-GEO-SOFTWARE",
+      "name": "Thực hành trong phòng máy tính với phần mềm toán học",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-020",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-029",
+      "code": "G7-GEO-SOFTWARE-01",
+      "name": "Sử dụng phần mềm để hỗ trợ việc học các kiến thức hình học",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-028",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-030",
+      "code": "G7-STAT-PROB",
+      "name": "Một số yếu tố Thống kê và Xác suất",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-031",
+      "code": "G7-STAT",
+      "name": "Một số yếu tố thống kê",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G7-030",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-032",
+      "code": "G7-STAT-COLLECT",
+      "name": "Thu thập và tổ chức dữ liệu",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-031",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-033",
+      "code": "G7-STAT-COLLECT-01",
+      "name": "Thu thập, phân loại, biểu diễn dữ liệu theo các tiêu chí cho trước",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-032",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-034",
+      "code": "G7-STAT-COLLECT-02",
+      "name": "Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-032",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-035",
+      "code": "G7-STAT-ANALYZE",
+      "name": "Phân tích và xử lí dữ liệu",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-031",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-036",
+      "code": "G7-STAT-ANALYZE-01",
+      "name": "Hình thành và giải quyết vấn đề đơn giản xuất hiện từ các số liệu và biểu đồ thống kê đã có",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-035",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-037",
+      "code": "G7-PROB",
+      "name": "Một số yếu tố xác suất",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G7-030",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-038",
+      "code": "G7-PROB-GROUP",
+      "name": "Một số yếu tố xác suất",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-037",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-039",
+      "code": "G7-PROB-01",
+      "name": "Làm quen với biến cố ngẫu nhiên. Làm quen với xác suất của biến cố ngẫu nhiên trong một số ví dụ đơn giản",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-038",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-040",
+      "code": "G7-STAT-SOFTWARE",
+      "name": "Thực hành trong phòng máy tính với phần mềm toán học",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G7-030",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G7-041",
+      "code": "G7-STAT-SOFTWARE-01",
+      "name": "Sử dụng phần mềm để tổ chức dữ liệu vào biểu đồ hình quạt tròn; biểu đồ đoạn thẳng",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G7-040",
+      "sequence": 1,
+      "status": "ACTIVE"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "source_id": "SRC-CUR-MATH-2018",
+  "source_type": "OFFICIAL_CURRICULUM",
+
+  "title": "Chương trình giáo dục phổ thông môn Toán",
+
+  "legal_authority": {
+    "organization": "Bộ Giáo dục và Đào tạo",
+    "country": "Việt Nam"
+  },
+
+  "legal_basis": {
+    "regulation_id": "32/2018/TT-BGDĐT",
+    "issued_date": "2018-12-26"
+  },
+
+  "scope": {
+    "subject": "MATHEMATICS",
+    "education_system": "GENERAL_EDUCATION",
+    "target_grades": [
+      6,
+      7,
+      8,
+      9
+    ]
+  },
+
+  "canonical_usage": [
+    "CURRICULUM_STRUCTURE",
+    "LEARNING_REQUIREMENTS",
+    "MATHEMATICAL_COMPETENCY_REFERENCE"
+  ],
+
+  "verification": {
+    "authority_verified": true,
+    "regulation_verified": true,
+    "source_status": "AUTHORITATIVE"
+  },
+
+  "lifecycle": {
+    "status": "ACTIVE",
+    "record_version": 1
+  }
+}

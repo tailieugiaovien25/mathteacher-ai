@@ -1,0 +1,1607 @@
+{
+  "schema_version": 4,
+  "curriculum_ref": "CURRICULUM-MATH-2018",
+  "grade": 6,
+  "requirements": [
+    {
+      "canonical_id": "YCCD-MATH-06-0001",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-004",
+      "requirement_text_original": "Sử dụng được thuật ngữ tập hợp, phần tử thuộc (không thuộc) một tập hợp; sử dụng được cách cho tập hợp.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Số tự nhiên và tập hợp các số tự nhiên. Thứ tự trong tập hợp các số tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0002",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-004",
+      "requirement_text_original": "Nhận biết được tập hợp các số tự nhiên.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Số tự nhiên và tập hợp các số tự nhiên. Thứ tự trong tập hợp các số tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0003",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-004",
+      "requirement_text_original": "Biểu diễn được số tự nhiên trong hệ thập phân.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Số tự nhiên và tập hợp các số tự nhiên. Thứ tự trong tập hợp các số tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0004",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-004",
+      "requirement_text_original": "Biểu diễn được các số tự nhiên từ 1 đến 30 bằng cách sử dụng các chữ số La Mã.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Số tự nhiên và tập hợp các số tự nhiên. Thứ tự trong tập hợp các số tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0005",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-004",
+      "requirement_text_original": "Nhận biết được (quan hệ) thứ tự trong tập hợp các số tự nhiên; so sánh được hai số tự nhiên cho trước.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Số tự nhiên và tập hợp các số tự nhiên. Thứ tự trong tập hợp các số tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0006",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-005",
+      "requirement_text_original": "Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số tự nhiên.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Các phép tính với số tự nhiên. Phép tính lũy thừa với số mũ tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0007",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-005",
+      "requirement_text_original": "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng trong tính toán.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Các phép tính với số tự nhiên. Phép tính lũy thừa với số mũ tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0008",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-005",
+      "requirement_text_original": "Thực hiện được phép tính lũy thừa với số mũ tự nhiên; thực hiện được các phép nhân và phép chia hai lũy thừa cùng cơ số với số mũ tự nhiên.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Các phép tính với số tự nhiên. Phép tính lũy thừa với số mũ tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0009",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-005",
+      "requirement_text_original": "Nhận biết được thứ tự thực hiện các phép tính.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Các phép tính với số tự nhiên. Phép tính lũy thừa với số mũ tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0010",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-005",
+      "requirement_text_original": "Vận dụng được các tính chất của phép tính (kể cả phép tính lũy thừa với số mũ tự nhiên) để tính nhẩm, tính nhanh một cách hợp lí.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Các phép tính với số tự nhiên. Phép tính lũy thừa với số mũ tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0011",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-005",
+      "requirement_text_original": "Giải quyết được những vấn đề thực tiễn gắn với thực hiện các phép tính (ví dụ: tính tiền mua sắm, tính lượng hàng mua được từ số tiền đã có,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Các phép tính với số tự nhiên. Phép tính lũy thừa với số mũ tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0012",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-006",
+      "requirement_text_original": "Nhận biết được quan hệ chia hết, khái niệm ước và bội.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0013",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-006",
+      "requirement_text_original": "Vận dụng được dấu hiệu chia hết cho 2, 5, 9, 3 để xác định một số đã cho có chia hết cho 2, 5, 9, 3 hay không.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0014",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-006",
+      "requirement_text_original": "Nhận biết được khái niệm số nguyên tố, hợp số.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0015",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-006",
+      "requirement_text_original": "Thực hiện được việc phân tích một số tự nhiên lớn hơn 1 thành tích của các thừa số nguyên tố trong những trường hợp đơn giản.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0016",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-006",
+      "requirement_text_original": "Nhận biết được phép chia có dư, định lí về phép chia có dư.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0017",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-006",
+      "requirement_text_original": "Xác định được ước chung, ước chung lớn nhất; xác định được bội chung, bội chung nhỏ nhất của hai hoặc ba số tự nhiên; nhận biết được phân số tối giản; thực hiện được phép cộng, phép trừ phân số bằng cách sử dụng ước chung lớn nhất, bội chung nhỏ nhất.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0018",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-006",
+      "requirement_text_original": "Vận dụng được kiến thức số học vào giải quyết những vấn đề thực tiễn (ví dụ: tính toán tiền hay lượng hàng hoá khi mua sắm, xác định số đồ vật cần thiết để sắp xếp chúng theo những quy tắc cho trước,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số tự nhiên > Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0019",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-008",
+      "requirement_text_original": "Nhận biết được số nguyên âm, tập hợp các số nguyên.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Số nguyên âm và tập hợp các số nguyên. Thứ tự trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0020",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-008",
+      "requirement_text_original": "Biểu diễn được số nguyên trên trục số.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Số nguyên âm và tập hợp các số nguyên. Thứ tự trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0021",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-008",
+      "requirement_text_original": "Nhận biết được số đối của một số nguyên.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Số nguyên âm và tập hợp các số nguyên. Thứ tự trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0022",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-008",
+      "requirement_text_original": "Nhận biết được thứ tự trong tập hợp các số nguyên. So sánh được hai số nguyên cho trước.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Số nguyên âm và tập hợp các số nguyên. Thứ tự trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0023",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-008",
+      "requirement_text_original": "Nhận biết được ý nghĩa của số nguyên âm trong một số bài toán thực tiễn.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Số nguyên âm và tập hợp các số nguyên. Thứ tự trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0024",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-009",
+      "requirement_text_original": "Thực hiện được các phép tính: cộng, trừ, nhân, chia (chia hết) trong tập hợp các số nguyên.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Các phép tính với số nguyên. Tính chia hết trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0025",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-009",
+      "requirement_text_original": "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc trong tập hợp các số nguyên trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Các phép tính với số nguyên. Tính chia hết trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0026",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-009",
+      "requirement_text_original": "Nhận biết được quan hệ chia hết, khái niệm ước và bội trong tập hợp các số nguyên.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Các phép tính với số nguyên. Tính chia hết trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0027",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-009",
+      "requirement_text_original": "Giải quyết được những vấn đề thực tiễn gắn với thực hiện các phép tính về số nguyên (ví dụ: tính lỗ lãi khi buôn bán, ...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số nguyên > Các phép tính với số nguyên. Tính chia hết trong tập hợp các số nguyên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0028",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-011",
+      "requirement_text_original": "Nhận biết được phân số với tử số hoặc mẫu số là số nguyên âm.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0029",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-011",
+      "requirement_text_original": "Nhận biết được khái niệm hai phân số bằng nhau và nhận biết được quy tắc bằng nhau của hai phân số.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0030",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-011",
+      "requirement_text_original": "Nêu được hai tính chất cơ bản của phân số.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0031",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-011",
+      "requirement_text_original": "So sánh được hai phân số cho trước.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0032",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-011",
+      "requirement_text_original": "Nhận biết được số đối của một phân số.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0033",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-011",
+      "requirement_text_original": "Nhận biết được hỗn số dương.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0034",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-012",
+      "requirement_text_original": "Thực hiện được các phép tính cộng, trừ, nhân, chia với phân số.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Các phép tính với phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0035",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-012",
+      "requirement_text_original": "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với phân số trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Các phép tính với phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0036",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-012",
+      "requirement_text_original": "Tính được giá trị phân số của một số cho trước và tính được một số biết giá trị phân số của số đó.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Các phép tính với phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0037",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-012",
+      "requirement_text_original": "Giải quyết được một số vấn đề thực tiễn gắn với các phép tính về phân số (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Phân số > Các phép tính với phân số",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0038",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-014",
+      "requirement_text_original": "Nhận biết được số thập phân âm, số đối của một số thập phân.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số thập phân > Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0039",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-014",
+      "requirement_text_original": "So sánh được hai số thập phân cho trước.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số thập phân > Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0040",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-014",
+      "requirement_text_original": "Thực hiện được các phép tính cộng, trừ, nhân, chia với số thập phân.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số thập phân > Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0041",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-014",
+      "requirement_text_original": "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với số thập phân trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số thập phân > Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0042",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-014",
+      "requirement_text_original": "Thực hiện được ước lượng và làm tròn số thập phân.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số thập phân > Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0043",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-014",
+      "requirement_text_original": "Tính được tỉ số và tỉ số phần trăm của hai đại lượng.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số thập phân > Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0044",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-014",
+      "requirement_text_original": "Tính được giá trị phần trăm của một số cho trước và tính được một số biết giá trị phần trăm của số đó.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số thập phân > Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0045",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-014",
+      "requirement_text_original": "Giải quyết được một số vấn đề thực tiễn gắn với các phép tính về số thập phân, tỉ số và tỉ số phần trăm (ví dụ: các bài toán liên quan đến lãi suất tín dụng, liên quan đến thành phần các chất trong Hoá học,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Số và Đại số > Số > Số thập phân > Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0046",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-018",
+      "requirement_text_original": "Nhận dạng được tam giác đều, hình vuông, lục giác đều.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Các hình phẳng trong thực tiễn > Tam giác đều, hình vuông, lục giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0047",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-018",
+      "requirement_text_original": "Mô tả được một số yếu tố cơ bản (cạnh, góc, đường chéo) của: tam giác đều (ví dụ: ba cạnh bằng nhau, ba góc bằng nhau); hình vuông (ví dụ: bốn cạnh bằng nhau, mỗi góc là góc vuông, hai đường chéo bằng nhau); lục giác đều (ví dụ: sáu cạnh bằng nhau, sáu góc bằng nhau, ba đường chéo chính bằng nhau).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Các hình phẳng trong thực tiễn > Tam giác đều, hình vuông, lục giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0048",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-018",
+      "requirement_text_original": "Vẽ được tam giác đều, hình vuông bằng dụng cụ học tập.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Các hình phẳng trong thực tiễn > Tam giác đều, hình vuông, lục giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0049",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-018",
+      "requirement_text_original": "Tạo lập được lục giác đều thông qua việc lắp ghép các tam giác đều.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Các hình phẳng trong thực tiễn > Tam giác đều, hình vuông, lục giác đều",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0050",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-019",
+      "requirement_text_original": "Mô tả được một số yếu tố cơ bản (cạnh, góc, đường chéo) của hình chữ nhật, hình thoi, hình bình hành, hình thang cân.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Các hình phẳng trong thực tiễn > Hình chữ nhật, hình thoi, hình bình hành, hình thang cân",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0051",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-019",
+      "requirement_text_original": "Vẽ được hình chữ nhật, hình thoi, hình bình hành bằng các dụng cụ học tập.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Các hình phẳng trong thực tiễn > Hình chữ nhật, hình thoi, hình bình hành, hình thang cân",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0052",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-019",
+      "requirement_text_original": "Giải quyết được một số vấn đề thực tiễn gắn với việc tính chu vi và diện tích của các hình đặc biệt nói trên (ví dụ: tính chu vi hoặc diện tích của một số đối tượng có dạng đặc biệt nói trên,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Các hình phẳng trong thực tiễn > Hình chữ nhật, hình thoi, hình bình hành, hình thang cân",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0053",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-021",
+      "requirement_text_original": "Nhận biết được trục đối xứng của một hình phẳng.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Tính đối xứng của hình phẳng trong thế giới tự nhiên > Hình có trục đối xứng",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0054",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-021",
+      "requirement_text_original": "Nhận biết được những hình phẳng trong tự nhiên có trục đối xứng (khi quan sát trên hình ảnh 2 chiều).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Tính đối xứng của hình phẳng trong thế giới tự nhiên > Hình có trục đối xứng",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0055",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-022",
+      "requirement_text_original": "Nhận biết được tâm đối xứng của một hình phẳng.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Tính đối xứng của hình phẳng trong thế giới tự nhiên > Hình có tâm đối xứng",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0056",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-022",
+      "requirement_text_original": "Nhận biết được những hình phẳng trong thế giới tự nhiên có tâm đối xứng (khi quan sát trên hình ảnh 2 chiều).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Tính đối xứng của hình phẳng trong thế giới tự nhiên > Hình có tâm đối xứng",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0057",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-023",
+      "requirement_text_original": "Nhận biết được tính đối xứng trong Toán học, tự nhiên, nghệ thuật, kiến trúc, công nghệ chế tạo,...",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Tính đối xứng của hình phẳng trong thế giới tự nhiên > Vai trò của đối xứng trong thế giới tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0058",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-023",
+      "requirement_text_original": "Nhận biết được vẻ đẹp của thế giới tự nhiên biểu hiện qua tính đối xứng (ví dụ: nhận biết vẻ đẹp của một số loài thực vật, động vật trong tự nhiên có tâm đối xứng hoặc có trục đối xứng).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học trực quan > Tính đối xứng của hình phẳng trong thế giới tự nhiên > Vai trò của đối xứng trong thế giới tự nhiên",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0059",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-026",
+      "requirement_text_original": "Nhận biết được những quan hệ cơ bản giữa điểm, đường thẳng: điểm thuộc đường thẳng, điểm không thuộc đường thẳng; tiên đề về đường thẳng đi qua hai điểm phân biệt.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Điểm, đường thẳng, tia",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0060",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-026",
+      "requirement_text_original": "Nhận biết được khái niệm hai đường thẳng cắt nhau, song song.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Điểm, đường thẳng, tia",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0061",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-026",
+      "requirement_text_original": "Nhận biết được khái niệm ba điểm thẳng hàng, ba điểm không thẳng hàng.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Điểm, đường thẳng, tia",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0062",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-026",
+      "requirement_text_original": "Nhận biết được khái niệm điểm nằm giữa hai điểm.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Điểm, đường thẳng, tia",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0063",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-026",
+      "requirement_text_original": "Nhận biết được khái niệm tia.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Điểm, đường thẳng, tia",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0064",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-027",
+      "requirement_text_original": "Nhận biết được khái niệm đoạn thẳng, trung điểm của đoạn thẳng, độ dài đoạn thẳng.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Đoạn thẳng. Độ dài đoạn thẳng",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0065",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-028",
+      "requirement_text_original": "Nhận biết được khái niệm góc, điểm trong của góc (không đề cập đến góc lõm).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Góc. Các góc đặc biệt. Số đo góc",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0066",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-028",
+      "requirement_text_original": "Nhận biết được các góc đặc biệt (góc vuông, góc nhọn, góc tù, góc bẹt).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Góc. Các góc đặc biệt. Số đo góc",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0067",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-028",
+      "requirement_text_original": "Nhận biết được khái niệm số đo góc.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Hình học phẳng > Các hình hình học cơ bản > Góc. Các góc đặc biệt. Số đo góc",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0068",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-030",
+      "requirement_text_original": "Sử dụng phần mềm để hỗ trợ việc học các kiến thức hình học.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0069",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-030",
+      "requirement_text_original": "Thực hành sử dụng phần mềm để vẽ hình và thiết kế đồ hoạ liên quan đến các khái niệm: tam giác đều, hình vuông, hình chữ nhật, hình thoi, hình bình hành, hình thang cân, hình đối xứng.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Hình học và Đo lường > Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0070",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-034",
+      "requirement_text_original": "Thực hiện được việc thu thập, phân loại dữ liệu theo các tiêu chí cho trước từ những nguồn: bảng biểu, kiến thức trong các môn học khác.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Thu thập và tổ chức dữ liệu > Thu thập, phân loại, biểu diễn dữ liệu theo các tiêu chí cho trước",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0071",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-034",
+      "requirement_text_original": "Nhận biết được tính hợp lí của dữ liệu theo các tiêu chí đơn giản.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Thu thập và tổ chức dữ liệu > Thu thập, phân loại, biểu diễn dữ liệu theo các tiêu chí cho trước",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0072",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-035",
+      "requirement_text_original": "Đọc và mô tả thành thạo các dữ liệu ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Thu thập và tổ chức dữ liệu > Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0073",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-035",
+      "requirement_text_original": "Lựa chọn và biểu diễn được dữ liệu vào bảng, biểu đồ thích hợp ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Thu thập và tổ chức dữ liệu > Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0074",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-037",
+      "requirement_text_original": "Nhận ra được vấn đề hoặc quy luật đơn giản dựa trên phân tích các số liệu thu được ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Hình thành và giải quyết vấn đề đơn giản xuất hiện từ các số liệu và biểu đồ thống kê đã có",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0075",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-037",
+      "requirement_text_original": "Giải quyết được những vấn đề đơn giản liên quan đến các số liệu thu được ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Hình thành và giải quyết vấn đề đơn giản xuất hiện từ các số liệu và biểu đồ thống kê đã có",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0076",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-037",
+      "requirement_text_original": "Nhận biết được mối liên hệ giữa thống kê với những kiến thức trong các môn học trong Chương trình lớp 6 (ví dụ: Lịch sử và Địa lí lớp 6, Khoa học tự nhiên lớp 6,...) và trong thực tiễn (ví dụ: khí hậu, giá cả thị trường,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố thống kê > Phân tích và xử lí dữ liệu > Hình thành và giải quyết vấn đề đơn giản xuất hiện từ các số liệu và biểu đồ thống kê đã có",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0077",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-040",
+      "requirement_text_original": "Làm quen với mô hình xác suất trong một số trò chơi, thí nghiệm đơn giản (ví dụ: ở trò chơi tung đồng xu thì mô hình xác suất gồm hai khả năng ứng với mặt xuất hiện của đồng xu,...).",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố xác suất > Làm quen với một số mô hình xác suất đơn giản. Làm quen với việc mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần của một sự kiện trong một số mô hình xác suất đơn giản",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0078",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-040",
+      "requirement_text_original": "Làm quen với việc mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần của một sự kiện trong một số mô hình xác suất đơn giản.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố xác suất > Làm quen với một số mô hình xác suất đơn giản. Làm quen với việc mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần của một sự kiện trong một số mô hình xác suất đơn giản",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0079",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-041",
+      "requirement_text_original": "Sử dụng được phân số để mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần thông qua kiểm đếm số lần lặp lại của khả năng đó trong một số mô hình xác suất đơn giản.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Một số yếu tố xác suất > Mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần của một sự kiện trong một số mô hình xác suất đơn giản",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    },
+    {
+      "canonical_id": "YCCD-MATH-06-0080",
+      "curriculum_node_ref": "CURR-NODE-MATH-G6-043",
+      "requirement_text_original": "Sử dụng được phần mềm để vẽ biểu đồ tranh; biểu đồ dạng cột/cột kép.",
+      "provenance": {
+        "legal_authority": "Bộ Giáo dục và Đào tạo",
+        "regulation_id": "32/2018/TT-BGDĐT",
+        "source_document_id": "SRC-CUR-MATH-2018",
+        "verified_copy_id": null,
+        "source_location": "Lớp 6 > Một số yếu tố Thống kê và Xác suất > Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+        "source_version": "2018"
+      },
+      "validation": {
+        "text_integrity": "PASS",
+        "structural_integrity": "PASS",
+        "provenance_integrity": "PASS",
+        "identity_integrity": "PASS"
+      },
+      "status": "VERIFIED"
+    }
+  ]
+}

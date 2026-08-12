@@ -1,0 +1,367 @@
+{
+  "schema_version": 1,
+  "curriculum_ref": "CURRICULUM-MATH-2018",
+  "grade": 8,
+  "nodes": [
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-001",
+      "code": "G8-NUM-ALG",
+      "name": "Số và Đại số",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-002",
+      "code": "G8-ALG",
+      "name": "Đại số",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G8-001",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-003",
+      "code": "G8-ALG-EXPR",
+      "name": "Biểu thức đại số",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-002",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-004",
+      "code": "G8-ALG-POLY",
+      "name": "Đa thức nhiều biến. Các phép toán cộng, trừ, nhân, chia các đa thức nhiều biến",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-003",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-005",
+      "code": "G8-ALG-ID",
+      "name": "Hằng đẳng thức đáng nhớ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-003",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-006",
+      "code": "G8-ALG-RATEXPR",
+      "name": "Phân thức đại số. Tính chất cơ bản của phân thức đại số. Các phép toán cộng, trừ, nhân, chia các phân thức đại số",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-003",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-007",
+      "code": "G8-FUNC",
+      "name": "Hàm số và đồ thị",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-002",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-008",
+      "code": "G8-FUNC-01",
+      "name": "Hàm số và đồ thị",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-007",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-009",
+      "code": "G8-FUNC-LINEAR",
+      "name": "Hàm số bậc nhất y = ax + b (a ≠ 0) và đồ thị. Hệ số góc của đường thẳng y = ax + b (a ≠ 0)",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-007",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-010",
+      "code": "G8-EQUATION",
+      "name": "Phương trình",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-002",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-011",
+      "code": "G8-EQUATION-LINEAR",
+      "name": "Phương trình bậc nhất",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-010",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-012",
+      "code": "G8-GEO-MEAS",
+      "name": "Hình học và Đo lường",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-013",
+      "code": "G8-VIS-GEO",
+      "name": "Hình học trực quan",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G8-012",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-014",
+      "code": "G8-SOLIDS",
+      "name": "Các hình khối trong thực tiễn",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-013",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-015",
+      "code": "G8-PYRAMID",
+      "name": "Hình chóp tam giác đều, hình chóp tứ giác đều",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-014",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-016",
+      "code": "G8-PLANE-GEO",
+      "name": "Hình học phẳng",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G8-012",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-017",
+      "code": "G8-PYTHAGORE",
+      "name": "Định lí Pythagore",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-016",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-018",
+      "code": "G8-PYTHAGORE-01",
+      "name": "Định lí Pythagore",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-017",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-019",
+      "code": "G8-QUAD",
+      "name": "Tứ giác",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-016",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-020",
+      "code": "G8-QUAD-01",
+      "name": "Tứ giác",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-019",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-021",
+      "code": "G8-QUAD-SPECIAL",
+      "name": "Tính chất và dấu hiệu nhận biết các tứ giác đặc biệt",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-019",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-022",
+      "code": "G8-THALES",
+      "name": "Định lí Thalès trong tam giác",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-016",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-023",
+      "code": "G8-THALES-01",
+      "name": "Định lí Thalès trong tam giác",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-022",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-024",
+      "code": "G8-SIMILAR",
+      "name": "Hình đồng dạng",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-016",
+      "sequence": 4,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-025",
+      "code": "G8-SIMILAR-TRI",
+      "name": "Tam giác đồng dạng",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-024",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-026",
+      "code": "G8-SIMILAR-FIG",
+      "name": "Hình đồng dạng",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-024",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-027",
+      "code": "G8-GEO-SOFTWARE",
+      "name": "Thực hành trong phòng máy tính với phần mềm toán học",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-016",
+      "sequence": 5,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-028",
+      "code": "G8-GEO-SOFTWARE-01",
+      "name": "Sử dụng phần mềm để hỗ trợ việc học các kiến thức hình học",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-027",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-029",
+      "code": "G8-STAT-PROB",
+      "name": "Một số yếu tố Thống kê và Xác suất",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-030",
+      "code": "G8-STAT",
+      "name": "Một số yếu tố thống kê",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G8-029",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-031",
+      "code": "G8-STAT-COLLECT",
+      "name": "Thu thập và tổ chức dữ liệu",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-030",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-032",
+      "code": "G8-STAT-COLLECT-01",
+      "name": "Thu thập, phân loại, tổ chức dữ liệu theo các tiêu chí cho trước",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-031",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-033",
+      "code": "G8-STAT-REP",
+      "name": "Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-031",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-034",
+      "code": "G8-STAT-ANALYZE",
+      "name": "Phân tích và xử lí dữ liệu",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-030",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-035",
+      "code": "G8-STAT-ANALYZE-01",
+      "name": "Hình thành và giải quyết vấn đề đơn giản xuất hiện từ các số liệu và biểu đồ thống kê đã có",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-034",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-036",
+      "code": "G8-PROB",
+      "name": "Một số yếu tố xác suất",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G8-029",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-037",
+      "code": "G8-PROB-GROUP",
+      "name": "Một số yếu tố xác suất",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-036",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-038",
+      "code": "G8-PROB-01",
+      "name": "Mô tả xác suất của biến cố ngẫu nhiên trong một số ví dụ đơn giản. Mối liên hệ giữa xác suất thực nghiệm của một biến cố với xác suất của biến cố đó",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-037",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-039",
+      "code": "G8-STAT-SOFTWARE",
+      "name": "Thực hành trong phòng máy tính với phần mềm toán học",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G8-029",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G8-040",
+      "code": "G8-STAT-SOFTWARE-01",
+      "name": "Sử dụng phần mềm trong thống kê và xác suất",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G8-039",
+      "sequence": 1,
+      "status": "ACTIVE"
+    }
+  ]
+}

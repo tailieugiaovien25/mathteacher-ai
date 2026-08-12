@@ -1,0 +1,394 @@
+{
+  "schema_version": 1,
+  "curriculum_ref": "CURRICULUM-MATH-2018",
+  "grade": 6,
+  "nodes": [
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-001",
+      "code": "G6-NUM-ALG",
+      "name": "Số và Đại số",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-002",
+      "code": "G6-NUM",
+      "name": "Số",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G6-001",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-003",
+      "code": "G6-NAT",
+      "name": "Số tự nhiên",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-002",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-004",
+      "code": "G6-NAT-01",
+      "name": "Số tự nhiên và tập hợp các số tự nhiên. Thứ tự trong tập hợp các số tự nhiên",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-003",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-005",
+      "code": "G6-NAT-02",
+      "name": "Các phép tính với số tự nhiên. Phép tính lũy thừa với số mũ tự nhiên",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-003",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-006",
+      "code": "G6-NAT-03",
+      "name": "Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-003",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-007",
+      "code": "G6-INT",
+      "name": "Số nguyên",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-002",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-008",
+      "code": "G6-INT-01",
+      "name": "Số nguyên âm và tập hợp các số nguyên. Thứ tự trong tập hợp các số nguyên",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-007",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-009",
+      "code": "G6-INT-02",
+      "name": "Các phép tính với số nguyên. Tính chia hết trong tập hợp các số nguyên",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-007",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-010",
+      "code": "G6-FRA",
+      "name": "Phân số",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-002",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-011",
+      "code": "G6-FRA-01",
+      "name": "Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-010",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-012",
+      "code": "G6-FRA-02",
+      "name": "Các phép tính với phân số",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-010",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-013",
+      "code": "G6-DEC",
+      "name": "Số thập phân",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-002",
+      "sequence": 4,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-014",
+      "code": "G6-DEC-01",
+      "name": "Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-013",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-015",
+      "code": "G6-GEO-MEA",
+      "name": "Hình học và Đo lường",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-016",
+      "code": "G6-VIS-GEO",
+      "name": "Hình học trực quan",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G6-015",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-017",
+      "code": "G6-REAL-PLANE",
+      "name": "Các hình phẳng trong thực tiễn",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-016",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-018",
+      "code": "G6-REAL-PLANE-01",
+      "name": "Tam giác đều, hình vuông, lục giác đều",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-017",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-019",
+      "code": "G6-REAL-PLANE-02",
+      "name": "Hình chữ nhật, hình thoi, hình bình hành, hình thang cân",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-017",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-020",
+      "code": "G6-SYMMETRY",
+      "name": "Tính đối xứng của hình phẳng trong thế giới tự nhiên",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-016",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-021",
+      "code": "G6-SYMMETRY-01",
+      "name": "Hình có trục đối xứng",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-020",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-022",
+      "code": "G6-SYMMETRY-02",
+      "name": "Hình có tâm đối xứng",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-020",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-023",
+      "code": "G6-SYMMETRY-03",
+      "name": "Vai trò của đối xứng trong thế giới tự nhiên",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-020",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-024",
+      "code": "G6-PLANE-GEO",
+      "name": "Hình học phẳng",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G6-015",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-025",
+      "code": "G6-BASIC-GEO",
+      "name": "Các hình hình học cơ bản",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-024",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-026",
+      "code": "G6-BASIC-GEO-01",
+      "name": "Điểm, đường thẳng, tia",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-025",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-027",
+      "code": "G6-BASIC-GEO-02",
+      "name": "Đoạn thẳng. Độ dài đoạn thẳng",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-025",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-028",
+      "code": "G6-BASIC-GEO-03",
+      "name": "Góc. Các góc đặc biệt. Số đo góc",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-025",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-029",
+      "code": "G6-GEO-SOFTWARE",
+      "name": "Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-024",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-030",
+      "code": "G6-GEO-SOFTWARE-01",
+      "name": "Sử dụng phần mềm toán học trong hình học",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-029",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-031",
+      "code": "G6-STAT-PROB",
+      "name": "Một số yếu tố Thống kê và Xác suất",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-032",
+      "code": "G6-STAT",
+      "name": "Một số yếu tố thống kê",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G6-031",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-033",
+      "code": "G6-DATA-COLLECT",
+      "name": "Thu thập và tổ chức dữ liệu",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-032",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-034",
+      "code": "G6-DATA-COLLECT-01",
+      "name": "Thu thập, phân loại, biểu diễn dữ liệu theo các tiêu chí cho trước",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-033",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-035",
+      "code": "G6-DATA-COLLECT-02",
+      "name": "Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-033",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-036",
+      "code": "G6-DATA-ANALYSIS",
+      "name": "Phân tích và xử lí dữ liệu",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-032",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-037",
+      "code": "G6-DATA-ANALYSIS-01",
+      "name": "Hình thành và giải quyết vấn đề đơn giản xuất hiện từ các số liệu và biểu đồ thống kê đã có",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-036",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-038",
+      "code": "G6-PROB",
+      "name": "Một số yếu tố xác suất",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G6-031",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-039",
+      "code": "G6-PROB-GROUP",
+      "name": "Một số yếu tố xác suất",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G6-038",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-040",
+      "code": "G6-PROB-01",
+      "name": "Làm quen với một số mô hình xác suất đơn giản. Làm quen với việc mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần của một sự kiện trong một số mô hình xác suất đơn giản",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-039",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-041",
+      "code": "G6-PROB-02",
+      "name": "Mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần của một sự kiện trong một số mô hình xác suất đơn giản",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-039",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-042",
+      "code": "G6-STAT-SOFTWARE",
+      "name": "Thực hành trong phòng máy tính với phần mềm toán học (nếu nhà trường có điều kiện thực hiện)",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G6-031",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G6-043",
+      "code": "G6-STAT-SOFTWARE-01",
+      "name": "Sử dụng phần mềm để vẽ biểu đồ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G6-042",
+      "sequence": 1,
+      "status": "ACTIVE"
+    }
+  ]
+}

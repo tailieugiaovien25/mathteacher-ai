@@ -1,0 +1,376 @@
+{
+  "schema_version": 1,
+  "curriculum_ref": "CURRICULUM-MATH-2018",
+  "grade": 9,
+  "nodes": [
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-001",
+      "code": "G9-NUM-ALG",
+      "name": "Số và Đại số",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-002",
+      "code": "G9-ALG",
+      "name": "Đại số",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G9-001",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-003",
+      "code": "G9-RADICAL",
+      "name": "Căn thức",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-002",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-004",
+      "code": "G9-RADICAL-NUM",
+      "name": "Căn bậc hai và căn bậc ba của số thực",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-003",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-005",
+      "code": "G9-RADICAL-ALG",
+      "name": "Căn thức bậc hai và căn thức bậc ba của biểu thức đại số",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-003",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-006",
+      "code": "G9-FUNC",
+      "name": "Hàm số và đồ thị",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-002",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-007",
+      "code": "G9-FUNC-QUAD",
+      "name": "Hàm số y = ax² (a ≠ 0) và đồ thị",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-006",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-008",
+      "code": "G9-EQS",
+      "name": "Phương trình và hệ phương trình",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-002",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-009",
+      "code": "G9-EQ-REDUCE",
+      "name": "Phương trình quy về phương trình bậc nhất một ẩn",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-008",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-010",
+      "code": "G9-EQ-SYSTEM",
+      "name": "Phương trình và hệ phương trình bậc nhất hai ẩn",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-008",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-011",
+      "code": "G9-EQ-QUAD",
+      "name": "Phương trình bậc hai một ẩn. Định lí Viète",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-008",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-012",
+      "code": "G9-INEQ",
+      "name": "Bất phương trình bậc nhất một ẩn",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-002",
+      "sequence": 4,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-013",
+      "code": "G9-INEQ-LINEAR",
+      "name": "Bất đẳng thức. Bất phương trình bậc nhất một ẩn",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-012",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-014",
+      "code": "G9-GEO-MEAS",
+      "name": "Hình học và Đo lường",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-015",
+      "code": "G9-VIS-GEO",
+      "name": "Hình học trực quan",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G9-014",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-016",
+      "code": "G9-SOLIDS",
+      "name": "Các hình khối trong thực tiễn",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-015",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-017",
+      "code": "G9-SOLIDS-ROUND",
+      "name": "Hình trụ. Hình nón. Hình cầu",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-016",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-018",
+      "code": "G9-PLANE-GEO",
+      "name": "Hình học phẳng",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G9-014",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-019",
+      "code": "G9-RIGHT-TRI",
+      "name": "Hệ thức lượng trong tam giác vuông",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-018",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-020",
+      "code": "G9-TRIG",
+      "name": "Tỉ số lượng giác của góc nhọn. Một số hệ thức về cạnh và góc trong tam giác vuông",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-019",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-021",
+      "code": "G9-CIRCLE",
+      "name": "Đường tròn",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-018",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-022",
+      "code": "G9-CIRCLE-REL",
+      "name": "Đường tròn. Vị trí tương đối của hai đường tròn",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-021",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-023",
+      "code": "G9-LINE-CIRCLE",
+      "name": "Vị trí tương đối của đường thẳng và đường tròn. Tiếp tuyến của đường tròn",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-021",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-024",
+      "code": "G9-CIRCLE-ANGLES",
+      "name": "Góc ở tâm, góc nội tiếp",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-021",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-025",
+      "code": "G9-CIRCLE-TRI",
+      "name": "Đường tròn ngoại tiếp tam giác. Đường tròn nội tiếp tam giác",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-021",
+      "sequence": 4,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-026",
+      "code": "G9-CYCLIC-QUAD",
+      "name": "Tứ giác nội tiếp",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-021",
+      "sequence": 5,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-027",
+      "code": "G9-REG-POLY",
+      "name": "Đa giác đều",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-018",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-028",
+      "code": "G9-REG-POLY-01",
+      "name": "Đa giác đều",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-027",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-029",
+      "code": "G9-GEO-SOFTWARE",
+      "name": "Thực hành trong phòng máy tính với phần mềm toán học",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-018",
+      "sequence": 4,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-030",
+      "code": "G9-GEO-SOFTWARE-01",
+      "name": "Sử dụng phần mềm để hỗ trợ việc học các kiến thức hình học",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-029",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-031",
+      "code": "G9-STAT-PROB",
+      "name": "Một số yếu tố Thống kê và Xác suất",
+      "node_type": "CONTENT_STRAND",
+      "parent_id": null,
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-032",
+      "code": "G9-STAT",
+      "name": "Một số yếu tố thống kê",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G9-031",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-033",
+      "code": "G9-STAT-COLLECT",
+      "name": "Thu thập và tổ chức dữ liệu",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-032",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-034",
+      "code": "G9-STAT-REP",
+      "name": "Mô tả và biểu diễn dữ liệu trên các bảng, biểu đồ",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-033",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-035",
+      "code": "G9-STAT-ANALYZE",
+      "name": "Phân tích và xử lí dữ liệu",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-032",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-036",
+      "code": "G9-FREQ",
+      "name": "Bảng tần số, biểu đồ tần số. Bảng tần số tương đối, biểu đồ tần số tương đối",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-035",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-037",
+      "code": "G9-PROB",
+      "name": "Một số yếu tố xác suất",
+      "node_type": "CONTENT_DOMAIN",
+      "parent_id": "CURR-NODE-MATH-G9-031",
+      "sequence": 2,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-038",
+      "code": "G9-PROB-GROUP",
+      "name": "Một số yếu tố xác suất",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-037",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-039",
+      "code": "G9-PROB-SIMPLE",
+      "name": "Phép thử ngẫu nhiên và không gian mẫu. Xác suất của biến cố trong một số mô hình xác suất đơn giản",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-038",
+      "sequence": 1,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-040",
+      "code": "G9-STAT-SOFTWARE",
+      "name": "Thực hành trong phòng máy tính với phần mềm toán học",
+      "node_type": "CONTENT_GROUP",
+      "parent_id": "CURR-NODE-MATH-G9-031",
+      "sequence": 3,
+      "status": "ACTIVE"
+    },
+    {
+      "curriculum_node_id": "CURR-NODE-MATH-G9-041",
+      "code": "G9-STAT-SOFTWARE-01",
+      "name": "Sử dụng phần mềm trong thống kê và xác suất",
+      "node_type": "CONTENT_ITEM",
+      "parent_id": "CURR-NODE-MATH-G9-040",
+      "sequence": 1,
+      "status": "ACTIVE"
+    }
+  ]
+}

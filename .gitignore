@@ -232,3 +232,6 @@ output/
 audit_*.txt
 # Source code audit files
 source_code_tree.txt
+# Local Excel data / working artifacts
+/data/
+project-tree.txt
