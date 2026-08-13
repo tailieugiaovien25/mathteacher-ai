@@ -4,5 +4,6 @@
   "body": {"font": "Times New Roman", "size_pt": 14, "line_spacing": 1.15},
   "title": {"size_pt": 14},
   "table": {"size_pt": 14, "repeat_header": true, "allow_row_split": true},
+  "header_footer": {"remove_existing": true, "page_number": true, "page_number_alignment": "center"},
   "equations": {"mode": "force_times", "text_font": "Times New Roman", "math_font": "Times New Roman", "preserve_omml_structure": true}
 }

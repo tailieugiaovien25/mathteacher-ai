@@ -10,12 +10,15 @@ PROFILE = {
     "profile_name": "test", "page": {"margin_left_cm": 3, "margin_right_cm": 2, "margin_top_cm": 2, "margin_bottom_cm": 2},
     "body": {"font": "Times New Roman", "size_pt": 13, "line_spacing": 1.15},
     "title": {"size_pt": 14}, "table": {"size_pt": 12},
+    "header_footer": {"remove_existing": True, "page_number": True},
     "equations": {"mode": "safe", "text_font": "Times New Roman"},
 }
 
 
 def make_docx(path: Path):
     document = Document()
+    document.sections[0].header.paragraphs[0].text = "Đầu trang cũ"
+    document.sections[0].footer.paragraphs[0].text = "Chân trang cũ"
     document.add_paragraph("BÀI 1: BÀI HỌC MẪU")
     document.add_paragraph("I. MỤC TIÊU")
     document.add_paragraph("Nội dung không được thay đổi.")
@@ -64,3 +67,19 @@ def test_standardizer_allows_long_data_rows_to_continue_on_next_page(tmp_path):
     namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
     assert rows[0]._tr.trPr.find(namespace + "cantSplit") is not None
     assert rows[1]._tr.trPr.find(namespace + "cantSplit") is None
+
+
+def test_standardizer_replaces_headers_and_footers_with_automatic_page_number(tmp_path):
+    source, output = tmp_path / "source.docx", tmp_path / "out.docx"
+    make_docx(source)
+    result = LessonPlanWordStandardizer(PROFILE).standardize(
+        source, output, tmp_path / "report.json"
+    )
+    document = Document(output)
+    section = document.sections[0]
+    assert "Đầu trang cũ" not in section.header.paragraphs[0].text
+    assert "Chân trang cũ" not in section.footer.paragraphs[0].text
+    footer_xml = section.footer._element.xml
+    assert " PAGE " in footer_xml
+    assert 'w:val="center"' in footer_xml
+    assert result["changes"]["automatic_page_numbers_added"] >= 1

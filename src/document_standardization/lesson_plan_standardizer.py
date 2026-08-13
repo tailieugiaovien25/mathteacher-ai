@@ -112,6 +112,7 @@ class LessonPlanWordStandardizer:
         self._normalize_styles(document)
         self._normalize_paragraphs(document, changes)
         self._normalize_tables(document, changes)
+        self._normalize_headers_and_footers(document, changes)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         document.save(output)
@@ -160,6 +161,58 @@ class LessonPlanWordStandardizer:
         style.font.name = body["font"]
         style.font.size = Pt(body["size_pt"])
         style._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), body["font"])
+
+    @staticmethod
+    def _clear_header_or_footer(container):
+        element = container._element
+        for child in list(element):
+            element.remove(child)
+        element.append(OxmlElement("w:p"))
+
+    def _normalize_headers_and_footers(self, document, changes):
+        profile = self.profile.get("header_footer", {})
+        if not profile.get("remove_existing", False):
+            return
+
+        body = self.profile["body"]
+        for section in document.sections:
+            headers = (section.header, section.first_page_header, section.even_page_header)
+            footers = (section.footer, section.first_page_footer, section.even_page_footer)
+            for header in headers:
+                header.is_linked_to_previous = False
+                self._clear_header_or_footer(header)
+                changes["headers_cleared"] += 1
+            for footer in footers:
+                footer.is_linked_to_previous = False
+                self._clear_header_or_footer(footer)
+                changes["footers_cleared"] += 1
+
+            if profile.get("page_number", True):
+                for footer in footers:
+                    paragraph = footer.paragraphs[0]
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = paragraph.add_run()
+                    run.font.name = body["font"]
+                    run.font.size = Pt(body["size_pt"])
+                    fonts = run._element.get_or_add_rPr().rFonts
+                    for key in ("ascii", "hAnsi", "eastAsia", "cs"):
+                        fonts.set(qn(f"w:{key}"), body["font"])
+                    field_begin = OxmlElement("w:fldChar")
+                    field_begin.set(qn("w:fldCharType"), "begin")
+                    instruction = OxmlElement("w:instrText")
+                    instruction.set(qn("xml:space"), "preserve")
+                    instruction.text = " PAGE "
+                    field_end = OxmlElement("w:fldChar")
+                    field_end.set(qn("w:fldCharType"), "end")
+                    run._r.extend((field_begin, instruction, field_end))
+                    changes["automatic_page_numbers_added"] += 1
+
+        settings = document.settings._element
+        update_fields = settings.find(qn("w:updateFields"))
+        if update_fields is None:
+            update_fields = OxmlElement("w:updateFields")
+            settings.append(update_fields)
+        update_fields.set(qn("w:val"), "true")
 
     def _paragraph_kind(self, text: str) -> str:
         stripped = " ".join(text.split())
