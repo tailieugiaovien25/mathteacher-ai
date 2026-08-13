@@ -15,6 +15,8 @@ def run_cli(*arguments):
         env={
             **os.environ,
             "PYTHONPATH": str(PROJECT_ROOT / "src"),
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONUTF8": "1",
         },
         capture_output=True,
         text=True,
