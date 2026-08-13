@@ -1,0 +1,14 @@
+﻿{
+  "schema_version": 1,
+  "source_id": "SRC-TB-MATH6-KNTT",
+  "source_type": "TEXTBOOK",
+  "textbook_ref": "TEXTBOOK-MATH6-KNTT",
+  "subject": "Toán",
+  "grade": 6,
+  "book_series": "Kết nối tri thức với cuộc sống",
+  "publisher": "NXB Giáo dục Việt Nam",
+  "status": "CANDIDATE",
+  "verified_copy_id": null,
+  "source_version": null,
+  "notes": "Source registry seed. Not generation-ready until the textbook source is formally verified."
+}
