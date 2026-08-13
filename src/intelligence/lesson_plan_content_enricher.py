@@ -65,9 +65,9 @@ class LessonPlanContentEnricher:
     def enrich(self, plan: LessonPlanContent) -> LessonPlanContent:
         enriched = deepcopy(plan)
         requirements = [
-            item.strip()
+            item.strip().rstrip(".;:!?")
             for item in enriched.objectives.knowledge
-            if item.strip()
+            if item.strip().rstrip(".;:!?")
         ]
         requirement_text = "; ".join(requirements)
 

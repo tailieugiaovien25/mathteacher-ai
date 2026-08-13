@@ -41,3 +41,12 @@ def test_enricher_uses_changed_requirement_without_changing_system_logic():
     assert [len(item.organization_steps) for item in first.activities] == [
         len(item.organization_steps) for item in second.activities
     ]
+
+
+def test_enricher_normalizes_terminal_punctuation_in_objective():
+    enriched = LessonPlanContentEnricher().enrich(
+        make_plan("Yêu cầu đã có dấu chấm.")
+    )
+
+    assert enriched.activities[0].objective.endswith(".")
+    assert not enriched.activities[0].objective.endswith("..")
