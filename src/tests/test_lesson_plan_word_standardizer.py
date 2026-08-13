@@ -42,3 +42,15 @@ def test_standardizer_refuses_to_overwrite_source(tmp_path):
     source = tmp_path / "source.docx"; make_docx(source)
     with pytest.raises(ValueError, match="ghi đè"):
         LessonPlanWordStandardizer(PROFILE).standardize(source, source, tmp_path / "report.json")
+
+
+def test_standardizer_scales_wide_tables_to_printable_width(tmp_path):
+    source, output = tmp_path / "source.docx", tmp_path / "out.docx"
+    make_docx(source)
+    result = LessonPlanWordStandardizer(PROFILE).standardize(source, output, tmp_path / "report.json")
+    document = Document(output)
+    section = document.sections[0]
+    usable_dxa = round((section.page_width - section.left_margin - section.right_margin) / 635)
+    widths = [int(column.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w")) for column in document.tables[0]._tbl.tblGrid.gridCol_lst]
+    assert sum(widths) <= usable_dxa
+    assert result["before"]["table_cells"] == result["after"]["table_cells"]

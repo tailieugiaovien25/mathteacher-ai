@@ -4,5 +4,5 @@
   "body": {"font": "Times New Roman", "size_pt": 13, "line_spacing": 1.15},
   "title": {"size_pt": 14},
   "table": {"size_pt": 12, "repeat_header": true, "allow_row_split": false},
-  "equations": {"mode": "safe", "text_font": "Times New Roman", "math_font": "Cambria Math", "preserve_omml_structure": true}
+  "equations": {"mode": "force_times", "text_font": "Times New Roman", "math_font": "Times New Roman", "preserve_omml_structure": true}
 }

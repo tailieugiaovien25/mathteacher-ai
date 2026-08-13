@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import tempfile
 import zipfile
 from collections import Counter
 from copy import deepcopy
@@ -18,6 +20,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
+from lxml import etree
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,10 @@ class LessonPlanWordStandardizer:
 
         output.parent.mkdir(parents=True, exist_ok=True)
         document.save(output)
+        if self.profile.get("equations", {}).get("mode") == "force_times":
+            changes["omml_runs_forced_to_times"] = self._force_omml_font(
+                output, self.profile["equations"].get("text_font", "Times New Roman")
+            )
         after = inventory(output)
         self._validate_integrity(before, after)
 
@@ -125,6 +132,7 @@ class LessonPlanWordStandardizer:
                 "mode": self.profile.get("equations", {}).get("mode", "safe"),
                 "plain_text_font": self.profile.get("equations", {}).get("text_font", "Times New Roman"),
                 "omml_preserved": before.omml_equations,
+                "omml_runs_forced_to_times": changes.get("omml_runs_forced_to_times", 0),
                 "legacy_or_embedded_requires_review": before.ole_objects,
             },
             "warnings": self._warnings(before),
@@ -193,20 +201,88 @@ class LessonPlanWordStandardizer:
 
     def _normalize_tables(self, document, changes):
         table_profile = self.profile["table"]
+        section = document.sections[0]
+        usable_dxa = round((section.page_width - section.left_margin - section.right_margin) / 635)
         for table in document.tables:
+            table.autofit = False
+            grid_columns = list(table._tbl.tblGrid.gridCol_lst)
+            original_widths = [int(column.get(qn("w:w")) or 0) for column in grid_columns]
+            original_total = sum(original_widths)
+            if original_total > usable_dxa and original_total:
+                scale = usable_dxa / original_total
+                widths = [round(width * scale) for width in original_widths]
+                widths[-1] += usable_dxa - sum(widths)
+                changes["tables_scaled_to_page"] += 1
+            else:
+                widths = original_widths
+            for column, width in zip(grid_columns, widths):
+                column.set(qn("w:w"), str(width))
+            table_width = table._tbl.tblPr.first_child_found_in("w:tblW")
+            if table_width is not None and widths:
+                table_width.set(qn("w:w"), str(sum(widths)))
+                table_width.set(qn("w:type"), "dxa")
             for row_index, row in enumerate(table.rows):
                 row_pr = row._tr.get_or_add_trPr()
                 if row_pr.find(qn("w:cantSplit")) is None:
                     row_pr.append(OxmlElement("w:cantSplit"))
                 if row_index == 0 and len(table.rows) > 1:
                     header = OxmlElement("w:tblHeader"); header.set(qn("w:val"), "true"); row_pr.append(header)
-                for cell in row.cells:
+                for cell_index, cell in enumerate(row.cells):
                     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                    if cell_index < len(widths):
+                        cell_width = cell._tc.get_or_add_tcPr().get_or_add_tcW()
+                        cell_width.set(qn("w:w"), str(widths[cell_index]))
+                        cell_width.set(qn("w:type"), "dxa")
                     if row_index == 0 and len(table.rows) > 1:
                         for paragraph in cell.paragraphs:
                             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                             for run in paragraph.runs: run.bold = True; run.font.size = Pt(table_profile["size_pt"])
             changes["tables_normalized"] += 1
+
+    @staticmethod
+    def _force_omml_font(path: Path, font: str) -> int:
+        """Set editable OMML runs to normal text font while preserving math structures."""
+        math_ns = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+        word_ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        forced = 0
+        handle, temporary_name = tempfile.mkstemp(suffix=".docx", dir=path.parent)
+        os.close(handle)
+        try:
+            with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(
+                temporary_name, "w", zipfile.ZIP_DEFLATED
+            ) as target:
+                for item in source.infolist():
+                    data = source.read(item.filename)
+                    if item.filename.startswith("word/") and item.filename.endswith(".xml"):
+                        root = etree.fromstring(data)
+                        if item.filename == "word/settings.xml":
+                            for node in root.xpath(".//m:mathPr/m:mathFont", namespaces={"m": math_ns}):
+                                node.set(f"{{{math_ns}}}val", font)
+                        for math_run in root.xpath(".//m:r", namespaces={"m": math_ns}):
+                            math_properties = math_run.find(f"{{{math_ns}}}rPr")
+                            if math_properties is None:
+                                math_properties = etree.Element(f"{{{math_ns}}}rPr")
+                                math_run.insert(0, math_properties)
+                            if math_properties.find(f"{{{math_ns}}}nor") is None:
+                                math_properties.append(etree.Element(f"{{{math_ns}}}nor"))
+                            word_properties = math_run.find(f"{{{word_ns}}}rPr")
+                            if word_properties is None:
+                                word_properties = etree.Element(f"{{{word_ns}}}rPr")
+                                math_run.insert(1, word_properties)
+                            fonts = word_properties.find(f"{{{word_ns}}}rFonts")
+                            if fonts is None:
+                                fonts = etree.Element(f"{{{word_ns}}}rFonts")
+                                word_properties.insert(0, fonts)
+                            for key in ("ascii", "hAnsi", "eastAsia", "cs"):
+                                fonts.set(f"{{{word_ns}}}{key}", font)
+                            forced += 1
+                        data = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+                    target.writestr(item, data)
+            os.replace(temporary_name, path)
+        finally:
+            if os.path.exists(temporary_name):
+                os.unlink(temporary_name)
+        return forced
 
     @staticmethod
     def _validate_integrity(before, after):
@@ -218,7 +294,9 @@ class LessonPlanWordStandardizer:
     def _warnings(before):
         warnings = []
         if before.omml_equations:
-            warnings.append(f"Giữ nguyên {before.omml_equations} công thức Word để bảo vệ cấu trúc toán.")
+            warnings.append(
+                f"Giữ nguyên cấu trúc của {before.omml_equations} công thức Word; cần kiểm tra trực quan font và ký hiệu."
+            )
         if before.ole_objects:
             warnings.append(f"Có {before.ole_objects} đối tượng OLE/MathType/Equation cũ cần kiểm tra thủ công.")
         return warnings
