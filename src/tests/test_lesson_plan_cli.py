@@ -80,3 +80,19 @@ def test_cli_rejects_non_positive_period_count(tmp_path):
 
     assert result.returncode != 0
     assert "Số tiết phải lớn hơn hoặc bằng 1" in result.stderr
+
+
+def test_cli_optionally_generates_docx(tmp_path):
+    json_output = tmp_path / "lesson-plan.json"
+    docx_output = tmp_path / "lesson-plan.docx"
+    result = run_cli(
+        "--lesson-name", "Bài học mẫu",
+        "--grade", "6",
+        "--requirement", "Yêu cầu mẫu.",
+        "--output", str(json_output),
+        "--docx-output", str(docx_output),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json_output.exists()
+    assert docx_output.exists()
