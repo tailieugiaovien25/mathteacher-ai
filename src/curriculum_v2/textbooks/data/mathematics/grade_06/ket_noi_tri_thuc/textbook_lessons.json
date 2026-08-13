@@ -1,0 +1,24 @@
+﻿{
+  "schema_version": 1,
+  "textbook_ref": "TEXTBOOK-MATH6-KNTT",
+  "subject": "Toán",
+  "grade": 6,
+  "lessons": [
+    {
+      "lesson_id": "TB-MATH6-KNTT-L001",
+      "title": "Bài 1. Tập hợp",
+      "sequence": 1,
+      "lesson_kind": "LESSON",
+      "unit_ref": "CHAPTER-01",
+      "unit_title": "Số tự nhiên",
+      "status": "CANDIDATE",
+      "provenance": {
+        "source_document_id": "SRC-TB-MATH6-KNTT",
+        "publisher": "NXB Giáo dục Việt Nam",
+        "verified_copy_id": null,
+        "source_location": "Bài 1",
+        "source_version": null
+      }
+    }
+  ]
+}
