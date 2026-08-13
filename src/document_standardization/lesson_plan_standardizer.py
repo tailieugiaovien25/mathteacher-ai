@@ -117,7 +117,9 @@ class LessonPlanWordStandardizer:
         document.save(output)
         if self.profile.get("equations", {}).get("mode") == "force_times":
             changes["omml_runs_forced_to_times"] = self._force_omml_font(
-                output, self.profile["equations"].get("text_font", "Times New Roman")
+                output,
+                self.profile["equations"].get("text_font", "Times New Roman"),
+                self.profile["body"]["size_pt"],
             )
         after = inventory(output)
         self._validate_integrity(before, after)
@@ -223,9 +225,11 @@ class LessonPlanWordStandardizer:
                 table_width.set(qn("w:type"), "dxa")
             for row_index, row in enumerate(table.rows):
                 row_pr = row._tr.get_or_add_trPr()
-                if row_pr.find(qn("w:cantSplit")) is None:
-                    row_pr.append(OxmlElement("w:cantSplit"))
+                existing_no_split = row_pr.find(qn("w:cantSplit"))
+                if existing_no_split is not None:
+                    row_pr.remove(existing_no_split)
                 if row_index == 0 and len(table.rows) > 1:
+                    row_pr.append(OxmlElement("w:cantSplit"))
                     header = OxmlElement("w:tblHeader"); header.set(qn("w:val"), "true"); row_pr.append(header)
                 for cell_index, cell in enumerate(row.cells):
                     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
@@ -236,11 +240,12 @@ class LessonPlanWordStandardizer:
                     if row_index == 0 and len(table.rows) > 1:
                         for paragraph in cell.paragraphs:
                             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            paragraph.paragraph_format.keep_with_next = True
                             for run in paragraph.runs: run.bold = True; run.font.size = Pt(table_profile["size_pt"])
             changes["tables_normalized"] += 1
 
     @staticmethod
-    def _force_omml_font(path: Path, font: str) -> int:
+    def _force_omml_font(path: Path, font: str, size_pt: int) -> int:
         """Set editable OMML runs to normal text font while preserving math structures."""
         math_ns = "http://schemas.openxmlformats.org/officeDocument/2006/math"
         word_ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -275,6 +280,12 @@ class LessonPlanWordStandardizer:
                                 word_properties.insert(0, fonts)
                             for key in ("ascii", "hAnsi", "eastAsia", "cs"):
                                 fonts.set(f"{{{word_ns}}}{key}", font)
+                            for tag in ("sz", "szCs"):
+                                size = word_properties.find(f"{{{word_ns}}}{tag}")
+                                if size is None:
+                                    size = etree.Element(f"{{{word_ns}}}{tag}")
+                                    word_properties.append(size)
+                                size.set(f"{{{word_ns}}}val", str(round(size_pt * 2)))
                             forced += 1
                         data = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
                     target.writestr(item, data)

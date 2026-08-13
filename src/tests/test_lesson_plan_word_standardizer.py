@@ -54,3 +54,13 @@ def test_standardizer_scales_wide_tables_to_printable_width(tmp_path):
     widths = [int(column.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w")) for column in document.tables[0]._tbl.tblGrid.gridCol_lst]
     assert sum(widths) <= usable_dxa
     assert result["before"]["table_cells"] == result["after"]["table_cells"]
+
+
+def test_standardizer_allows_long_data_rows_to_continue_on_next_page(tmp_path):
+    source, output = tmp_path / "source.docx", tmp_path / "out.docx"
+    make_docx(source)
+    LessonPlanWordStandardizer(PROFILE).standardize(source, output, tmp_path / "report.json")
+    rows = Document(output).tables[0].rows
+    namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    assert rows[0]._tr.trPr.find(namespace + "cantSplit") is not None
+    assert rows[1]._tr.trPr.find(namespace + "cantSplit") is None
