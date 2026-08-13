@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from intelligence.lesson_plan_builder import LessonPlanBuilder
+from intelligence.lesson_plan_content_enricher import LessonPlanContentEnricher
 from models.lesson_model import LessonModel
 from models.math_lesson_plan_schema import create_math_lesson_plan_schema
 
@@ -84,6 +85,7 @@ def generate_lesson_plan(args: argparse.Namespace) -> dict[str, object]:
         lesson=lesson,
         schema=create_math_lesson_plan_schema(),
     )
+    plan = LessonPlanContentEnricher().enrich(plan)
     return asdict(plan)
 
 

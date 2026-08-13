@@ -56,7 +56,12 @@ def test_cli_generates_utf8_lesson_plan_json(tmp_path):
     assert data["resources"]["teacher"] == ["Máy chiếu"]
     assert data["resources"]["students"] == ["Vở ghi"]
     assert len(data["activities"]) == 4
+    assert all(item["objective"] for item in data["activities"])
+    assert all(item["content"] for item in data["activities"])
+    assert all(item["product"] for item in data["activities"])
+    assert all(item["organization_steps"] for item in data["activities"])
     assert data["metadata"]["schema_id"] == "math_lesson_plan_v1_1"
+    assert data["metadata"]["content_enricher"] == "rule_based_v1"
 
 
 def test_cli_rejects_non_positive_period_count(tmp_path):
