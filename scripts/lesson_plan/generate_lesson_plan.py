@@ -10,6 +10,8 @@ from typing import Sequence
 
 from intelligence.lesson_plan_builder import LessonPlanBuilder
 from intelligence.lesson_plan_content_enricher import LessonPlanContentEnricher
+from exporters import LessonPlanDocxExporter
+from models.lesson_plan_content import LessonPlanContent
 from models.lesson_model import LessonModel
 from models.math_lesson_plan_schema import create_math_lesson_plan_schema
 
@@ -50,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="Đường dẫn tệp JSON đầu ra.",
+    )
+    parser.add_argument(
+        "--docx-output",
+        type=Path,
+        help="Đường dẫn Word DOCX tùy chọn.",
     )
     return parser
 
@@ -104,10 +111,42 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         plan = generate_lesson_plan(args)
         write_json(plan, args.output)
+        if args.docx_output is not None:
+            from models.lesson_plan_content import (
+                LearningActivity,
+                LessonObjectives,
+                OrganizationStep,
+                TeachingResources,
+            )
+
+            docx_plan = LessonPlanContent(
+                subject=plan["subject"],
+                grade=plan["grade"],
+                lesson_name=plan["lesson_name"],
+                total_periods=plan["total_periods"],
+                objectives=LessonObjectives(**plan["objectives"]),
+                resources=TeachingResources(**plan["resources"]),
+                activities=[
+                    LearningActivity(
+                        **{
+                            **activity,
+                            "organization_steps": [
+                                OrganizationStep(**step)
+                                for step in activity["organization_steps"]
+                            ],
+                        }
+                    )
+                    for activity in plan["activities"]
+                ],
+                metadata=plan["metadata"],
+            )
+            LessonPlanDocxExporter().export(docx_plan, args.docx_output)
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
 
     print(f"Đã tạo kế hoạch bài dạy: {args.output}")
+    if args.docx_output is not None:
+        print(f"Đã tạo tệp Word: {args.docx_output}")
     return 0
 
 
