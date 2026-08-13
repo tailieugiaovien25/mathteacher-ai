@@ -1,0 +1,8 @@
+{
+  "profile_name": "ke-hoach-bai-day-v1",
+  "page": {"margin_left_cm": 3.0, "margin_right_cm": 2.0, "margin_top_cm": 2.0, "margin_bottom_cm": 2.0},
+  "body": {"font": "Times New Roman", "size_pt": 13, "line_spacing": 1.15},
+  "title": {"size_pt": 14},
+  "table": {"size_pt": 12, "repeat_header": true, "allow_row_split": false},
+  "equations": {"mode": "safe", "text_font": "Times New Roman", "math_font": "Cambria Math", "preserve_omml_structure": true}
+}
