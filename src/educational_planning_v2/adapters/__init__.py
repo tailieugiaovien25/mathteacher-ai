@@ -9,9 +9,11 @@ from educational_planning_v2.adapters.weekly_schedule_excel_adapter import (
     WeeklyScheduleWorkbookSchema,
 )
 from educational_planning_v2.adapters.local_weekly_schedule_repository import LocalWeeklyScheduleRepository
+from educational_planning_v2.adapters.supabase_weekly_schedule_repository import SupabaseWeeklyScheduleRepository
 
 __all__ = [
     "LocalWeeklyScheduleRepository",
+    "SupabaseWeeklyScheduleRepository",
     "PPCTPlanItemAdapter",
     "PPCTRow",
     "WeeklyScheduleExcelAdapter",

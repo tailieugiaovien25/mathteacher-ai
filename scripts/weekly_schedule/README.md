@@ -28,3 +28,12 @@ khong phu thuoc Streamlit hay cach luu tru tep.
 Ban thu nghiem luu du lieu tai `data/weekly_schedules`. Thu muc nay la du lieu
 van hanh cua nguoi dung va khong dua vao Git. Adapter JSON co the duoc thay bang
 Supabase ma khong sua dich vu lap lich.
+
+## Luu tren Supabase
+
+1. Cai cac goi trong `requirements.txt`.
+2. Chay migration `supabase/migrations/202608140001_weekly_teaching_schedules.sql`.
+3. Dat `SUPABASE_URL` va `SUPABASE_PUBLISHABLE_KEY` trong moi truong.
+4. Khoi dong giao dien, chon `Supabase` va dang nhap tai khoan giao vien.
+
+Khong dung secret key hoac service-role key trong giao dien giao vien.

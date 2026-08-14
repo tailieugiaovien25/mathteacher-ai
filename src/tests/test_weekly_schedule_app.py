@@ -10,6 +10,8 @@ from scripts.weekly_schedule.app import (
     load_saved_schedule,
     save_weekly_schedule,
     saved_schedule_options,
+    supabase_settings,
+    authenticate_supabase,
     schedule_rows,
     source_table_rows,
     teacher_options,
@@ -104,3 +106,26 @@ def test_app_storage_helpers_keep_persistence_details_outside_core():
     assert "json" not in source
     assert "supabase" not in source
     assert "storage_root" not in source
+
+
+def test_supabase_settings_requires_both_public_values():
+    assert supabase_settings({}) is None
+    assert supabase_settings({"SUPABASE_URL": "https://example.supabase.co"}) is None
+    assert supabase_settings({
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_test",
+    }) == ("https://example.supabase.co", "sb_publishable_test")
+
+
+def test_authentication_scopes_repository_to_returned_user():
+    class User:
+        id = "user-123"
+
+    class Auth:
+        def sign_in_with_password(self, credentials):
+            assert credentials == {"email": "teacher@example.com", "password": "safe-pass"}
+            return type("AuthResponse", (), {"user": User()})()
+
+    client = type("Client", (), {"auth": Auth()})()
+    repository = authenticate_supabase(client, " teacher@example.com ", "safe-pass")
+    assert repository._user_id == "user-123"
