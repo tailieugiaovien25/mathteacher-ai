@@ -7,6 +7,9 @@ from scripts.weekly_schedule.app import (
     build_weekly_schedule,
     export_weekly_schedule,
     load_uploaded_workbook,
+    load_saved_schedule,
+    save_weekly_schedule,
+    saved_schedule_options,
     schedule_rows,
     source_table_rows,
     teacher_options,
@@ -81,3 +84,23 @@ def test_ui_module_keeps_excel_details_in_the_adapter():
     source = inspect.getsource(app).lower()
     assert "openpyxl" not in source
     assert "load_workbook" not in source
+
+
+def test_app_can_save_list_and_reopen_schedule(tmp_path):
+    schedule = build_weekly_schedule(
+        data=_data(), teacher_id="GV001", academic_year="2026-2027", week_number=5
+    )
+    saved = save_weekly_schedule(schedule, tmp_path)
+    assert saved.schedule_id == schedule.schedule_id
+    assert saved_schedule_options("GV001", tmp_path)[0].week_number == 5
+    assert load_saved_schedule(schedule.schedule_id, tmp_path) == schedule
+
+
+def test_app_storage_helpers_keep_persistence_details_outside_core():
+    import inspect
+    from educational_planning_v2.services import WeeklyTeachingScheduleService
+
+    source = inspect.getsource(WeeklyTeachingScheduleService).lower()
+    assert "json" not in source
+    assert "supabase" not in source
+    assert "storage_root" not in source

@@ -8,8 +8,10 @@ from educational_planning_v2.adapters.weekly_schedule_excel_adapter import (
     WeeklyScheduleWorkbookError,
     WeeklyScheduleWorkbookSchema,
 )
+from educational_planning_v2.adapters.local_weekly_schedule_repository import LocalWeeklyScheduleRepository
 
 __all__ = [
+    "LocalWeeklyScheduleRepository",
     "PPCTPlanItemAdapter",
     "PPCTRow",
     "WeeklyScheduleExcelAdapter",

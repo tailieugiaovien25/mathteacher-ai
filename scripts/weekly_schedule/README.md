@@ -20,6 +20,11 @@ Trinh duyet se mo giao dien tai dia chi Streamlit thong bao. Tai tep
 - Tao va xem truoc lich bao giang.
 - Tai lich bao giang Excel da dinh dang va san sang de in.
 - Khong sua hoac ghi de tep Excel nguon.
+- Luu, cap nhat va mo lai lich theo giao vien, nam hoc va tuan.
 
 Giao dien chi dieu phoi adapter va dich vu mien hien co. Thuat toan lap lich
 khong phu thuoc Streamlit hay cach luu tru tep.
+
+Ban thu nghiem luu du lieu tai `data/weekly_schedules`. Thu muc nay la du lieu
+van hanh cua nguoi dung va khong dua vao Git. Adapter JSON co the duoc thay bang
+Supabase ma khong sua dich vu lap lich.

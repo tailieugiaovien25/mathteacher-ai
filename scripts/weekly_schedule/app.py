@@ -7,6 +7,7 @@ from io import BytesIO
 from pathlib import Path
 
 from educational_planning_v2.adapters import (
+    LocalWeeklyScheduleRepository,
     WeeklyScheduleExcelAdapter,
     WeeklyScheduleSourceData,
     WeeklyScheduleWorkbookError,
@@ -17,6 +18,7 @@ from educational_planning_v2.services import WeeklyTeachingScheduleService
 
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+DEFAULT_SCHEDULE_STORAGE = Path("data/weekly_schedules")
 WEEKDAY_LABELS = {
     1: "Thứ 2",
     2: "Thứ 3",
@@ -110,6 +112,21 @@ def schedule_rows(schedule: WeeklyTeachingSchedule) -> list[dict[str, object]]:
 def export_weekly_schedule(schedule: WeeklyTeachingSchedule):
     """Create the downloadable system-template workbook."""
     return WeeklyScheduleExcelExporter().export(schedule)
+
+
+def save_weekly_schedule(schedule: WeeklyTeachingSchedule, storage_root: str | Path):
+    """Save or update a schedule through the repository boundary."""
+    return LocalWeeklyScheduleRepository(storage_root).save(schedule)
+
+
+def saved_schedule_options(teacher_id: str, storage_root: str | Path):
+    """Return saved schedules for one teacher only."""
+    return LocalWeeklyScheduleRepository(storage_root).list_for_teacher(teacher_id)
+
+
+def load_saved_schedule(schedule_id: str, storage_root: str | Path):
+    """Open a canonical schedule previously saved by the teacher."""
+    return LocalWeeklyScheduleRepository(storage_root).get(schedule_id)
 
 
 def source_table_rows(
@@ -270,6 +287,30 @@ def main() -> None:
     )
 
     selection = (uploaded.name, teacher_id, academic_year, week_number)
+    with st.expander("Lịch báo giảng đã lưu", expanded=False):
+        saved_items = saved_schedule_options(teacher_id, DEFAULT_SCHEDULE_STORAGE)
+        if not saved_items:
+            st.caption("Giáo viên này chưa có lịch báo giảng đã lưu.")
+        else:
+            saved_by_label = {
+                f"{item.academic_year} · Tuần {item.week_number} · {item.entry_count} tiết": item
+                for item in saved_items
+            }
+            saved_label = st.selectbox("Chọn lịch", tuple(saved_by_label))
+            if st.button("Mở lịch đã lưu", use_container_width=True):
+                selected = saved_by_label[saved_label]
+                stored = load_saved_schedule(selected.schedule_id, DEFAULT_SCHEDULE_STORAGE)
+                if stored is None:
+                    st.error("Không tìm thấy lịch đã lưu.")
+                elif (
+                    stored.academic_week.academic_year != academic_year
+                    or stored.academic_week.week_number != week_number
+                ):
+                    st.warning("Hãy chọn đúng năm học và tuần của lịch đã lưu rồi mở lại.")
+                else:
+                    st.session_state["weekly_schedule"] = stored
+                    st.session_state["weekly_schedule_selection"] = selection
+                    st.success("Đã mở lịch báo giảng đã lưu.")
     if st.button("Tạo lịch báo giảng", type="primary", use_container_width=True):
         try:
             with st.spinner("Đang tìm thời khóa biểu và đối chiếu PPCT..."):
@@ -300,6 +341,15 @@ def main() -> None:
     metric1.metric("Số tiết", len(rows))
     metric2.metric("Số lớp", len({row["Lớp"] for row in rows}))
     metric3.metric("Số môn/phân môn", len({(row["Môn học"], row["Phân môn"]) for row in rows}))
+    if st.button("Lưu lịch báo giảng", use_container_width=True):
+        try:
+            saved = save_weekly_schedule(schedule, DEFAULT_SCHEDULE_STORAGE)
+            st.success(
+                f"Đã lưu lịch tuần {saved.week_number}. "
+                "Nếu lịch đã tồn tại, hệ thống đã cập nhật bản mới nhất."
+            )
+        except Exception as error:
+            st.error(f"Không thể lưu lịch báo giảng: {error}")
     excel_export = export_weekly_schedule(schedule)
     st.download_button(
         "Tải lịch báo giảng Excel",
@@ -310,8 +360,8 @@ def main() -> None:
         use_container_width=True,
     )
     st.info(
-        "Tệp Excel sử dụng mẫu chuẩn của hệ thống. Giai đoạn tiếp theo sẽ "
-        "bổ sung ánh xạ sang mẫu riêng do giáo viên tải lên."
+        "Lịch được lưu qua một cổng dữ liệu độc lập. Bộ lưu cục bộ có thể "
+        "được thay bằng Supabase mà không thay đổi dịch vụ lập lịch."
     )
 
 
