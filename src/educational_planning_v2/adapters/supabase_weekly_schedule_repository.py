@@ -18,6 +18,10 @@ class SupabaseWeeklyScheduleRepository:
         self._user_id = self._required_text(user_id, "user_id")
         self._table_name = self._required_text(table_name, "table_name")
 
+    @property
+    def user_id(self) -> str:
+        return self._user_id
+
     def save(self, schedule: WeeklyTeachingSchedule) -> SavedWeeklyScheduleSummary:
         if not isinstance(schedule, WeeklyTeachingSchedule):
             raise TypeError("schedule must be a WeeklyTeachingSchedule")

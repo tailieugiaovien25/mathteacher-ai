@@ -37,3 +37,7 @@ Supabase ma khong sua dich vu lap lich.
 4. Khoi dong giao dien, chon `Supabase` va dang nhap tai khoan giao vien.
 
 Khong dung secret key hoac service-role key trong giao dien giao vien.
+
+Sau khi dang nhap Supabase, giao vien tao ho so truc tiep tren giao dien. Ma
+giao vien trong ho so phai trung voi ma trong bang Thoi khoa bieu. Ho ten va
+truong co the duoc hien thi tren tep lich bao giang theo lua chon cua giao vien.

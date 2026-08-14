@@ -70,6 +70,7 @@ class WeeklyScheduleExcelExporter:
 
     def _write_heading(self, sheet, schedule):
         week = schedule.academic_week
+        profile = schedule.metadata.get("teacher_profile", {})
         sheet.merge_cells("A1:K1")
         sheet["A1"] = f"LỊCH BÁO GIẢNG TUẦN {week.week_number}"
         sheet["A1"].font = Font(name="Times New Roman", size=16, bold=True, color="FFFFFF")
@@ -78,10 +79,16 @@ class WeeklyScheduleExcelExporter:
         sheet.row_dimensions[1].height = 30
 
         sheet.merge_cells("A2:K2")
-        sheet["A2"] = (
-            f"Giáo viên: {schedule.teacher_id}  |  "
-            f"Năm học: {week.academic_year}"
-        )
+        teacher_value = schedule.teacher_id
+        if profile.get("show_teacher_name") and profile.get("full_name"):
+            teacher_value = f"{profile['full_name']} ({schedule.teacher_id})"
+        heading_parts = [
+            f"Giáo viên: {teacher_value}",
+            f"Năm học: {week.academic_year}",
+        ]
+        if profile.get("show_school_name") and profile.get("school_name"):
+            heading_parts.insert(1, f"Trường: {profile['school_name']}")
+        sheet["A2"] = "  |  ".join(heading_parts)
         sheet["A2"].font = Font(name="Times New Roman", size=12, bold=True)
         sheet["A2"].alignment = Alignment(horizontal="center")
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
 import os
@@ -11,11 +12,12 @@ from typing import Any
 from educational_planning_v2.adapters import (
     LocalWeeklyScheduleRepository,
     SupabaseWeeklyScheduleRepository,
+    SupabaseTeacherProfileRepository,
     WeeklyScheduleExcelAdapter,
     WeeklyScheduleSourceData,
     WeeklyScheduleWorkbookError,
 )
-from educational_planning_v2.models import WeeklyTeachingSchedule
+from educational_planning_v2.models import TeacherProfile, WeeklyTeachingSchedule
 from educational_planning_v2.exporters import WeeklyScheduleExcelExporter
 from educational_planning_v2.services import WeeklyTeachingScheduleService
 
@@ -78,16 +80,32 @@ def build_weekly_schedule(
     teacher_id: str,
     academic_year: str,
     week_number: int,
+    teacher_profile: TeacherProfile | None = None,
 ) -> WeeklyTeachingSchedule:
     week = data.week(week_number, academic_year)
     schedule_id = f"{teacher_id}-{academic_year}-W{week_number:02d}"
-    return WeeklyTeachingScheduleService().build(
+    schedule = WeeklyTeachingScheduleService().build(
         schedule_id=schedule_id,
         teacher_id=teacher_id,
         academic_week=week,
         timetable_slots=data.timetable_slots,
         curriculum_periods=data.curriculum_periods,
         execution_records=data.execution_records,
+    )
+    if teacher_profile is None:
+        return schedule
+    profile_metadata = {
+        "teacher_code": teacher_profile.teacher_code,
+        "full_name": teacher_profile.full_name,
+        "school_name": teacher_profile.school_name,
+        "subjects": list(teacher_profile.subjects),
+        "grade_levels": list(teacher_profile.grade_levels),
+        "show_teacher_name": teacher_profile.show_teacher_name,
+        "show_school_name": teacher_profile.show_school_name,
+    }
+    return replace(
+        schedule,
+        metadata={**schedule.metadata, "teacher_profile": profile_metadata},
     )
 
 
@@ -142,6 +160,38 @@ def authenticate_supabase(client: Any, email: str, password: str):
     if not user_id:
         raise ValueError("Supabase không trả về tài khoản người dùng hợp lệ.")
     return SupabaseWeeklyScheduleRepository(client, user_id)
+
+
+def comma_separated_values(value: str) -> tuple[str, ...]:
+    """Normalize teacher-entered comma-separated lists."""
+    if not isinstance(value, str):
+        raise TypeError("value must be a string")
+    return tuple(dict.fromkeys(item.strip() for item in value.split(",") if item.strip()))
+
+
+def save_teacher_profile(
+    repository,
+    *,
+    teacher_code: str,
+    full_name: str,
+    school_name: str,
+    subjects: str,
+    grade_levels: str,
+    default_academic_year: str,
+    show_teacher_name: bool,
+    show_school_name: bool,
+) -> TeacherProfile:
+    profile = TeacherProfile(
+        teacher_code=teacher_code,
+        full_name=full_name,
+        school_name=school_name,
+        subjects=comma_separated_values(subjects),
+        grade_levels=comma_separated_values(grade_levels),
+        default_academic_year=default_academic_year,
+        show_teacher_name=show_teacher_name,
+        show_school_name=show_school_name,
+    )
+    return repository.save(profile)
 
 
 def save_weekly_schedule(
@@ -261,6 +311,7 @@ def main() -> None:
         help="Có thể đổi nơi lưu mà không thay đổi thuật toán lập lịch.",
     )
     repository = None
+    teacher_profile = None
     if storage_label == "Supabase":
         settings = supabase_settings()
         if settings is None:
@@ -289,6 +340,7 @@ def main() -> None:
             st.info("Hãy đăng nhập để lưu và mở lịch trên Supabase.")
             return
         repository = st.session_state["weekly_supabase_repository"]
+        client = st.session_state["weekly_supabase_client"]
         st.sidebar.success("Đã kết nối Supabase")
         if st.sidebar.button("Đăng xuất", use_container_width=True):
             client = st.session_state.pop("weekly_supabase_client", None)
@@ -296,6 +348,81 @@ def main() -> None:
             if client is not None:
                 client.auth.sign_out()
             st.rerun()
+
+        profile_repository = SupabaseTeacherProfileRepository(
+            client, repository.user_id
+        )
+        try:
+            teacher_profile = profile_repository.get()
+        except Exception as error:
+            st.error(f"Không thể đọc hồ sơ giáo viên: {error}")
+            return
+
+        with st.expander(
+            "Hồ sơ giáo viên",
+            expanded=teacher_profile is None,
+        ):
+            if teacher_profile is None:
+                st.info("Hãy tạo hồ sơ trước khi lập lịch báo giảng.")
+            with st.form("teacher_profile_form"):
+                teacher_code = st.text_input(
+                    "Mã giáo viên",
+                    value=teacher_profile.teacher_code if teacher_profile else "",
+                )
+                full_name = st.text_input(
+                    "Họ và tên",
+                    value=teacher_profile.full_name if teacher_profile else "",
+                )
+                school_name = st.text_input(
+                    "Trường công tác",
+                    value=teacher_profile.school_name if teacher_profile else "",
+                )
+                subjects = st.text_input(
+                    "Môn giảng dạy (phân cách bằng dấu phẩy)",
+                    value=", ".join(teacher_profile.subjects) if teacher_profile else "",
+                )
+                grade_levels = st.text_input(
+                    "Khối/lớp phụ trách (phân cách bằng dấu phẩy)",
+                    value=", ".join(teacher_profile.grade_levels) if teacher_profile else "",
+                )
+                default_academic_year = st.text_input(
+                    "Năm học mặc định",
+                    value=(teacher_profile.default_academic_year if teacher_profile else ""),
+                )
+                show_teacher_name = st.checkbox(
+                    "Hiển thị họ tên trên lịch báo giảng",
+                    value=teacher_profile.show_teacher_name if teacher_profile else True,
+                )
+                show_school_name = st.checkbox(
+                    "Hiển thị trường trên lịch báo giảng",
+                    value=teacher_profile.show_school_name if teacher_profile else True,
+                )
+                submitted = st.form_submit_button(
+                    "Lưu hồ sơ giáo viên", use_container_width=True
+                )
+                if submitted:
+                    try:
+                        save_teacher_profile(
+                            profile_repository,
+                            teacher_code=teacher_code,
+                            full_name=full_name,
+                            school_name=school_name,
+                            subjects=subjects,
+                            grade_levels=grade_levels,
+                            default_academic_year=default_academic_year,
+                            show_teacher_name=show_teacher_name,
+                            show_school_name=show_school_name,
+                        )
+                        st.success("Đã lưu hồ sơ giáo viên.")
+                        st.rerun()
+                    except Exception as error:
+                        st.error(f"Không thể lưu hồ sơ: {error}")
+
+        if teacher_profile is None:
+            return
+        st.sidebar.caption(
+            f"{teacher_profile.full_name} · {teacher_profile.teacher_code}"
+        )
 
     with st.expander("Quy trình sử dụng", expanded=False):
         st.markdown(
@@ -356,8 +483,25 @@ def main() -> None:
         return
 
     left, middle, right = st.columns(3)
-    teacher_id = left.selectbox("Giáo viên", teachers)
-    academic_year = middle.selectbox("Năm học", years)
+    if teacher_profile is not None:
+        if teacher_profile.teacher_code not in teachers:
+            st.warning(
+                "Mã giáo viên trong hồ sơ không có trong bảng Thời khóa biểu. "
+                "Hãy sửa hồ sơ hoặc dữ liệu nguồn để hai mã trùng nhau."
+            )
+            return
+        teacher_id = left.selectbox(
+            "Giáo viên", (teacher_profile.teacher_code,), disabled=True
+        )
+    else:
+        teacher_id = left.selectbox("Giáo viên", teachers)
+    year_index = (
+        years.index(teacher_profile.default_academic_year)
+        if teacher_profile is not None
+        and teacher_profile.default_academic_year in years
+        else 0
+    )
+    academic_year = middle.selectbox("Năm học", years, index=year_index)
     available_weeks = week_options(data, academic_year)
     if not available_weeks:
         st.warning("Năm học đã chọn chưa có tuần học.")
@@ -410,6 +554,7 @@ def main() -> None:
                     teacher_id=teacher_id,
                     academic_year=academic_year,
                     week_number=week_number,
+                    teacher_profile=teacher_profile,
                 )
                 st.session_state["weekly_schedule_selection"] = selection
         except Exception as error:

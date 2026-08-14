@@ -12,6 +12,8 @@ from scripts.weekly_schedule.app import (
     saved_schedule_options,
     supabase_settings,
     authenticate_supabase,
+    comma_separated_values,
+    save_teacher_profile,
     schedule_rows,
     source_table_rows,
     teacher_options,
@@ -129,3 +131,43 @@ def test_authentication_scopes_repository_to_returned_user():
     client = type("Client", (), {"auth": Auth()})()
     repository = authenticate_supabase(client, " teacher@example.com ", "safe-pass")
     assert repository._user_id == "user-123"
+
+
+def test_teacher_profile_is_entered_in_system_and_added_to_schedule_metadata():
+    class Repository:
+        def save(self, profile):
+            return profile
+
+    profile = save_teacher_profile(
+        Repository(), teacher_code="GV001", full_name="Nguyễn Văn A",
+        school_name="THCS Mẫu", subjects="Toán, Tin học, Toán",
+        grade_levels="6, 7", default_academic_year="2026-2027",
+        show_teacher_name=True, show_school_name=True,
+    )
+    schedule = build_weekly_schedule(
+        data=_data(), teacher_id="GV001", academic_year="2026-2027",
+        week_number=5, teacher_profile=profile,
+    )
+    assert comma_separated_values("Toán, Tin học, Toán") == ("Toán", "Tin học")
+    assert schedule.metadata["teacher_profile"]["full_name"] == "Nguyễn Văn A"
+    assert schedule.metadata["teacher_profile"]["school_name"] == "THCS Mẫu"
+
+
+def test_export_uses_profile_display_preferences():
+    from io import BytesIO
+    from openpyxl import load_workbook
+    from educational_planning_v2.models import TeacherProfile
+
+    profile = TeacherProfile(
+        "GV001", "Nguyễn Văn A", "THCS Mẫu", ("Toán",), ("6",), "2026-2027"
+    )
+    schedule = build_weekly_schedule(
+        data=_data(), teacher_id="GV001", academic_year="2026-2027",
+        week_number=5, teacher_profile=profile,
+    )
+    exported = export_weekly_schedule(schedule)
+    workbook = load_workbook(BytesIO(exported.content), read_only=True)
+    heading = workbook["Lich_bao_giang"]["A2"].value
+    workbook.close()
+    assert "Nguyễn Văn A" in heading
+    assert "THCS Mẫu" in heading
