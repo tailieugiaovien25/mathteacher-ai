@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from hashlib import sha256
 from io import BytesIO
+import os
 from pathlib import Path
+from typing import Any
 
 from educational_planning_v2.adapters import (
     LocalWeeklyScheduleRepository,
+    SupabaseWeeklyScheduleRepository,
     WeeklyScheduleExcelAdapter,
     WeeklyScheduleSourceData,
     WeeklyScheduleWorkbookError,
@@ -114,19 +117,61 @@ def export_weekly_schedule(schedule: WeeklyTeachingSchedule):
     return WeeklyScheduleExcelExporter().export(schedule)
 
 
-def save_weekly_schedule(schedule: WeeklyTeachingSchedule, storage_root: str | Path):
+def supabase_settings(environ: dict[str, str] | None = None) -> tuple[str, str] | None:
+    """Read public Supabase connection settings without embedding credentials."""
+    values = os.environ if environ is None else environ
+    url = values.get("SUPABASE_URL", "").strip()
+    key = values.get("SUPABASE_PUBLISHABLE_KEY", "").strip()
+    return (url, key) if url and key else None
+
+
+def create_supabase_client(url: str, publishable_key: str):
+    """Import the optional SDK only when cloud storage is selected."""
+    from supabase import create_client
+
+    return create_client(url, publishable_key)
+
+
+def authenticate_supabase(client: Any, email: str, password: str):
+    """Authenticate one teacher and return a repository scoped to that user."""
+    response = client.auth.sign_in_with_password(
+        {"email": email.strip(), "password": password}
+    )
+    user = getattr(response, "user", None)
+    user_id = getattr(user, "id", None)
+    if not user_id:
+        raise ValueError("Supabase không trả về tài khoản người dùng hợp lệ.")
+    return SupabaseWeeklyScheduleRepository(client, user_id)
+
+
+def save_weekly_schedule(
+    schedule: WeeklyTeachingSchedule,
+    storage_root: str | Path,
+    repository=None,
+):
     """Save or update a schedule through the repository boundary."""
-    return LocalWeeklyScheduleRepository(storage_root).save(schedule)
+    target = repository or LocalWeeklyScheduleRepository(storage_root)
+    return target.save(schedule)
 
 
-def saved_schedule_options(teacher_id: str, storage_root: str | Path):
+def saved_schedule_options(
+    teacher_id: str,
+    storage_root: str | Path,
+    repository=None,
+):
     """Return saved schedules for one teacher only."""
-    return LocalWeeklyScheduleRepository(storage_root).list_for_teacher(teacher_id)
+    target = repository or LocalWeeklyScheduleRepository(storage_root)
+    return target.list_for_teacher(teacher_id)
 
 
-def load_saved_schedule(schedule_id: str, storage_root: str | Path):
+def load_saved_schedule(
+    schedule_id: str,
+    storage_root: str | Path,
+    repository=None,
+):
     """Open a canonical schedule previously saved by the teacher."""
-    return LocalWeeklyScheduleRepository(storage_root).get(schedule_id)
+    target = repository or LocalWeeklyScheduleRepository(storage_root)
+    return target.get(schedule_id)
 
 
 def source_table_rows(
@@ -210,6 +255,48 @@ def main() -> None:
         "kiểm tra, tìm kiếm và lập lịch"
     )
 
+    storage_label = st.sidebar.radio(
+        "Nơi lưu lịch",
+        ("Trên máy", "Supabase"),
+        help="Có thể đổi nơi lưu mà không thay đổi thuật toán lập lịch.",
+    )
+    repository = None
+    if storage_label == "Supabase":
+        settings = supabase_settings()
+        if settings is None:
+            st.sidebar.error(
+                "Chưa có SUPABASE_URL và SUPABASE_PUBLISHABLE_KEY."
+            )
+            st.info(
+                "Hãy cấu hình hai biến môi trường Supabase rồi khởi động lại "
+                "giao diện. Không sử dụng secret key hoặc service-role key."
+            )
+            return
+        if "weekly_supabase_repository" not in st.session_state:
+            st.sidebar.subheader("Đăng nhập giáo viên")
+            email = st.sidebar.text_input("Email")
+            password = st.sidebar.text_input("Mật khẩu", type="password")
+            if st.sidebar.button("Đăng nhập", use_container_width=True):
+                try:
+                    client = create_supabase_client(*settings)
+                    st.session_state["weekly_supabase_client"] = client
+                    st.session_state["weekly_supabase_repository"] = authenticate_supabase(
+                        client, email, password
+                    )
+                    st.rerun()
+                except Exception as error:
+                    st.sidebar.error(f"Không thể đăng nhập: {error}")
+            st.info("Hãy đăng nhập để lưu và mở lịch trên Supabase.")
+            return
+        repository = st.session_state["weekly_supabase_repository"]
+        st.sidebar.success("Đã kết nối Supabase")
+        if st.sidebar.button("Đăng xuất", use_container_width=True):
+            client = st.session_state.pop("weekly_supabase_client", None)
+            st.session_state.pop("weekly_supabase_repository", None)
+            if client is not None:
+                client.auth.sign_out()
+            st.rerun()
+
     with st.expander("Quy trình sử dụng", expanded=False):
         st.markdown(
             """
@@ -288,7 +375,9 @@ def main() -> None:
 
     selection = (uploaded.name, teacher_id, academic_year, week_number)
     with st.expander("Lịch báo giảng đã lưu", expanded=False):
-        saved_items = saved_schedule_options(teacher_id, DEFAULT_SCHEDULE_STORAGE)
+        saved_items = saved_schedule_options(
+            teacher_id, DEFAULT_SCHEDULE_STORAGE, repository
+        )
         if not saved_items:
             st.caption("Giáo viên này chưa có lịch báo giảng đã lưu.")
         else:
@@ -299,7 +388,9 @@ def main() -> None:
             saved_label = st.selectbox("Chọn lịch", tuple(saved_by_label))
             if st.button("Mở lịch đã lưu", use_container_width=True):
                 selected = saved_by_label[saved_label]
-                stored = load_saved_schedule(selected.schedule_id, DEFAULT_SCHEDULE_STORAGE)
+                stored = load_saved_schedule(
+                    selected.schedule_id, DEFAULT_SCHEDULE_STORAGE, repository
+                )
                 if stored is None:
                     st.error("Không tìm thấy lịch đã lưu.")
                 elif (
@@ -343,7 +434,9 @@ def main() -> None:
     metric3.metric("Số môn/phân môn", len({(row["Môn học"], row["Phân môn"]) for row in rows}))
     if st.button("Lưu lịch báo giảng", use_container_width=True):
         try:
-            saved = save_weekly_schedule(schedule, DEFAULT_SCHEDULE_STORAGE)
+            saved = save_weekly_schedule(
+                schedule, DEFAULT_SCHEDULE_STORAGE, repository
+            )
             st.success(
                 f"Đã lưu lịch tuần {saved.week_number}. "
                 "Nếu lịch đã tồn tại, hệ thống đã cập nhật bản mới nhất."
@@ -360,8 +453,8 @@ def main() -> None:
         use_container_width=True,
     )
     st.info(
-        "Lịch được lưu qua một cổng dữ liệu độc lập. Bộ lưu cục bộ có thể "
-        "được thay bằng Supabase mà không thay đổi dịch vụ lập lịch."
+        f"Lịch đang được lưu tại {'Supabase' if repository else 'máy tính'}. "
+        "Việc đổi nơi lưu không thay đổi dịch vụ lập lịch."
     )
 
 
