@@ -18,6 +18,7 @@ Trinh duyet se mo giao dien tai dia chi Streamlit thong bao. Tai tep
 - Xem bon bang nguon da duoc chuan hoa.
 - Chon giao vien, nam hoc va tuan.
 - Tao va xem truoc lich bao giang.
+- Tai lich bao giang Excel da dinh dang va san sang de in.
 - Khong sua hoac ghi de tep Excel nguon.
 
 Giao dien chi dieu phoi adapter va dich vu mien hien co. Thuat toan lap lich

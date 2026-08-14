@@ -5,6 +5,7 @@ import pytest
 from scripts.weekly_schedule.app import (
     academic_year_options,
     build_weekly_schedule,
+    export_weekly_schedule,
     load_uploaded_workbook,
     schedule_rows,
     source_table_rows,
@@ -46,6 +47,10 @@ def test_app_builds_week_five_schedule_from_uploaded_template():
     assert len(rows) == 3
     assert [row["Tiết PPCT"] for row in rows] == [3, 2, 4]
     assert [row["Thứ"] for row in rows] == ["Thứ 2", "Thứ 3", "Thứ 4"]
+
+    exported = export_weekly_schedule(schedule)
+    assert exported.file_name.endswith("tuan-05.xlsx")
+    assert exported.content.startswith(b"PK")
 
 
 def test_source_tables_are_available_to_the_user_interface():

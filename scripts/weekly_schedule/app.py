@@ -12,6 +12,7 @@ from educational_planning_v2.adapters import (
     WeeklyScheduleWorkbookError,
 )
 from educational_planning_v2.models import WeeklyTeachingSchedule
+from educational_planning_v2.exporters import WeeklyScheduleExcelExporter
 from educational_planning_v2.services import WeeklyTeachingScheduleService
 
 
@@ -104,6 +105,11 @@ def schedule_rows(schedule: WeeklyTeachingSchedule) -> list[dict[str, object]]:
         }
         for entry in schedule.entries
     ]
+
+
+def export_weekly_schedule(schedule: WeeklyTeachingSchedule):
+    """Create the downloadable system-template workbook."""
+    return WeeklyScheduleExcelExporter().export(schedule)
 
 
 def source_table_rows(
@@ -294,9 +300,18 @@ def main() -> None:
     metric1.metric("Số tiết", len(rows))
     metric2.metric("Số lớp", len({row["Lớp"] for row in rows}))
     metric3.metric("Số môn/phân môn", len({(row["Môn học"], row["Phân môn"]) for row in rows}))
+    excel_export = export_weekly_schedule(schedule)
+    st.download_button(
+        "Tải lịch báo giảng Excel",
+        data=excel_export.content,
+        file_name=excel_export.file_name,
+        mime=excel_export.mime_type,
+        type="primary",
+        use_container_width=True,
+    )
     st.info(
-        "Đây là bản xem trước. Giai đoạn tiếp theo sẽ bổ sung lưu dữ liệu "
-        "và xuất theo mẫu lịch báo giảng của giáo viên."
+        "Tệp Excel sử dụng mẫu chuẩn của hệ thống. Giai đoạn tiếp theo sẽ "
+        "bổ sung ánh xạ sang mẫu riêng do giáo viên tải lên."
     )
 
 
