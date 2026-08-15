@@ -79,6 +79,7 @@ def _schema() -> WeeklyScheduleWorkbookSchema:
 
 def test_inspector_finds_sheets_and_header_row_without_changing_workbook():
     content = _mapped_workbook()
+    original_content = bytes(content)
     inspections = WeeklyScheduleWorkbookInspector().inspect(content)
 
     assert tuple(item.name for item in inspections) == (
@@ -87,7 +88,10 @@ def test_inspector_finds_sheets_and_header_row_without_changing_workbook():
     assert WeeklyScheduleWorkbookInspector.headers(inspections[0], 3) == (
         "NĂM", "TUẦN SỐ", "BẮT ĐẦU", "KẾT THÚC"
     )
-    assert content == _mapped_workbook()
+    # Verify that inspection does not modify the supplied workbook bytes.
+    # Do not regenerate a second XLSX archive for comparison because ZIP
+    # metadata may differ between otherwise equivalent generated workbooks.
+    assert content == original_content
 
 
 def test_custom_mapping_loads_nonstandard_workbook_and_optional_columns():
