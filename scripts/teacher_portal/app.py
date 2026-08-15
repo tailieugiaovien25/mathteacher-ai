@@ -11,6 +11,11 @@ from educational_planning_v2.adapters import (
 )
 from educational_planning_v2.models import TeacherProfile
 from teacher_document_library_v2.adapters import SupabaseTeacherDocumentRepository
+from portal_v2.authorization import (
+    PORTAL_ROLE_TEACHER,
+    build_portal_authorization_context,
+)
+from portal_v2.ui import render_admin_shell
 
 
 PORTAL_PAGES = (
@@ -24,6 +29,10 @@ PORTAL_SESSION_KEYS = (
     "portal_supabase_client",
     "portal_user_id",
     "portal_user_email",
+    "portal_user_role",
+    "portal_workspace",
+    "admin_portal_page",
+    "admin_portal_navigation",
     "portal_navigation",
     "weekly_supabase_client",
     "weekly_supabase_repository",
@@ -91,6 +100,20 @@ def select_portal_page(session_state: Any, page: str) -> None:
     session_state["portal_navigation"] = page
 
 
+def build_current_portal_authorization(session_state: Any):
+    """Build UI authorization from authenticated session state."""
+    return build_portal_authorization_context(
+        user_id=str(session_state.get("portal_user_id", "")),
+        email=str(session_state.get("portal_user_email", "")),
+        role=str(
+            session_state.get(
+                "portal_user_role",
+                PORTAL_ROLE_TEACHER,
+            )
+        ),
+    )
+
+
 def comma_values(value: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(item.strip() for item in value.split(",") if item.strip()))
 
@@ -130,6 +153,7 @@ def render_login(st, settings: tuple[str, str] | None) -> None:
             user_id, returned_email = authenticate_portal(client, email, password)
             connect_feature_repositories(st.session_state, client, user_id)
             st.session_state["portal_user_email"] = returned_email
+            st.session_state["portal_user_role"] = PORTAL_ROLE_TEACHER
             st.session_state["portal_page"] = "Tổng quan"
             st.rerun()
         except Exception as error:
@@ -228,6 +252,27 @@ def main() -> None:
     st.sidebar.title("MathTeacher-AI")
     st.sidebar.success("Đã đăng nhập")
     st.sidebar.caption(st.session_state.get("portal_user_email", "Giáo viên"))
+
+    authorization = build_current_portal_authorization(
+        st.session_state
+    )
+
+    workspace = "Gi?o vi?n"
+
+    if authorization.can_access_admin_portal:
+        workspace = st.sidebar.radio(
+            "Khu v?c",
+            ("Gi?o vi?n", "ADMIN"),
+            key="portal_workspace",
+            horizontal=True,
+        )
+
+    if workspace == "ADMIN":
+        render_admin_shell(
+            st,
+            authorization,
+        )
+        return
     current_page = st.session_state.get("portal_page", "Tổng quan")
     if current_page not in PORTAL_PAGES:
         current_page = "Tổng quan"

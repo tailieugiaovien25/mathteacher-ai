@@ -27,3 +27,21 @@ __all__ = [
     "admin_portal_pages",
     "resolve_admin_portal_page",
 ]
+
+from .admin_shell import (
+    ADMIN_PORTAL_SESSION_KEY,
+    admin_page_id_from_label,
+    admin_page_label_from_id,
+    render_admin_page,
+    render_admin_shell,
+    select_admin_portal_page,
+)
+
+__all__.extend([
+    "ADMIN_PORTAL_SESSION_KEY",
+    "admin_page_id_from_label",
+    "admin_page_label_from_id",
+    "render_admin_page",
+    "render_admin_shell",
+    "select_admin_portal_page",
+])
