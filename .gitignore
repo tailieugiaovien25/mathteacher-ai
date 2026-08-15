@@ -225,6 +225,7 @@ __pycache__/
 data/input/*.xlsx
 data/input/*.xlsm
 data/weekly_schedules/
+data/weekly_schedule_mappings/
 # Generated reports
 output/
 # VS Code

@@ -13,9 +13,13 @@ from educational_planning_v2.adapters import (
     LocalWeeklyScheduleRepository,
     SupabaseWeeklyScheduleRepository,
     SupabaseTeacherProfileRepository,
+    LocalWeeklyScheduleMappingRepository,
+    WeeklyScheduleMappingProfile,
+    WeeklyScheduleWorkbookInspector,
     WeeklyScheduleExcelAdapter,
     WeeklyScheduleSourceData,
     WeeklyScheduleWorkbookError,
+    WeeklyScheduleWorkbookSchema,
 )
 from educational_planning_v2.models import TeacherProfile, WeeklyTeachingSchedule
 from educational_planning_v2.exporters import WeeklyScheduleExcelExporter
@@ -24,6 +28,70 @@ from educational_planning_v2.services import WeeklyTeachingScheduleService
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 DEFAULT_SCHEDULE_STORAGE = Path("data/weekly_schedules")
+DEFAULT_MAPPING_STORAGE = Path("data/weekly_schedule_mappings")
+NO_COLUMN = "— Không có cột tương ứng —"
+MAPPING_TABLES = {
+    "academic_weeks": {
+        "label": "Tuần học",
+        "sheet_key": "academic_weeks_sheet",
+        "header_key": "academic_weeks_header_row",
+        "columns_key": "academic_week_columns",
+        "fields": {
+            "academic_year": ("Năm học", False),
+            "week_number": ("Số tuần", False),
+            "start_date": ("Từ ngày", False),
+            "end_date": ("Đến ngày", False),
+        },
+    },
+    "timetable": {
+        "label": "Thời khóa biểu",
+        "sheet_key": "timetable_sheet",
+        "header_key": "timetable_header_row",
+        "columns_key": "timetable_columns",
+        "fields": {
+            "teacher_id": ("Mã giáo viên", False),
+            "class_id": ("Lớp", False),
+            "subject_ref": ("Môn học", False),
+            "component_ref": ("Phân môn", True),
+            "weekday": ("Thứ", False),
+            "timetable_period": ("Tiết học", False),
+            "effective_from": ("Hiệu lực từ", False),
+            "effective_to": ("Hiệu lực đến", False),
+        },
+    },
+    "curriculum": {
+        "label": "PPCT",
+        "sheet_key": "curriculum_sheet",
+        "header_key": "curriculum_header_row",
+        "columns_key": "curriculum_columns",
+        "fields": {
+            "class_id": ("Lớp", False),
+            "subject_ref": ("Môn học", False),
+            "component_ref": ("Phân môn", True),
+            "period_number": ("Tiết PPCT", False),
+            "lesson_id": ("Mã bài học", False),
+            "lesson_title": ("Tên bài học", False),
+            "period_in_lesson": ("Tiết trong bài", True),
+            "total_lesson_periods": ("Tổng tiết của bài", True),
+            "teaching_equipment": ("Thiết bị dạy học", True),
+        },
+    },
+    "executions": {
+        "label": "Tiết đã dạy",
+        "sheet_key": "executions_sheet",
+        "header_key": "executions_header_row",
+        "columns_key": "execution_columns",
+        "fields": {
+            "teacher_id": ("Mã giáo viên", False),
+            "class_id": ("Lớp", False),
+            "subject_ref": ("Môn học", False),
+            "component_ref": ("Phân môn", True),
+            "teaching_date": ("Ngày dạy", False),
+            "curriculum_period": ("Tiết PPCT", False),
+            "status": ("Trạng thái", False),
+        },
+    },
+}
 WEEKDAY_LABELS = {
     1: "Thứ 2",
     2: "Thứ 3",
@@ -35,7 +103,11 @@ WEEKDAY_LABELS = {
 }
 
 
-def load_uploaded_workbook(content: bytes, original_name: str) -> WeeklyScheduleSourceData:
+def load_uploaded_workbook(
+    content: bytes,
+    original_name: str,
+    schema: WeeklyScheduleWorkbookSchema | None = None,
+) -> WeeklyScheduleSourceData:
     """Validate uploaded bytes and adapt the workbook to canonical data."""
     safe_name = Path(original_name).name
     if not safe_name.lower().endswith(".xlsx"):
@@ -46,11 +118,183 @@ def load_uploaded_workbook(content: bytes, original_name: str) -> WeeklySchedule
         raise ValueError("Tệp vượt quá giới hạn 20 MB.")
 
     try:
-        return WeeklyScheduleExcelAdapter().load(BytesIO(content))
+        return WeeklyScheduleExcelAdapter(schema).load(BytesIO(content))
     except WeeklyScheduleWorkbookError:
         raise
     except Exception as error:
         raise ValueError(f"Không thể đọc tệp Excel: {error}") from error
+
+
+def inspect_uploaded_workbook(content: bytes):
+    return WeeklyScheduleWorkbookInspector().inspect(content)
+
+
+def build_mapping_schema(selection: dict[str, dict[str, object]]) -> WeeklyScheduleWorkbookSchema:
+    kwargs: dict[str, object] = {}
+    for table_key, table_spec in MAPPING_TABLES.items():
+        chosen = selection[table_key]
+        kwargs[table_spec["sheet_key"]] = chosen["sheet"]
+        kwargs[table_spec["header_key"]] = chosen["header_row"]
+        columns = dict(chosen["columns"])
+        required_missing = [
+            logical
+            for logical, (_, optional) in table_spec["fields"].items()
+            if not optional and not columns.get(logical)
+        ]
+        if required_missing:
+            raise ValueError(
+                f"{table_spec['label']} còn thiếu trường bắt buộc: "
+                + ", ".join(required_missing)
+            )
+        physical = [value for value in columns.values() if value]
+        if len({value.casefold() for value in physical}) != len(physical):
+            raise ValueError(f"{table_spec['label']} đang dùng trùng một cột nguồn")
+        kwargs[table_spec["columns_key"]] = columns
+    return WeeklyScheduleWorkbookSchema(**kwargs)
+
+
+def mapping_profile_options(
+    storage_root: str | Path = DEFAULT_MAPPING_STORAGE,
+) -> tuple[str, ...]:
+    """List reusable local mapping profiles without exposing JSON details to UI."""
+    return LocalWeeklyScheduleMappingRepository(storage_root).list_names()
+
+
+def load_mapping_profile(
+    profile_name: str,
+    storage_root: str | Path = DEFAULT_MAPPING_STORAGE,
+) -> WeeklyScheduleMappingProfile | None:
+    """Load a previously saved workbook mapping profile."""
+    return LocalWeeklyScheduleMappingRepository(storage_root).get(profile_name)
+
+
+def save_mapping_profile(
+    profile_name: str,
+    schema: WeeklyScheduleWorkbookSchema,
+    storage_root: str | Path = DEFAULT_MAPPING_STORAGE,
+) -> WeeklyScheduleMappingProfile:
+    """Save a mapping profile while keeping persistence outside the core service."""
+    profile = WeeklyScheduleMappingProfile(profile_name.strip(), schema)
+    return LocalWeeklyScheduleMappingRepository(storage_root).save(profile)
+
+
+def _render_mapping_tool(st, content: bytes, original_name: str, content_digest) -> None:
+    """Render the sheet/header/column mapping tool and store validated source data."""
+    try:
+        inspections = inspect_uploaded_workbook(content)
+    except Exception as error:
+        st.error(f"Không thể kiểm tra cấu trúc tệp Excel: {error}")
+        return
+
+    inspection_by_name = {item.name: item for item in inspections}
+    sheet_names = tuple(inspection_by_name)
+    if not sheet_names:
+        st.error("Tệp Excel không có sheet dữ liệu.")
+        return
+
+    saved_names = mapping_profile_options()
+    if saved_names:
+        saved_name = st.selectbox(
+            "Ánh xạ đã lưu",
+            ("— Chọn ánh xạ —", *saved_names),
+            key="weekly_saved_mapping_name",
+        )
+        if st.button("Áp dụng ánh xạ đã lưu", use_container_width=True):
+            if saved_name.startswith("—"):
+                st.warning("Hãy chọn một ánh xạ đã lưu.")
+            else:
+                try:
+                    profile = load_mapping_profile(saved_name)
+                    if profile is None:
+                        raise ValueError("Không tìm thấy hồ sơ ánh xạ")
+                    data = load_uploaded_workbook(content, original_name, profile.schema)
+                    st.session_state["weekly_source_data"] = data
+                    st.session_state["weekly_source_digest"] = content_digest
+                    st.session_state["weekly_mapping_profile"] = saved_name
+                    st.session_state.pop("weekly_schedule", None)
+                    st.success(f"Đã áp dụng ánh xạ “{saved_name}”.")
+                    st.rerun()
+                except Exception as error:
+                    st.error(f"Không thể áp dụng ánh xạ đã lưu: {error}")
+
+    st.markdown("#### Tạo ánh xạ mới")
+    selection: dict[str, dict[str, object]] = {}
+    default_schema = WeeklyScheduleWorkbookSchema()
+    for table_key, table_spec in MAPPING_TABLES.items():
+        with st.expander(str(table_spec["label"]), expanded=table_key == "academic_weeks"):
+            default_sheet = getattr(default_schema, str(table_spec["sheet_key"]))
+            sheet_index = sheet_names.index(default_sheet) if default_sheet in sheet_names else 0
+            sheet_name = st.selectbox(
+                "Sheet nguồn",
+                sheet_names,
+                index=sheet_index,
+                key=f"mapping_{table_key}_sheet",
+            )
+            inspection = inspection_by_name[sheet_name]
+            max_preview_row = max(1, len(inspection.preview_rows))
+            header_row = int(
+                st.number_input(
+                    "Dòng chứa tiêu đề",
+                    min_value=1,
+                    max_value=max_preview_row,
+                    value=min(
+                        getattr(default_schema, str(table_spec["header_key"])),
+                        max_preview_row,
+                    ),
+                    step=1,
+                    key=f"mapping_{table_key}_header",
+                )
+            )
+            try:
+                headers = WeeklyScheduleWorkbookInspector.headers(inspection, header_row)
+            except Exception as error:
+                st.error(f"Dòng tiêu đề chưa hợp lệ: {error}")
+                headers = ()
+
+            preview = inspection.preview_rows[: min(len(inspection.preview_rows), header_row + 4)]
+            st.caption("Xem trước dữ liệu gốc (chỉ đọc)")
+            st.dataframe(preview, use_container_width=True, hide_index=True)
+
+            defaults = getattr(default_schema, str(table_spec["columns_key"]))
+            chosen_columns: dict[str, str | None] = {}
+            for logical_name, (field_label, optional) in table_spec["fields"].items():
+                options = ((NO_COLUMN,) if optional or not headers else ()) + headers
+                default_column = defaults.get(logical_name)
+                option_index = options.index(default_column) if default_column in options else 0
+                chosen = st.selectbox(
+                    f"{field_label}{' (không bắt buộc)' if optional else ' *'}",
+                    options,
+                    index=option_index,
+                    key=f"mapping_{table_key}_{logical_name}",
+                )
+                chosen_columns[logical_name] = None if chosen == NO_COLUMN else chosen
+            selection[table_key] = {
+                "sheet": sheet_name,
+                "header_row": header_row,
+                "columns": chosen_columns,
+            }
+
+    profile_name = st.text_input(
+        "Tên ánh xạ để dùng lại",
+        placeholder="Ví dụ: Mẫu lịch Trường THCS A",
+        key="weekly_new_mapping_name",
+    )
+    if st.button("Kiểm tra và áp dụng ánh xạ", type="primary", use_container_width=True):
+        try:
+            schema = build_mapping_schema(selection)
+            data = load_uploaded_workbook(content, original_name, schema)
+            if profile_name.strip():
+                save_mapping_profile(profile_name, schema)
+                st.session_state["weekly_mapping_profile"] = profile_name.strip()
+            else:
+                st.session_state["weekly_mapping_profile"] = "Ánh xạ tạm thời"
+            st.session_state["weekly_source_data"] = data
+            st.session_state["weekly_source_digest"] = content_digest
+            st.session_state.pop("weekly_schedule", None)
+            st.success("Ánh xạ hợp lệ và dữ liệu đã được chuẩn hóa.")
+            st.rerun()
+        except Exception as error:
+            st.error(f"Ánh xạ chưa hợp lệ: {error}")
 
 
 def academic_year_options(data: WeeklyScheduleSourceData) -> tuple[str, ...]:
@@ -449,20 +693,42 @@ def main() -> None:
         sha256(uploaded.getvalue()).hexdigest(),
     )
     if st.session_state.get("weekly_source_digest") != content_digest:
+        st.session_state.pop("weekly_source_data", None)
+        st.session_state.pop("weekly_mapping_profile", None)
         try:
             with st.spinner("Đang kiểm tra và chuẩn hóa dữ liệu..."):
                 st.session_state["weekly_source_data"] = load_uploaded_workbook(
                     uploaded.getvalue(), uploaded.name
                 )
                 st.session_state["weekly_source_digest"] = content_digest
+                st.session_state["weekly_mapping_profile"] = "Mẫu chuẩn MathTeacher-AI"
                 st.session_state.pop("weekly_schedule", None)
         except Exception as error:
-            st.error(f"Không thể sử dụng tệp dữ liệu: {error}")
-            return
+            st.session_state["weekly_default_mapping_error"] = str(error)
+
+    mapping_required = "weekly_source_data" not in st.session_state
+    with st.expander("Ánh xạ file Excel nguồn", expanded=mapping_required):
+        st.caption(
+            "Chọn sheet, dòng tiêu đề và cột tương ứng. Công cụ chỉ đọc tệp "
+            "gốc; hồ sơ ánh xạ có thể lưu để dùng lại khi dữ liệu thay đổi."
+        )
+        if mapping_required:
+            st.warning(
+                "Tệp không khớp mẫu chuẩn. Hãy ánh xạ các bảng dữ liệu của trường."
+            )
+            default_error = st.session_state.get("weekly_default_mapping_error")
+            if default_error:
+                st.caption(f"Kết quả kiểm tra mẫu chuẩn: {default_error}")
+        _render_mapping_tool(
+            st, uploaded.getvalue(), uploaded.name, content_digest
+        )
+
+    if mapping_required:
+        return
 
     data = st.session_state["weekly_source_data"]
     st.success(
-        "Đã đọc dữ liệu: "
+        f"Đã đọc dữ liệu bằng {st.session_state.get('weekly_mapping_profile', 'ánh xạ hiện tại')}: "
         f"{len(data.academic_weeks)} tuần · "
         f"{len(data.timetable_slots)} dòng TKB · "
         f"{len(data.curriculum_periods)} tiết PPCT · "

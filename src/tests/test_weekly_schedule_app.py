@@ -4,9 +4,11 @@ import pytest
 
 from scripts.weekly_schedule.app import (
     academic_year_options,
+    build_mapping_schema,
     build_weekly_schedule,
     export_weekly_schedule,
     load_uploaded_workbook,
+    inspect_uploaded_workbook,
     load_saved_schedule,
     save_weekly_schedule,
     saved_schedule_options,
@@ -88,6 +90,81 @@ def test_ui_module_keeps_excel_details_in_the_adapter():
     source = inspect.getsource(app).lower()
     assert "openpyxl" not in source
     assert "load_workbook" not in source
+
+
+def test_ui_builds_mapping_schema_without_excel_library_details():
+    inspections = inspect_uploaded_workbook(TEMPLATE.read_bytes())
+
+    sheet_names = {item.name for item in inspections}
+    assert {
+        "Tuan_hoc",
+        "Thoi_khoa_bieu",
+        "PPCT",
+        "Tiet_da_day",
+    }.issubset(sheet_names)
+
+    selection = {
+        "academic_weeks": {
+            "sheet": "Tuan_hoc",
+            "header_row": 1,
+            "columns": {
+                "academic_year": "nam_hoc",
+                "week_number": "tuan",
+                "start_date": "tu_ngay",
+                "end_date": "den_ngay",
+            },
+        },
+        "timetable": {
+            "sheet": "Thoi_khoa_bieu",
+            "header_row": 1,
+            "columns": {
+                "teacher_id": "ma_giao_vien",
+                "class_id": "lop",
+                "subject_ref": "mon_hoc",
+                "component_ref": "phan_mon",
+                "weekday": "thu",
+                "timetable_period": "tiet_hoc",
+                "effective_from": "hieu_luc_tu",
+                "effective_to": "hieu_luc_den",
+            },
+        },
+        "curriculum": {
+            "sheet": "PPCT",
+            "header_row": 1,
+            "columns": {
+                "class_id": "lop",
+                "subject_ref": "mon_hoc",
+                "component_ref": "phan_mon",
+                "period_number": "tiet_ppct",
+                "lesson_id": "ma_bai_hoc",
+                "lesson_title": "ten_bai_hoc",
+                "period_in_lesson": "tiet_trong_bai",
+                "total_lesson_periods": "tong_tiet_cua_bai",
+                "teaching_equipment": "thiet_bi_day_hoc",
+            },
+        },
+        "executions": {
+            "sheet": "Tiet_da_day",
+            "header_row": 1,
+            "columns": {
+                "teacher_id": "ma_giao_vien",
+                "class_id": "lop",
+                "subject_ref": "mon_hoc",
+                "component_ref": "phan_mon",
+                "teaching_date": "ngay_day",
+                "curriculum_period": "tiet_ppct",
+                "status": "trang_thai",
+            },
+        },
+    }
+
+    schema = build_mapping_schema(selection)
+
+    assert load_uploaded_workbook(
+        TEMPLATE.read_bytes(),
+        TEMPLATE.name,
+        schema,
+    ) == _data()
 
 
 def test_app_can_save_list_and_reopen_schedule(tmp_path):
