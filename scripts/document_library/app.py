@@ -150,12 +150,13 @@ def document_rows(documents: tuple[TeacherDocument, ...]) -> list[dict[str, obje
     ]
 
 
-def main() -> None:
+def main(*, embedded: bool = False) -> None:
     import streamlit as st
 
-    st.set_page_config(page_title="Kho tài liệu giáo viên", page_icon="📚", layout="wide")
-    st.title("Kho tài liệu cá nhân của giáo viên")
-    st.caption("Supabase quản lý thông tin và quyền sở hữu · Google Drive lưu file")
+    if not embedded:
+        st.set_page_config(page_title="Kho tài liệu giáo viên", page_icon="📚", layout="wide")
+        st.title("Kho tài liệu cá nhân của giáo viên")
+        st.caption("Supabase quản lý thông tin và quyền sở hữu · Google Drive lưu file")
 
     settings = supabase_settings()
     if settings is None:
@@ -180,8 +181,9 @@ def main() -> None:
     repository = st.session_state["document_library_repository"]
     client = st.session_state["document_library_client"]
     catalog = TeacherDocumentCatalog(repository)
-    st.sidebar.success("Đã kết nối kho tài liệu")
-    if st.sidebar.button("Đăng xuất", use_container_width=True):
+    if not embedded:
+        st.sidebar.success("Đã kết nối kho tài liệu")
+    if not embedded and st.sidebar.button("Đăng xuất", use_container_width=True):
         client.auth.sign_out()
         st.session_state.pop("document_library_repository", None)
         st.session_state.pop("document_library_client", None)

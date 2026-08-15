@@ -524,14 +524,15 @@ def source_table_rows(
     }
 
 
-def main() -> None:
+def main(*, embedded: bool = False) -> None:
     import streamlit as st
 
-    st.set_page_config(
-        page_title="Lịch báo giảng tự động",
-        page_icon="📅",
-        layout="wide",
-    )
+    if not embedded:
+        st.set_page_config(
+            page_title="Lịch báo giảng tự động",
+            page_icon="📅",
+            layout="wide",
+        )
     st.markdown(
         """
         <style>
@@ -543,13 +544,14 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.title("Lịch báo giảng tự động theo tuần")
-    st.caption(
-        "MathTeacher-AI V2 · Excel là nguồn dữ liệu; hệ thống thực hiện "
-        "kiểm tra, tìm kiếm và lập lịch"
-    )
+    if not embedded:
+        st.title("Lịch báo giảng tự động theo tuần")
+        st.caption(
+            "MathTeacher-AI V2 · Excel là nguồn dữ liệu; hệ thống thực hiện "
+            "kiểm tra, tìm kiếm và lập lịch"
+        )
 
-    storage_label = st.sidebar.radio(
+    storage_label = "Supabase" if embedded else st.sidebar.radio(
         "Nơi lưu lịch",
         ("Trên máy", "Supabase"),
         help="Có thể đổi nơi lưu mà không thay đổi thuật toán lập lịch.",
@@ -585,8 +587,9 @@ def main() -> None:
             return
         repository = st.session_state["weekly_supabase_repository"]
         client = st.session_state["weekly_supabase_client"]
-        st.sidebar.success("Đã kết nối Supabase")
-        if st.sidebar.button("Đăng xuất", use_container_width=True):
+        if not embedded:
+            st.sidebar.success("Đã kết nối Supabase")
+        if not embedded and st.sidebar.button("Đăng xuất", use_container_width=True):
             client = st.session_state.pop("weekly_supabase_client", None)
             st.session_state.pop("weekly_supabase_repository", None)
             if client is not None:
