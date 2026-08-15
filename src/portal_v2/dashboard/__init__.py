@@ -19,3 +19,13 @@ __all__ = [
     "AdminDashboardReadModel",
     "AdminDashboardStatusCounts",
 ]
+
+from .admin_dashboard_query_service import (
+    AdminDashboardQueryService,
+    AdminDashboardQuerySource,
+)
+
+__all__.extend([
+    "AdminDashboardQueryService",
+    "AdminDashboardQuerySource",
+])
