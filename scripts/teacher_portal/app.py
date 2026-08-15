@@ -1,4 +1,4 @@
-"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
+﻿"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from educational_planning_v2.models import TeacherProfile
 from teacher_document_library_v2.adapters import SupabaseTeacherDocumentRepository
 from portal_v2.authorization import (
     PORTAL_ROLE_TEACHER,
+    SupabaseTrustedPortalRoleSource,
     build_portal_authorization_context,
 )
 from portal_v2.ui import render_admin_shell
@@ -100,6 +101,21 @@ def select_portal_page(session_state: Any, page: str) -> None:
     session_state["portal_navigation"] = page
 
 
+def resolve_authenticated_portal_role(
+    *,
+    client: Any,
+    user_id: str,
+) -> str:
+    """Resolve effective portal role from the trusted server-governed source."""
+    source = SupabaseTrustedPortalRoleSource(
+        client=client
+    )
+    resolution = source.resolve_role(
+        user_id=user_id
+    )
+    return resolution.effective_role
+
+
 def build_current_portal_authorization(session_state: Any):
     """Build UI authorization from authenticated session state."""
     return build_portal_authorization_context(
@@ -153,7 +169,12 @@ def render_login(st, settings: tuple[str, str] | None) -> None:
             user_id, returned_email = authenticate_portal(client, email, password)
             connect_feature_repositories(st.session_state, client, user_id)
             st.session_state["portal_user_email"] = returned_email
-            st.session_state["portal_user_role"] = PORTAL_ROLE_TEACHER
+            st.session_state["portal_user_role"] = (
+                resolve_authenticated_portal_role(
+                    client=client,
+                    user_id=user_id,
+                )
+            )
             st.session_state["portal_page"] = "Tổng quan"
             st.rerun()
         except Exception as error:
@@ -310,3 +331,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

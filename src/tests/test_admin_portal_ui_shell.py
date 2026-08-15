@@ -118,9 +118,14 @@ def main():
     ))
 
     tests.append((
-        "AUS11 Default login role remains teacher",
-        '["portal_user_role"] = PORTAL_ROLE_TEACHER'
-        in app_source,
+        "AUS11 Login role comes from trusted role integration",
+        (
+            "resolve_authenticated_portal_role"
+            in app_source
+            and
+            '["portal_user_role"] = PORTAL_ROLE_TEACHER'
+            not in app_source
+        ),
     ))
 
     from portal_v2.ui import admin_shell
@@ -195,3 +200,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
