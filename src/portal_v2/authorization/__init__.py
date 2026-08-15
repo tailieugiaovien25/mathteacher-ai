@@ -13,3 +13,13 @@ __all__ = [
     "PortalAuthorizationContext",
     "build_portal_authorization_context",
 ]
+
+from .portal_role_source import (
+    PortalRoleResolution,
+    TrustedPortalRoleSource,
+)
+
+__all__.extend([
+    "PortalRoleResolution",
+    "TrustedPortalRoleSource",
+])
