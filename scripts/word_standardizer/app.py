@@ -46,14 +46,15 @@ def standardize_uploaded_docx(
         )
 
 
-def main() -> None:
+def main(*, embedded: bool = False) -> None:
     import streamlit as st
 
-    st.set_page_config(
-        page_title="Chuẩn hóa kế hoạch bài dạy",
-        page_icon="📘",
-        layout="centered",
-    )
+    if not embedded:
+        st.set_page_config(
+            page_title="Chuẩn hóa kế hoạch bài dạy",
+            page_icon="📘",
+            layout="centered",
+        )
     st.markdown(
         """
         <style>
@@ -64,8 +65,9 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.title("Chuẩn hóa kế hoạch bài dạy")
-    st.caption("MathTeacher-AI V2 · Xử lý an toàn trên máy tính, không ghi đè bản gốc")
+    if not embedded:
+        st.title("Chuẩn hóa kế hoạch bài dạy")
+        st.caption("MathTeacher-AI V2 · Xử lý an toàn trên máy tính, không ghi đè bản gốc")
 
     with st.expander("Quy tắc chuẩn hóa đang áp dụng", expanded=False):
         st.markdown(
