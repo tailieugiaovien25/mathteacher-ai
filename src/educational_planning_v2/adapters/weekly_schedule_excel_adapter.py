@@ -23,6 +23,10 @@ class WeeklyScheduleWorkbookSchema:
     timetable_sheet: str = "Thoi_khoa_bieu"
     curriculum_sheet: str = "PPCT"
     executions_sheet: str = "Tiet_da_day"
+    academic_weeks_header_row: int = 1
+    timetable_header_row: int = 1
+    curriculum_header_row: int = 1
+    executions_header_row: int = 1
     academic_week_columns: Mapping[str, str] = field(
         default_factory=lambda: {
             "academic_year": "nam_hoc",
@@ -148,18 +152,22 @@ class WeeklyScheduleExcelAdapter:
             weeks = self._read_rows(
                 workbook, self._schema.academic_weeks_sheet,
                 self._schema.academic_week_columns, self._academic_week,
+                self._schema.academic_weeks_header_row,
             )
             slots = self._read_rows(
                 workbook, self._schema.timetable_sheet,
                 self._schema.timetable_columns, self._timetable_slot,
+                self._schema.timetable_header_row,
             )
             curriculum = self._read_rows(
                 workbook, self._schema.curriculum_sheet,
                 self._schema.curriculum_columns, self._curriculum_period,
+                self._schema.curriculum_header_row,
             )
             executions = self._read_rows(
                 workbook, self._schema.executions_sheet,
                 self._schema.execution_columns, self._execution_record,
+                self._schema.executions_header_row,
             )
         finally:
             workbook.close()
@@ -170,36 +178,48 @@ class WeeklyScheduleExcelAdapter:
             execution_records=executions,
         )
 
-    def _read_rows(self, workbook, sheet_name, columns, factory):
+    def _read_rows(self, workbook, sheet_name, columns, factory, header_row=1):
         if sheet_name not in workbook.sheetnames:
             raise WeeklyScheduleWorkbookError(
                 "khong tim thay bang du lieu", sheet=sheet_name
             )
         sheet = workbook[sheet_name]
         iterator = sheet.iter_rows(values_only=True)
-        header_row = next(iterator, None)
-        if header_row is None:
+        if not isinstance(header_row, int) or isinstance(header_row, bool) or header_row <= 0:
+            raise WeeklyScheduleWorkbookError(
+                "dong tieu de phai la so nguyen duong", sheet=sheet_name
+            )
+        header_values = None
+        for _ in range(header_row):
+            header_values = next(iterator, None)
+            if header_values is None:
+                break
+        if header_values is None:
             raise WeeklyScheduleWorkbookError("bang du lieu rong", sheet=sheet_name)
         headers = {
             self._text(value).casefold(): index
-            for index, value in enumerate(header_row)
+            for index, value in enumerate(header_values)
             if self._text(value)
         }
         missing = tuple(
             physical for physical in columns.values()
-            if physical.casefold() not in headers
+            if physical is not None and physical.casefold() not in headers
         )
         if missing:
             raise WeeklyScheduleWorkbookError(
                 "thieu cot bat buoc: " + ", ".join(missing), sheet=sheet_name
             )
         result = []
-        for row_number, values in enumerate(iterator, start=2):
+        for row_number, values in enumerate(iterator, start=header_row + 1):
             if not any(value not in (None, "") for value in values):
                 continue
             logical = {
-                name: values[headers[physical.casefold()]]
-                if headers[physical.casefold()] < len(values) else None
+                name: (
+                    values[headers[physical.casefold()]]
+                    if physical is not None
+                    and headers[physical.casefold()] < len(values)
+                    else None
+                )
                 for name, physical in columns.items()
             }
             try:
