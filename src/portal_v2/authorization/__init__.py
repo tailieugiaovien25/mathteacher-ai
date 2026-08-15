@@ -23,3 +23,11 @@ __all__.extend([
     "PortalRoleResolution",
     "TrustedPortalRoleSource",
 ])
+
+from .supabase_portal_role_source import (
+    SupabaseTrustedPortalRoleSource,
+)
+
+__all__.append(
+    "SupabaseTrustedPortalRoleSource"
+)
