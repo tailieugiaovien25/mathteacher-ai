@@ -13,8 +13,19 @@ from teacher_document_library_v2 import (
     DocumentFilter,
     TeacherDocument,
     TeacherDocumentCatalog,
+    DocumentUploadMetadata,
+    TeacherDocumentUploadService,
 )
-from teacher_document_library_v2.adapters import SupabaseTeacherDocumentRepository
+from teacher_document_library_v2.adapters import (
+    GoogleDriveFileStorage,
+    GoogleOAuthSettings,
+    SupabaseTeacherDocumentRepository,
+    create_authorization_request,
+    credentials_from_dict,
+    credentials_to_dict,
+    exchange_authorization_code,
+    validate_signed_oauth_state,
+)
 
 
 MIME_OPTIONS = {
@@ -23,6 +34,7 @@ MIME_OPTIONS = {
     "PDF (.pdf)": "application/pdf",
     "Tệp khác": "application/octet-stream",
 }
+MAX_DIRECT_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
 def supabase_settings(environment: Mapping[str, str] | None = None) -> tuple[str, str] | None:
@@ -30,6 +42,26 @@ def supabase_settings(environment: Mapping[str, str] | None = None) -> tuple[str
     url = values.get("SUPABASE_URL", "").strip()
     key = values.get("SUPABASE_PUBLISHABLE_KEY", "").strip()
     return (url, key) if url and key else None
+
+
+def google_oauth_settings(
+    environment: Mapping[str, str] | None = None,
+) -> GoogleOAuthSettings | None:
+    values = environment if environment is not None else os.environ
+    return GoogleOAuthSettings.from_environment(values)
+
+
+def validate_oauth_callback(
+    *, incoming_state: str, signing_key: str, code: str
+) -> None:
+    try:
+        validate_signed_oauth_state(incoming_state, signing_key)
+    except ValueError as error:
+        raise ValueError(
+            "Trạng thái OAuth không hợp lệ hoặc đã hết hạn. Hãy kết nối lại Google Drive."
+        ) from error
+    if not code.strip():
+        raise ValueError("Google không trả về mã cấp quyền.")
 
 
 def create_supabase_client(url: str, key: str):
@@ -153,12 +185,129 @@ def main() -> None:
         client.auth.sign_out()
         st.session_state.pop("document_library_repository", None)
         st.session_state.pop("document_library_client", None)
+        st.session_state.pop("google_drive_credentials", None)
+        st.session_state.pop("google_oauth_state", None)
+        st.session_state.pop("google_oauth_url", None)
         st.rerun()
 
-    with st.expander("Đăng ký tài liệu từ Google Drive", expanded=False):
+    oauth_settings = google_oauth_settings()
+    callback_code = str(st.query_params.get("code", ""))
+    callback_state = str(st.query_params.get("state", ""))
+    callback_error = str(st.query_params.get("error", ""))
+    if callback_error:
+        st.error(f"Google Drive từ chối kết nối: {callback_error}")
+        st.query_params.clear()
+    elif callback_code:
+        try:
+            if oauth_settings is None:
+                raise ValueError("Chưa cấu hình Google OAuth trên máy chủ.")
+            validate_oauth_callback(
+                incoming_state=callback_state,
+                signing_key=oauth_settings.client_secret,
+                code=callback_code,
+            )
+            st.session_state["google_drive_credentials"] = exchange_authorization_code(
+                oauth_settings, code=callback_code, state=callback_state
+            )
+            st.session_state.pop("google_oauth_url", None)
+            st.query_params.clear()
+            st.rerun()
+        except Exception as error:
+            st.query_params.clear()
+            st.error(f"Không thể hoàn tất kết nối Google Drive: {error}")
+
+    st.sidebar.subheader("Google Drive")
+    if oauth_settings is None:
+        st.sidebar.warning(
+            "Chưa có GOOGLE_OAUTH_CLIENT_ID và GOOGLE_OAUTH_CLIENT_SECRET."
+        )
+    elif "google_drive_credentials" not in st.session_state:
+        if st.sidebar.button("Tạo liên kết kết nối", use_container_width=True):
+            try:
+                url, state = create_authorization_request(oauth_settings)
+                st.session_state["google_oauth_url"] = url
+            except Exception as error:
+                st.sidebar.error(f"Không thể tạo liên kết OAuth: {error}")
+        if st.session_state.get("google_oauth_url"):
+            st.sidebar.link_button(
+                "Kết nối tài khoản Google",
+                st.session_state["google_oauth_url"],
+                use_container_width=True,
+            )
+    else:
+        st.sidebar.success("Đã kết nối Google Drive")
+        if st.sidebar.button("Ngắt kết nối Drive", use_container_width=True):
+            st.session_state.pop("google_drive_credentials", None)
+            st.rerun()
+
+    if "google_drive_credentials" in st.session_state:
+        with st.expander("Tải file trực tiếp lên Google Drive", expanded=True):
+            st.caption(
+                "Chấp nhận Word, Excel và PDF tối đa 25 MB. File được đặt trong "
+                "thư mục MathTeacher-AI trên Drive của giáo viên."
+            )
+            with st.form("direct_google_drive_upload"):
+                uploaded = st.file_uploader(
+                    "Chọn file *", type=["docx", "xlsx", "pdf"]
+                )
+                upload_title = st.text_input("Tên tài liệu *", key="upload_title")
+                upload_category_label = st.selectbox(
+                    "Loại tài liệu *",
+                    tuple(DOCUMENT_CATEGORY_LABELS.values()),
+                    key="upload_category",
+                )
+                upload_category = next(
+                    key for key, label in DOCUMENT_CATEGORY_LABELS.items()
+                    if label == upload_category_label
+                )
+                upload_left, upload_middle, upload_right = st.columns(3)
+                upload_year = upload_left.text_input("Năm học *", key="upload_year")
+                upload_subject = upload_middle.text_input("Môn học *", key="upload_subject")
+                upload_grade = upload_right.text_input("Khối *", key="upload_grade")
+                upload_class = st.text_input("Lớp", key="upload_class")
+                upload_description = st.text_area("Mô tả", key="upload_description")
+                upload_tags = st.text_input(
+                    "Nhãn (phân cách bằng dấu phẩy)", key="upload_tags"
+                )
+                upload_submitted = st.form_submit_button(
+                    "Tải lên Drive và lưu vào kho", use_container_width=True
+                )
+                if upload_submitted:
+                    try:
+                        if uploaded is None:
+                            raise ValueError("Hãy chọn một file Word, Excel hoặc PDF.")
+                        content = uploaded.getvalue()
+                        if len(content) > MAX_DIRECT_UPLOAD_BYTES:
+                            raise ValueError("File vượt quá giới hạn 25 MB.")
+                        credentials = credentials_from_dict(
+                            st.session_state["google_drive_credentials"]
+                        )
+                        storage = GoogleDriveFileStorage(credentials)
+                        service = TeacherDocumentUploadService(catalog, storage)
+                        service.upload(
+                            content=content,
+                            file_name=uploaded.name,
+                            mime_type=uploaded.type or "application/octet-stream",
+                            metadata=DocumentUploadMetadata(
+                                title=upload_title,
+                                category=upload_category,
+                                academic_year=upload_year,
+                                subject=upload_subject,
+                                grade_level=upload_grade,
+                                class_name=upload_class,
+                                description=upload_description,
+                                tags=comma_values(upload_tags),
+                            ),
+                        )
+                        st.session_state["google_drive_credentials"] = credentials_to_dict(credentials)
+                        st.success("Đã tải file lên Drive và lưu metadata vào Supabase.")
+                        st.rerun()
+                    except Exception as error:
+                        st.error(f"Không thể tải tài liệu: {error}")
+
+    with st.expander("Đăng ký tài liệu đã có trên Google Drive", expanded=False):
         st.info(
-            "Bản này đăng ký file đã có trên Drive. Công cụ tải file trực tiếp bằng OAuth "
-            "sẽ được bổ sung ở bước tiếp theo."
+            "Dùng mục này khi file đã có sẵn trên Drive và bạn muốn đăng ký bằng liên kết."
         )
         with st.form("new_teacher_document"):
             title = st.text_input("Tên tài liệu *")

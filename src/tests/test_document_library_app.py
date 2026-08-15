@@ -6,7 +6,9 @@ from scripts.document_library.app import (
     comma_values,
     document_rows,
     drive_reference,
+    google_oauth_settings,
     supabase_settings,
+    validate_oauth_callback,
 )
 from teacher_document_library_v2 import DocumentCategory
 
@@ -58,3 +60,27 @@ def test_ui_keeps_provider_sdk_outside_catalog_service():
     assert "supabase" not in source
     assert "google" not in source
     assert "streamlit" not in source
+
+
+def test_google_oauth_settings_are_read_from_environment():
+    assert google_oauth_settings({}) is None
+    settings = google_oauth_settings({
+        "GOOGLE_OAUTH_CLIENT_ID": "client-id",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "client-secret",
+        "GOOGLE_OAUTH_REDIRECT_URI": "http://localhost:8501",
+    })
+    assert settings.client_id == "client-id"
+
+
+def test_oauth_callback_rejects_state_mismatch_and_empty_code():
+    from teacher_document_library_v2.adapters import create_signed_oauth_state
+
+    state = create_signed_oauth_state("secret", now=1000)
+    with pytest.raises(ValueError, match="Trạng thái"):
+        validate_oauth_callback(incoming_state=state + "x", signing_key="secret", code="code")
+    with pytest.raises(ValueError, match="mã cấp quyền"):
+        validate_oauth_callback(
+            incoming_state=create_signed_oauth_state("secret"),
+            signing_key="secret",
+            code="",
+        )
