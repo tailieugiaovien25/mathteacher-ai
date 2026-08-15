@@ -29,3 +29,7 @@ __all__.extend([
     "AdminDashboardQueryService",
     "AdminDashboardQuerySource",
 ])
+
+from portal_v2.dashboard.trusted_admin_repository_dashboard_query_source import (
+    TrustedAdminRepositoryDashboardQuerySource,
+)
