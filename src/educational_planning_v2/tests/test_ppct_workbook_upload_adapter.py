@@ -28,6 +28,7 @@ def _workbook_bytes() -> bytes:
     worksheet.append(
         [
             "M\u00f4n/L\u1edbp",
+            "Ph\u00e2n m\u00f4n",
             "Ti\u1ebft",
             "T\u00ean b\u00e0i h\u1ecdc",
         ]
@@ -35,6 +36,7 @@ def _workbook_bytes() -> bytes:
     worksheet.append(
         [
             "To\u00e1n 6",
+            "S\u1ed1 h\u1ecdc",
             1,
             "B\u00e0i th\u1ee9 nh\u1ea5t",
         ]
@@ -42,6 +44,7 @@ def _workbook_bytes() -> bytes:
     worksheet.append(
         [
             "To\u00e1n 6",
+            "H\u00ecnh h\u1ecdc",
             2,
             "B\u00e0i th\u1ee9 hai",
         ]
@@ -91,12 +94,18 @@ def run_contract() -> bool:
     ))
 
     tests.append((
-        "PPCTU4 Period preserved",
+        "PPCTU4 Sub-subject preserved",
+        rows[0].sub_subject
+        == "S\u1ed1 h\u1ecdc",
+    ))
+
+    tests.append((
+        "PPCTU5 Period preserved",
         rows[0].period == 1,
     ))
 
     tests.append((
-        "PPCTU5 Lesson name preserved",
+        "PPCTU6 Lesson name preserved",
         rows[0].lesson_name
         == "B\u00e0i th\u1ee9 nh\u1ea5t",
     ))
@@ -108,36 +117,38 @@ def run_contract() -> bool:
     )
 
     tests.append((
-        "PPCTU6 Envelope created",
+        "PPCTU7 Envelope created",
         envelope.reference.source_id
         == "ppct-upload-001",
     ))
 
     tests.append((
-        "PPCTU7 Envelope data type PPCT",
+        "PPCTU8 Envelope data type PPCT",
         envelope.reference.data_type
         is OperationalDataType.PPCT,
     ))
 
     tests.append((
-        "PPCTU8 Payload version normalized",
+        "PPCTU9 Payload version normalized",
         envelope.reference.payload_version
         == "v1",
     ))
 
     tests.append((
-        "PPCTU9 Payload JSON-compatible structure",
+        "PPCTU10 Payload JSON-compatible structure",
         envelope.payload
         == (
             {
                 "subject_grade": "To\u00e1n 6",
                 "period": 1,
                 "lesson_name": "B\u00e0i th\u1ee9 nh\u1ea5t",
+                "sub_subject": "S\u1ed1 h\u1ecdc",
             },
             {
                 "subject_grade": "To\u00e1n 6",
                 "period": 2,
                 "lesson_name": "B\u00e0i th\u1ee9 hai",
+                "sub_subject": "H\u00ecnh h\u1ecdc",
             },
         ),
     ))
@@ -152,7 +163,7 @@ def run_contract() -> bool:
         invalid_bytes_blocked = True
 
     tests.append((
-        "PPCTU10 Empty workbook blocked",
+        "PPCTU11 Empty workbook blocked",
         invalid_bytes_blocked,
     ))
 
@@ -166,7 +177,7 @@ def run_contract() -> bool:
         wrong_type_blocked = True
 
     tests.append((
-        "PPCTU11 Non-bytes input blocked",
+        "PPCTU12 Non-bytes input blocked",
         wrong_type_blocked,
     ))
 

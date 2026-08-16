@@ -33,6 +33,13 @@ class PPCTWorkbookUploadAdapter:
         "subject grade",
     }
 
+    _SUB_SUBJECT_ALIASES = {
+        "phan mon",
+        "sub subject",
+        "subsubject",
+        "subject component",
+    }
+
     _PERIOD_ALIASES = {
         "tiet",
         "tiet ppct",
@@ -136,6 +143,14 @@ class PPCTWorkbookUploadAdapter:
                 columns["subject_grade"],
             )
 
+            sub_subject = None
+
+            if "sub_subject" in columns:
+                sub_subject = self._cell_text(
+                    raw_row,
+                    columns["sub_subject"],
+                )
+
             lesson_name = self._cell_text(
                 raw_row,
                 columns["lesson_name"],
@@ -169,6 +184,7 @@ class PPCTWorkbookUploadAdapter:
                     subject_grade=subject_grade,
                     period=period,
                     lesson_name=lesson_name,
+                    sub_subject=sub_subject,
                 )
             )
 
@@ -211,6 +227,14 @@ class PPCTWorkbookUploadAdapter:
 
                 if (
                     normalized
+                    in self._SUB_SUBJECT_ALIASES
+                ):
+                    mapping["sub_subject"] = (
+                        column_index
+                    )
+
+                if (
+                    normalized
                     in self._PERIOD_ALIASES
                 ):
                     mapping["period"] = (
@@ -225,11 +249,15 @@ class PPCTWorkbookUploadAdapter:
                         column_index
                     )
 
-            if set(mapping) == {
+            required_columns = {
                 "subject_grade",
                 "period",
                 "lesson_name",
-            }:
+            }
+
+            if required_columns.issubset(
+                mapping
+            ):
                 return index, mapping
 
         return None, {}

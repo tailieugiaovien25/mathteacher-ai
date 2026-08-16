@@ -226,6 +226,32 @@ class PPCTImportService:
                 "request must be PPCTImportRequest"
             )
 
+        if self._source_repository.get(
+            source_id=request.source_id,
+        ) is not None:
+            raise ValueError(
+                "operational data source already exists: "
+                f"{request.source_id}"
+            )
+
+        active_sources = self._source_repository.list_sources(
+            owner_id=request.owner_id,
+            academic_year=request.academic_year,
+            data_type=OperationalDataType.PPCT,
+            status=OperationalDataStatus.ACTIVE,
+        )
+
+        if len(active_sources) > 1:
+            raise ValueError(
+                "multiple ACTIVE PPCT sources already exist"
+            )
+
+        previous_active = (
+            active_sources[0]
+            if active_sources
+            else None
+        )
+
         envelope = self._upload_adapter.build_envelope(
             workbook_bytes=workbook_bytes,
             source_id=request.source_id,
@@ -268,6 +294,12 @@ class PPCTImportService:
             source=source,
             target_status=OperationalDataStatus.VALIDATED,
         )
+
+        if previous_active is not None:
+            self._transition_and_save(
+                source=previous_active,
+                target_status=OperationalDataStatus.SUPERSEDED,
+            )
 
         source = self._transition_and_save(
             source=source,

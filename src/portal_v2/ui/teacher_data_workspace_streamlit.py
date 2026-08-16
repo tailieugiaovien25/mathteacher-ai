@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from educational_planning_v2.models.operational_data_source import (
+    OperationalDataType,
+)
 from portal_v2.ui.teacher_data_workspace_portal import (
     TeacherDataWorkspaceItemState,
     TeacherDataWorkspaceViewModel,
@@ -10,6 +15,7 @@ def render_teacher_data_workspace(
     *,
     st,
     view: TeacherDataWorkspaceViewModel,
+    on_ppct_update: Callable[[], None] | None = None,
 ) -> None:
     if not isinstance(
         view,
@@ -19,7 +25,17 @@ def render_teacher_data_workspace(
             "view must be TeacherDataWorkspaceViewModel"
         )
 
-    st.title("D\u1eef li\u1ec7u c\u1ee7a t\u00f4i")
+    if (
+        on_ppct_update is not None
+        and not callable(on_ppct_update)
+    ):
+        raise TypeError(
+            "on_ppct_update must be callable or None"
+        )
+
+    st.title(
+        "D\u1eef li\u1ec7u c\u1ee7a t\u00f4i"
+    )
 
     st.caption(
         "Qu\u1ea3n l\u00fd d\u1eef li\u1ec7u d\u00f9ng chung "
@@ -78,17 +94,36 @@ def render_teacher_data_workspace(
                     "d\u1eef li\u1ec7u l\u00ean."
                 )
 
-            st.button(
+            is_ppct = (
+                item.data_type
+                is OperationalDataType.PPCT
+            )
+
+            clicked = st.button(
                 "C\u1eadp nh\u1eadt d\u1eef li\u1ec7u",
                 key=(
                     "teacher_data_update_"
                     + item.data_type.value.lower()
                 ),
                 use_container_width=True,
-                disabled=True,
+                disabled=(
+                    not is_ppct
+                    or on_ppct_update is None
+                ),
                 help=(
-                    "Ch\u1ee9c n\u0103ng nh\u1eadp/c\u1eadp nh\u1eadt "
-                    "s\u1ebd \u0111\u01b0\u1ee3c n\u1ed1i \u1edf "
-                    "b\u01b0\u1edbc ti\u1ebfp theo."
+                    None
+                    if is_ppct
+                    else (
+                        "Ch\u1ee9c n\u0103ng n\u00e0y s\u1ebd "
+                        "\u0111\u01b0\u1ee3c k\u00edch ho\u1ea1t "
+                        "\u1edf b\u01b0\u1edbc ti\u1ebfp theo."
+                    )
                 ),
             )
+
+            if (
+                clicked
+                and is_ppct
+                and on_ppct_update is not None
+            ):
+                on_ppct_update()
