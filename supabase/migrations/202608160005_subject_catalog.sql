@@ -92,6 +92,13 @@ create table if not exists
         unique (
             subject_id,
             code
+        ),
+
+        constraint
+            subject_components_subject_component_unique
+        unique (
+            subject_id,
+            component_id
         )
     );
 
