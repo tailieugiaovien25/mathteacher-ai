@@ -234,53 +234,529 @@ def render_dashboard(st) -> None:
 
 
 def render_profile(st, client: Any, user_id: str) -> None:
-    st.title("Hồ sơ giáo viên")
-    st.caption("Thông tin này được dùng chung cho lịch báo giảng và tệp xuất.")
-    repository = SupabaseTeacherProfileRepository(client, user_id)
+    from dataclasses import replace
+    from datetime import date
+    from uuid import uuid4
+
+    from educational_planning_v2.adapters.supabase_teaching_assignment_repository import (
+        SupabaseTeachingAssignmentRepository,
+    )
+    from educational_planning_v2.models.teaching_assignment import (
+        TeachingAssignment,
+        TeachingAssignmentRole,
+        TeachingAssignmentStatus,
+    )
+
+    st.title("H\u1ed3 s\u01a1 gi\u00e1o vi\u00ean")
+    st.caption(
+        "Th\u00f4ng tin n\u00e0y \u0111\u01b0\u1ee3c d\u00f9ng chung "
+        "cho l\u1ecbch b\u00e1o gi\u1ea3ng v\u00e0 t\u1ec7p xu\u1ea5t."
+    )
+
+    repository = SupabaseTeacherProfileRepository(
+        client,
+        user_id,
+    )
+
     try:
         profile = repository.get()
     except Exception as error:
-        st.error(f"Không thể đọc hồ sơ giáo viên: {error}")
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            f"h\u1ed3 s\u01a1 gi\u00e1o vi\u00ean: {error}"
+        )
         return
+
     with st.form("portal_teacher_profile"):
-        teacher_code = st.text_input("Mã giáo viên *", value=profile.teacher_code if profile else "")
-        full_name = st.text_input("Họ và tên *", value=profile.full_name if profile else "")
-        school_name = st.text_input("Trường công tác *", value=profile.school_name if profile else "")
+        teacher_code = st.text_input(
+            "M\u00e3 gi\u00e1o vi\u00ean *",
+            value=(
+                profile.teacher_code
+                if profile
+                else ""
+            ),
+        )
+
+        full_name = st.text_input(
+            "H\u1ecd v\u00e0 t\u00ean *",
+            value=(
+                profile.full_name
+                if profile
+                else ""
+            ),
+        )
+
+        school_name = st.text_input(
+            "Tr\u01b0\u1eddng c\u00f4ng t\u00e1c *",
+            value=(
+                profile.school_name
+                if profile
+                else ""
+            ),
+        )
+
         subjects = st.text_input(
-            "Môn giảng dạy *", value=", ".join(profile.subjects) if profile else "",
-            help="Phân cách nhiều môn bằng dấu phẩy.",
+            "M\u00f4n gi\u1ea3ng d\u1ea1y *",
+            value=(
+                ", ".join(profile.subjects)
+                if profile
+                else ""
+            ),
+            help=(
+                "Ph\u00e2n c\u00e1ch nhi\u1ec1u m\u00f4n "
+                "b\u1eb1ng d\u1ea5u ph\u1ea9y."
+            ),
         )
+
         grade_levels = st.text_input(
-            "Khối/lớp phụ trách *", value=", ".join(profile.grade_levels) if profile else "",
-            help="Phân cách nhiều khối bằng dấu phẩy.",
+            "Kh\u1ed1i/l\u1edbp ph\u1ee5 tr\u00e1ch *",
+            value=(
+                ", ".join(profile.grade_levels)
+                if profile
+                else ""
+            ),
+            help=(
+                "Ph\u00e2n c\u00e1ch nhi\u1ec1u kh\u1ed1i "
+                "b\u1eb1ng d\u1ea5u ph\u1ea9y."
+            ),
         )
+
         academic_year = st.text_input(
-            "Năm học mặc định *", value=profile.default_academic_year if profile else "",
+            "N\u0103m h\u1ecdc m\u1eb7c \u0111\u1ecbnh *",
+            value=(
+                profile.default_academic_year
+                if profile
+                else ""
+            ),
             placeholder="2026-2027",
         )
+
         show_teacher_name = st.checkbox(
-            "Hiển thị họ tên trên lịch báo giảng",
-            value=profile.show_teacher_name if profile else True,
+            "Hi\u1ec3n th\u1ecb h\u1ecd t\u00ean "
+            "tr\u00ean l\u1ecbch b\u00e1o gi\u1ea3ng",
+            value=(
+                profile.show_teacher_name
+                if profile
+                else True
+            ),
         )
+
         show_school_name = st.checkbox(
-            "Hiển thị trường trên lịch báo giảng",
-            value=profile.show_school_name if profile else True,
+            "Hi\u1ec3n th\u1ecb tr\u01b0\u1eddng "
+            "tr\u00ean l\u1ecbch b\u00e1o gi\u1ea3ng",
+            value=(
+                profile.show_school_name
+                if profile
+                else True
+            ),
         )
-        submitted = st.form_submit_button("Lưu hồ sơ", use_container_width=True)
+
+        submitted = st.form_submit_button(
+            "L\u01b0u h\u1ed3 s\u01a1",
+            use_container_width=True,
+        )
+
     if submitted:
         try:
-            repository.save(build_teacher_profile(
-                teacher_code=teacher_code, full_name=full_name,
-                school_name=school_name, subjects=subjects,
-                grade_levels=grade_levels, default_academic_year=academic_year,
-                show_teacher_name=show_teacher_name,
-                show_school_name=show_school_name,
-            ))
-            st.success("Đã lưu hồ sơ giáo viên.")
-            st.rerun()
-        except Exception as error:
-            st.error(f"Không thể lưu hồ sơ: {error}")
+            repository.save(
+                build_teacher_profile(
+                    teacher_code=teacher_code,
+                    full_name=full_name,
+                    school_name=school_name,
+                    subjects=subjects,
+                    grade_levels=grade_levels,
+                    default_academic_year=academic_year,
+                    show_teacher_name=show_teacher_name,
+                    show_school_name=show_school_name,
+                )
+            )
 
+            st.success(
+                "\u0110\u00e3 l\u01b0u h\u1ed3 s\u01a1 "
+                "gi\u00e1o vi\u00ean."
+            )
+
+            st.rerun()
+
+        except Exception as error:
+            st.error(
+                f"Kh\u00f4ng th\u1ec3 l\u01b0u "
+                f"h\u1ed3 s\u01a1: {error}"
+            )
+
+    st.divider()
+
+    st.subheader(
+        "Ph\u00e2n c\u00f4ng gi\u1ea3ng d\u1ea1y"
+    )
+
+    assignment_repository = (
+        SupabaseTeachingAssignmentRepository(
+            client,
+            user_id,
+        )
+    )
+
+    assignment_year = (
+        profile.default_academic_year
+        if profile is not None
+        else academic_year.strip()
+    )
+
+    if not assignment_year:
+        st.info(
+            "H\u00e3y l\u01b0u N\u0103m h\u1ecdc "
+            "m\u1eb7c \u0111\u1ecbnh tr\u01b0\u1edbc."
+        )
+        return
+
+    st.caption(
+        f"N\u0103m h\u1ecdc: {assignment_year}"
+    )
+
+    st.info(
+        "M\u1ed7i d\u00f2ng ph\u00e2n c\u00f4ng = "
+        "1 L\u1edbp + 1 M\u00f4n + 0/1 Ph\u00e2n m\u00f4n. "
+        "N\u1ebfu d\u1ea1y nhi\u1ec1u m\u00f4n ho\u1eb7c "
+        "nhi\u1ec1u ph\u00e2n m\u00f4n tr\u00ean c\u00f9ng "
+        "m\u1ed9t l\u1edbp, h\u00e3y th\u00eam nhi\u1ec1u "
+        "d\u00f2ng ph\u00e2n c\u00f4ng."
+    )
+
+    with st.form(
+        "portal_teaching_assignment_add"
+    ):
+        role_label = st.selectbox(
+            "Vai tr\u00f2 *",
+            (
+                "Gi\u1ea3ng d\u1ea1y",
+                "Ch\u1ee7 nhi\u1ec7m",
+            ),
+        )
+
+        is_homeroom = (
+            role_label == "Ch\u1ee7 nhi\u1ec7m"
+        )
+
+        other_label = "Kh\u00e1c..."
+
+        known_classes = (
+            tuple(profile.grade_levels)
+            if profile is not None
+            else ()
+        )
+
+        class_options = (
+            ("",)
+            + known_classes
+            + (other_label,)
+        )
+
+        class_choice = st.selectbox(
+            "L\u1edbp *",
+            options=class_options,
+            help=(
+                "M\u1ed7i ph\u00e2n c\u00f4ng "
+                "ch\u1ec9 ch\u1ecdn m\u1ed9t l\u1edbp."
+            ),
+        )
+
+        if class_choice == other_label:
+            class_id = st.text_input(
+                "Nh\u1eadp l\u1edbp kh\u00e1c *",
+                placeholder="V\u00ed d\u1ee5: 6A2",
+            )
+        else:
+            class_id = class_choice
+
+        known_subjects = (
+            tuple(profile.subjects)
+            if profile is not None
+            else ()
+        )
+
+        subject_options = (
+            ("",)
+            + known_subjects
+            + (other_label,)
+        )
+
+        if is_homeroom:
+            subject_ref = ""
+            st.text_input(
+                "M\u00f4n",
+                value="",
+                disabled=True,
+                help=(
+                    "Ph\u00e2n c\u00f4ng ch\u1ee7 nhi\u1ec7m "
+                    "kh\u00f4ng b\u1eaft bu\u1ed9c c\u00f3 m\u00f4n."
+                ),
+            )
+        else:
+            subject_choice = st.selectbox(
+                "M\u00f4n *",
+                options=subject_options,
+                help=(
+                    "M\u1ed7i ph\u00e2n c\u00f4ng "
+                    "ch\u1ec9 ch\u1ecdn m\u1ed9t m\u00f4n."
+                ),
+            )
+
+            if subject_choice == other_label:
+                subject_ref = st.text_input(
+                    "Nh\u1eadp m\u00f4n kh\u00e1c *",
+                    placeholder="V\u00ed d\u1ee5: To\u00e1n",
+                )
+            else:
+                subject_ref = subject_choice
+
+        component_ref = st.text_input(
+            "Ph\u00e2n m\u00f4n",
+            placeholder=(
+                "V\u00ed d\u1ee5: S\u1ed1 h\u1ecdc, "
+                "H\u00ecnh h\u1ecdc..."
+            ),
+            disabled=is_homeroom,
+        )
+
+        date_columns = st.columns(2)
+
+        with date_columns[0]:
+            effective_from = st.date_input(
+                "T\u1eeb ng\u00e0y *",
+                value=date.today(),
+            )
+
+        with date_columns[1]:
+            effective_to = st.date_input(
+                "\u0110\u1ebfn ng\u00e0y *",
+                value=date.today(),
+            )
+
+        add_assignment = st.form_submit_button(
+            "Th\u00eam ph\u00e2n c\u00f4ng",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if add_assignment:
+        try:
+            if "," in class_id or ";" in class_id:
+                raise ValueError(
+                    "M\u1ed7i ph\u00e2n c\u00f4ng ch\u1ec9 \u0111\u01b0\u1ee3c ch\u1ecdn m\u1ed9t l\u1edbp. "
+                    "H\u00e3y t\u1ea1o th\u00eam ph\u00e2n c\u00f4ng cho l\u1edbp kh\u00e1c."
+                )
+
+            if (
+                not is_homeroom
+                and (
+                    "," in subject_ref
+                    or ";" in subject_ref
+                )
+            ):
+                raise ValueError(
+                    "M\u1ed7i ph\u00e2n c\u00f4ng ch\u1ec9 \u0111\u01b0\u1ee3c ch\u1ecdn m\u1ed9t m\u00f4n. "
+                    "H\u00e3y t\u1ea1o th\u00eam ph\u00e2n c\u00f4ng cho m\u00f4n kh\u00e1c."
+                )
+
+            if (
+                not is_homeroom
+                and (
+                    "," in component_ref
+                    or ";" in component_ref
+                )
+            ):
+                raise ValueError(
+                    "M\u1ed7i ph\u00e2n c\u00f4ng ch\u1ec9 \u0111\u01b0\u1ee3c ch\u1ecdn m\u1ed9t ph\u00e2n m\u00f4n. "
+                    "H\u00e3y t\u1ea1o th\u00eam ph\u00e2n c\u00f4ng cho ph\u00e2n m\u00f4n kh\u00e1c."
+                )
+
+            role = (
+                TeachingAssignmentRole.HOMEROOM
+                if is_homeroom
+                else TeachingAssignmentRole.TEACHING
+            )
+
+            assignment_repository.save(
+                assignment=TeachingAssignment(
+                    assignment_id=(
+                        "assign-"
+                        + uuid4().hex
+                    ),
+                    owner_id=user_id,
+                    academic_year=assignment_year,
+                    class_id=class_id,
+                    subject_ref=(
+                        None
+                        if is_homeroom
+                        else subject_ref
+                    ),
+                    component_ref=(
+                        None
+                        if is_homeroom
+                        else component_ref
+                    ),
+                    role=role,
+                    effective_from=effective_from,
+                    effective_to=effective_to,
+                    status=(
+                        TeachingAssignmentStatus.ACTIVE
+                    ),
+                )
+            )
+
+            st.success(
+                "\u0110\u00e3 th\u00eam "
+                "ph\u00e2n c\u00f4ng."
+            )
+
+            st.rerun()
+
+        except Exception as error:
+            st.error(
+                "Kh\u00f4ng th\u1ec3 th\u00eam "
+                f"ph\u00e2n c\u00f4ng: {error}"
+            )
+
+    try:
+        assignments = (
+            assignment_repository.list_assignments(
+                owner_id=user_id,
+                academic_year=assignment_year,
+            )
+        )
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            f"ph\u00e2n c\u00f4ng: {error}"
+        )
+        return
+
+    if not assignments:
+        st.info(
+            "Ch\u01b0a c\u00f3 ph\u00e2n c\u00f4ng "
+            "cho n\u0103m h\u1ecdc n\u00e0y."
+        )
+        return
+
+    st.markdown(
+        "#### Danh s\u00e1ch ph\u00e2n c\u00f4ng"
+    )
+
+    st.dataframe(
+        [
+            {
+                "L\u1edbp": item.class_id,
+                "M\u00f4n": (
+                    item.subject_ref or ""
+                ),
+                "Ph\u00e2n m\u00f4n": (
+                    item.component_ref or ""
+                ),
+                "Vai tr\u00f2": (
+                    "Ch\u1ee7 nhi\u1ec7m"
+                    if item.role
+                    is TeachingAssignmentRole.HOMEROOM
+                    else "Gi\u1ea3ng d\u1ea1y"
+                ),
+                "T\u1eeb ng\u00e0y": (
+                    item.effective_from.isoformat()
+                ),
+                "\u0110\u1ebfn ng\u00e0y": (
+                    item.effective_to.isoformat()
+                ),
+                "Tr\u1ea1ng th\u00e1i": (
+                    item.status.value
+                ),
+            }
+            for item in assignments
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    for item in assignments:
+        with st.container(
+            border=True
+        ):
+            role_text = (
+                "Ch\u1ee7 nhi\u1ec7m"
+                if item.role
+                is TeachingAssignmentRole.HOMEROOM
+                else "Gi\u1ea3ng d\u1ea1y"
+            )
+
+            st.write(
+                " | ".join(
+                    part
+                    for part in (
+                        item.class_id,
+                        item.subject_ref,
+                        item.component_ref,
+                        role_text,
+                    )
+                    if part
+                )
+            )
+
+            actions = st.columns(2)
+
+            with actions[0]:
+                if (
+                    item.status
+                    is TeachingAssignmentStatus.ACTIVE
+                ):
+                    if st.button(
+                        "Ng\u1eebng hi\u1ec7u l\u1ef1c",
+                        key=(
+                            "assignment_deactivate_"
+                            + item.assignment_id
+                        ),
+                        use_container_width=True,
+                    ):
+                        assignment_repository.save(
+                            assignment=replace(
+                                item,
+                                status=(
+                                    TeachingAssignmentStatus.INACTIVE
+                                ),
+                            )
+                        )
+                        st.rerun()
+                else:
+                    if st.button(
+                        "K\u00edch ho\u1ea1t l\u1ea1i",
+                        key=(
+                            "assignment_activate_"
+                            + item.assignment_id
+                        ),
+                        use_container_width=True,
+                    ):
+                        assignment_repository.save(
+                            assignment=replace(
+                                item,
+                                status=(
+                                    TeachingAssignmentStatus.ACTIVE
+                                ),
+                            )
+                        )
+                        st.rerun()
+
+            with actions[1]:
+                if st.button(
+                    "X\u00f3a",
+                    key=(
+                        "assignment_delete_"
+                        + item.assignment_id
+                    ),
+                    use_container_width=True,
+                ):
+                    assignment_repository.delete(
+                        assignment_id=(
+                            item.assignment_id
+                        )
+                    )
+                    st.rerun()
 
 def main() -> None:
     import streamlit as st
