@@ -22,6 +22,7 @@ from portal_v2.ui import render_admin_shell
 PORTAL_PAGES = (
     "Tổng quan",
     "Lịch báo giảng",
+    "Dữ liệu của tôi",
     "Kho tài liệu",
     "Chuẩn hóa Word",
     "Hồ sơ giáo viên",
@@ -186,6 +187,10 @@ def render_dashboard(st) -> None:
     st.caption("Chọn một công cụ để bắt đầu công việc.")
     cards = (
         ("Lịch báo giảng", "Tạo, lưu và xuất lịch dạy theo tuần."),
+        (
+            "Dữ liệu của tôi",
+            "Quản lý PPCT, thời khóa biểu và tuần học theo năm học.",
+        ),
         ("Kho tài liệu", "Tìm kiếm và tải tài liệu lên Google Drive."),
         ("Chuẩn hóa Word", "Chuẩn hóa giáo án Word mà không ghi đè bản gốc."),
         ("Hồ sơ giáo viên", "Quản lý thông tin dùng chung khi lập và xuất lịch."),
@@ -314,9 +319,49 @@ def main() -> None:
     if selected == "Tổng quan":
         render_dashboard(st)
     elif selected == "Lịch báo giảng":
-        from scripts.weekly_schedule.app import main as render_weekly_schedule
-        st.title("Lịch báo giảng")
-        render_weekly_schedule(embedded=True)
+        from portal_v2.ui.weekly_schedule_streamlit import (
+            render_weekly_schedule_workspace,
+        )
+        render_weekly_schedule_workspace()
+
+    elif selected == "Dữ liệu của tôi":
+        from educational_planning_v2.models.teacher_operational_data_workspace import (
+            TeacherOperationalDataWorkspace,
+        )
+        from portal_v2.ui.teacher_data_workspace_portal import (
+            TeacherDataWorkspacePresenter,
+        )
+        from portal_v2.ui.teacher_data_workspace_streamlit import (
+            render_teacher_data_workspace,
+        )
+
+        academic_year = st.text_input(
+            "N\u0103m h\u1ecdc",
+            key="teacher_data_academic_year",
+            placeholder="V\u00ed d\u1ee5: 2026-2027",
+        ).strip()
+
+        if not academic_year:
+            st.title("D\u1eef li\u1ec7u c\u1ee7a t\u00f4i")
+            st.info(
+                "Nh\u1eadp n\u0103m h\u1ecdc \u0111\u1ec3 xem "
+                "v\u00e0 qu\u1ea3n l\u00fd d\u1eef li\u1ec7u."
+            )
+        else:
+            workspace = TeacherOperationalDataWorkspace(
+                owner_id=str(user_id),
+                academic_year=academic_year,
+            )
+
+            view = TeacherDataWorkspacePresenter().present(
+                workspace=workspace,
+            )
+
+            render_teacher_data_workspace(
+                st=st,
+                view=view,
+            )
+
     elif selected == "Kho tài liệu":
         from scripts.document_library.app import main as render_document_library
         st.title("Kho tài liệu")
