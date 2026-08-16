@@ -76,6 +76,11 @@ on public.operational_data_sources (
     status
 );
 
+
+grant select, insert, update, delete
+on table public.operational_data_sources
+to authenticated;
+
 alter table public.operational_data_sources
 enable row level security;
 

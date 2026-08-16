@@ -106,6 +106,20 @@ def run_contract() -> bool:
     ))
 
     tests.append((
+        "ODSDB8A Authenticated CRUD grant exists",
+        (
+            "grant select, insert, update, delete"
+            in lower
+            and
+            "on table public.operational_data_sources"
+            in lower
+            and
+            "to authenticated"
+            in lower
+        ),
+    ))
+
+    tests.append((
         "ODSDB9 SELECT own-row policy exists",
         (
             "operational_data_sources_select_own"
