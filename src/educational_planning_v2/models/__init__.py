@@ -12,6 +12,11 @@ from educational_planning_v2.models.weekly_teaching_schedule import (
     WeeklyTeachingScheduleEntry,
 )
 from educational_planning_v2.models.teacher_profile import TeacherProfile
+from educational_planning_v2.models.teacher_timetable import (
+    TeacherTimetableSlot,
+    TeacherTimetableSlotStatus,
+    TeachingSession,
+)
 
 __all__ = [
     "CurriculumScope",
@@ -26,4 +31,7 @@ __all__ = [
     "WeeklyTeachingSchedule",
     "WeeklyTeachingScheduleEntry",
     "TeacherProfile",
+    "TeacherTimetableSlot",
+    "TeacherTimetableSlotStatus",
+    "TeachingSession",
 ]
