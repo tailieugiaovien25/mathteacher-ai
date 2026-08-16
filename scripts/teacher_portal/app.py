@@ -33,6 +33,7 @@ PORTAL_SESSION_KEYS = (
     "portal_user_email",
     "portal_user_role",
     "portal_workspace",
+    "operational_data_source_repository",
     "admin_portal_page",
     "admin_portal_navigation",
     "portal_navigation",
@@ -80,6 +81,18 @@ def connect_feature_repositories(session_state: Any, client: Any, user_id: str) 
     """Share one authenticated client across feature-specific adapters."""
     session_state["portal_supabase_client"] = client
     session_state["portal_user_id"] = user_id
+
+    from educational_planning_v2.adapters.supabase_operational_data_source_repository import (
+        SupabaseOperationalDataSourceRepository,
+    )
+
+    session_state["operational_data_source_repository"] = (
+        SupabaseOperationalDataSourceRepository(
+            client=client,
+            user_id=user_id,
+        )
+    )
+
     session_state["weekly_supabase_client"] = client
     session_state["weekly_supabase_repository"] = SupabaseWeeklyScheduleRepository(
         client, user_id
@@ -325,8 +338,9 @@ def main() -> None:
         render_weekly_schedule_workspace()
 
     elif selected == "Dữ liệu của tôi":
-        from educational_planning_v2.models.teacher_operational_data_workspace import (
-            TeacherOperationalDataWorkspace,
+        from educational_planning_v2.services.teacher_operational_data_workspace_service import (
+            TeacherOperationalDataWorkspaceRequest,
+            TeacherOperationalDataWorkspaceService,
         )
         from portal_v2.ui.teacher_data_workspace_portal import (
             TeacherDataWorkspacePresenter,
@@ -348,9 +362,25 @@ def main() -> None:
                 "v\u00e0 qu\u1ea3n l\u00fd d\u1eef li\u1ec7u."
             )
         else:
-            workspace = TeacherOperationalDataWorkspace(
-                owner_id=str(user_id),
-                academic_year=academic_year,
+            repository = st.session_state.get(
+                "operational_data_source_repository"
+            )
+
+            if repository is None:
+                st.error(
+                    "Kho d\u1eef li\u1ec7u v\u1eadn h\u00e0nh "
+                    "ch\u01b0a s\u1eb5n s\u00e0ng. "
+                    "H\u00e3y \u0111\u0103ng nh\u1eadp l\u1ea1i."
+                )
+                return
+
+            workspace = TeacherOperationalDataWorkspaceService(
+                repository
+            ).build(
+                request=TeacherOperationalDataWorkspaceRequest(
+                    owner_id=str(user_id),
+                    academic_year=academic_year,
+                )
             )
 
             view = TeacherDataWorkspacePresenter().present(

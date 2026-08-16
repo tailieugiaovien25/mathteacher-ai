@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from educational_planning_v2.models.operational_data_source import (
     OperationalDataSource,
@@ -33,11 +34,29 @@ class TeacherOperationalDataWorkspaceRequest:
         object.__setattr__(
             self,
             "academic_year",
-            self._required_text(
+            self._normalize_academic_year(
                 self.academic_year,
-                "academic_year",
             ),
         )
+
+    @staticmethod
+    def _normalize_academic_year(
+        value: str,
+    ) -> str:
+        normalized = TeacherOperationalDataWorkspaceRequest._required_text(
+            value,
+            "academic_year",
+        )
+
+        match = re.fullmatch(
+            r"(\d{4})\s*-\s*(\d{4})",
+            normalized,
+        )
+
+        if match is None:
+            return normalized
+
+        return f"{match.group(1)}-{match.group(2)}"
 
     @staticmethod
     def _required_text(
