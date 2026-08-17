@@ -35,6 +35,7 @@ PORTAL_SESSION_KEYS = (
     "portal_user_email",
     "portal_user_role",
     "portal_workspace",
+    "portal_flash_feedback",
     "notification_repository",
     "operational_data_source_repository",
     "operational_payload_repository",
@@ -879,12 +880,102 @@ def main() -> None:
         )
         return
 
+    # Rebind feature adapters on every authenticated rerun.
+    # Streamlit can retain old Python objects in session_state
+    # across source-code hot reloads.
+    connect_feature_repositories(
+        st.session_state,
+        client,
+        str(user_id),
+    )
+
     if st.query_params.get("code") or st.query_params.get("error"):
         select_portal_page(st.session_state, "Kho tài liệu")
 
     st.sidebar.title("MathTeacher-AI")
     st.sidebar.success("Đã đăng nhập")
     st.sidebar.caption(st.session_state.get("portal_user_email", "Giáo viên"))
+
+    from portal_v2.ui.portal_flash_feedback import (
+        render_portal_flash,
+    )
+
+    render_portal_flash(
+        st=st,
+        session_state=st.session_state,
+    )
+
+    notification_repository = (
+        st.session_state.get(
+            "notification_repository"
+        )
+    )
+
+    if notification_repository is not None:
+        try:
+            from notification_v2.services import (
+                NotificationService,
+            )
+            from portal_v2.ui.notification_center_presenter import (
+                build_notification_center_view,
+            )
+            from portal_v2.ui.notification_center_streamlit import (
+                render_notification_center_sidebar,
+            )
+
+            notification_service = NotificationService(
+                repository=notification_repository,
+            )
+
+            notifications = (
+                notification_service.list_for_owner(
+                    owner_id=str(user_id),
+                    limit=20,
+                )
+            )
+
+            unread_count = (
+                notification_service.count_unread(
+                    owner_id=str(user_id),
+                )
+            )
+
+            notification_view = (
+                build_notification_center_view(
+                    notifications=notifications,
+                    unread_count=unread_count,
+                )
+            )
+
+            def handle_notification_mark_read(
+                notification_id: str,
+            ) -> None:
+                notification_service.mark_read(
+                    notification_id=notification_id,
+                    owner_id=str(user_id),
+                )
+
+            def handle_notification_mark_all_read() -> None:
+                notification_service.mark_all_read(
+                    owner_id=str(user_id),
+                )
+
+            render_notification_center_sidebar(
+                st=st,
+                view=notification_view,
+                on_mark_read=(
+                    handle_notification_mark_read
+                ),
+                on_mark_all_read=(
+                    handle_notification_mark_all_read
+                ),
+            )
+
+        except Exception:
+            st.sidebar.caption(
+                "Th\u00f4ng b\u00e1o t\u1ea1m th\u1eddi "
+                "ch\u01b0a kh\u1ea3 d\u1ee5ng."
+            )
 
     authorization = build_current_portal_authorization(
         st.session_state
@@ -1221,6 +1312,21 @@ def main() -> None:
                                 st.session_state[
                                     "teacher_data_ppct_view_source_id"
                                 ] = result.source.source_id
+
+                                from portal_v2.ui.portal_flash_feedback import (
+                                    PortalFlashLevel,
+                                    set_portal_flash,
+                                )
+
+                                set_portal_flash(
+                                    st.session_state,
+                                    message=(
+                                        "\u0110\u00e3 c\u1eadp nh\u1eadt "
+                                        "d\u1eef li\u1ec7u PPCT "
+                                        "th\u00e0nh c\u00f4ng."
+                                    ),
+                                    level=PortalFlashLevel.SUCCESS,
+                                )
 
                                 st.rerun()
 

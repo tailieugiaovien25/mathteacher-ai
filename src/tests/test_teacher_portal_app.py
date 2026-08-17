@@ -51,6 +51,7 @@ def test_portal_logout_clears_shared_and_feature_sessions():
         "portal_user_id": "user-123",
         "weekly_supabase_repository": object(),
         "document_library_repository": object(),
+        "portal_flash_feedback": object(),
         "google_drive_credentials": {},
         "unrelated": "keep",
     }
