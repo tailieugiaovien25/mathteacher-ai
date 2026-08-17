@@ -1,0 +1,1003 @@
+from __future__ import annotations
+
+from typing import Any
+from uuid import uuid4
+
+from educational_planning_v2.adapters.supabase_subject_catalog_repository import (
+    SupabaseSubjectCatalogRepository,
+)
+from educational_planning_v2.adapters.supabase_teacher_subject_registration_repository import (
+    SupabaseTeacherSubjectRegistrationRepository,
+)
+from educational_planning_v2.services.teacher_timetable_subject_scope_service import (
+    TeacherTimetableSubjectScopeService,
+)
+from educational_planning_v2.services.teacher_timetable_assignment_bridge import (
+    TeacherTimetableAssignmentBridge,
+)
+
+from educational_planning_v2.adapters.supabase_teacher_timetable_repository import (
+    SupabaseTeacherTimetableRepository,
+)
+from educational_planning_v2.adapters.supabase_teaching_assignment_repository import (
+    SupabaseTeachingAssignmentRepository,
+)
+from educational_planning_v2.adapters.supabase_teacher_profile_repository import (
+    SupabaseTeacherProfileRepository,
+)
+from educational_planning_v2.models.teacher_timetable import (
+    TeacherTimetableSlot,
+    TeacherTimetableSlotStatus,
+    TeachingSession,
+)
+from educational_planning_v2.models.teaching_assignment import (
+    TeachingAssignmentRole,
+    TeachingAssignmentStatus,
+)
+from educational_planning_v2.services.teacher_timetable_service import (
+    TeacherTimetableService,
+)
+
+
+_WEEKDAYS = (
+    (1, "Th\u1ee9 2"),
+    (2, "Th\u1ee9 3"),
+    (3, "Th\u1ee9 4"),
+    (4, "Th\u1ee9 5"),
+    (5, "Th\u1ee9 6"),
+    (6, "Th\u1ee9 7"),
+    (7, "Ch\u1ee7 nh\u1eadt"),
+)
+
+
+def _assignment_label(
+    assignment,
+) -> str:
+    parts = [
+        assignment.class_id,
+        assignment.subject_ref or "",
+        assignment.component_ref or "",
+    ]
+
+    return " | ".join(
+        part
+        for part in parts
+        if part
+    )
+
+
+def render_teacher_timetable(
+    *,
+    st,
+    client: Any,
+    user_id: str,
+) -> None:
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border: 2px solid #3b82f6 !important;
+            border-radius: 14px !important;
+            box-shadow: 0 2px 8px rgba(30, 64, 175, 0.08);
+        }
+
+        div[data-testid="stSelectbox"] > div {
+            border-radius: 8px;
+        }
+
+        div[data-baseweb="select"] > div {
+            border: 1.5px solid #94a3b8 !important;
+            min-height: 42px;
+        }
+
+        div[data-baseweb="select"]:focus-within > div {
+            border: 2px solid #2563eb !important;
+            box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
+        }
+
+        hr {
+            border-top: 2px solid #cbd5e1 !important;
+        }
+
+        @media (max-width: 900px) {
+            .block-container {
+                padding-left: 0.8rem;
+                padding-right: 0.8rem;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.title(
+        "Th\u1eddi kh\u00f3a bi\u1ec3u"
+    )
+
+    st.caption(
+        "Nh\u1eadp th\u1eddi kh\u00f3a bi\u1ec3u "
+        "tr\u1ef1c ti\u1ebfp theo ph\u00e2n c\u00f4ng "
+        "gi\u1ea3ng d\u1ea1y \u0111\u00e3 khai b\u00e1o."
+    )
+
+    profile_repository = (
+        SupabaseTeacherProfileRepository(
+            client,
+            user_id,
+        )
+    )
+
+    assignment_repository = (
+        SupabaseTeachingAssignmentRepository(
+            client,
+            user_id,
+        )
+    )
+
+    timetable_repository = (
+        SupabaseTeacherTimetableRepository(
+            client,
+            user_id,
+        )
+    )
+
+    subject_catalog_repository = (
+        SupabaseSubjectCatalogRepository(
+            client=client,
+        )
+    )
+
+    subject_registration_repository = (
+        SupabaseTeacherSubjectRegistrationRepository(
+            client,
+            user_id,
+        )
+    )
+
+    try:
+        profile = profile_repository.get()
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            f"h\u1ed3 s\u01a1 gi\u00e1o vi\u00ean: {error}"
+        )
+        return
+
+    if profile is None:
+        st.warning(
+            "H\u00e3y khai b\u00e1o H\u1ed3 s\u01a1 "
+            "gi\u00e1o vi\u00ean tr\u01b0\u1edbc."
+        )
+        return
+
+    academic_year = (
+        profile.default_academic_year
+    )
+
+    st.subheader(
+        f"N\u0103m h\u1ecdc: {academic_year}"
+    )
+
+    try:
+        assignments = (
+            assignment_repository.list_assignments(
+                owner_id=user_id,
+                academic_year=academic_year,
+                role=TeachingAssignmentRole.TEACHING,
+                status=TeachingAssignmentStatus.ACTIVE,
+            )
+        )
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            f"ph\u00e2n c\u00f4ng gi\u1ea3ng d\u1ea1y: {error}"
+        )
+        return
+
+    if not assignments:
+        st.info(
+            "Ch\u01b0a c\u00f3 ph\u00e2n c\u00f4ng "
+            "gi\u1ea3ng d\u1ea1y ACTIVE cho n\u0103m h\u1ecdc n\u00e0y."
+        )
+        return
+
+    try:
+        subject_scopes = (
+            TeacherTimetableSubjectScopeService(
+                catalog_repository=(
+                    subject_catalog_repository
+                ),
+                registration_repository=(
+                    subject_registration_repository
+                ),
+            ).list_scopes(
+                owner_id=user_id,
+                academic_year=academic_year,
+            )
+        )
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            "danh s\u00e1ch m\u00f4n/ph\u00e2n m\u00f4n "
+            f"\u0111\u00e3 \u0111\u0103ng k\u00fd: {error}"
+        )
+        return
+
+    if not subject_scopes:
+        st.warning(
+            "Ch\u01b0a c\u00f3 m\u00f4n ho\u1eb7c ph\u00e2n m\u00f4n "
+            "\u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd cho n\u0103m h\u1ecdc n\u00e0y. "
+            "H\u00e3y th\u1ef1c hi\u1ec7n \u0110\u0103ng k\u00fd "
+            "m\u00f4n/ph\u00e2n m\u00f4n tr\u01b0\u1edbc khi "
+            "l\u1eadp th\u1eddi kh\u00f3a bi\u1ec3u."
+        )
+        return
+
+    canonical_assignment_options = (
+        TeacherTimetableAssignmentBridge()
+        .build_options(
+            assignments=assignments,
+            subject_scopes=subject_scopes,
+        )
+    )
+
+    if not canonical_assignment_options:
+        st.warning(
+            "Kh\u00f4ng c\u00f3 ph\u00e2n c\u00f4ng "
+            "gi\u1ea3ng d\u1ea1y n\u00e0o ph\u00f9 h\u1ee3p "
+            "v\u1edbi m\u00f4n/ph\u00e2n m\u00f4n "
+            "\u0111\u00e3 \u0111\u0103ng k\u00fd. "
+            "H\u00e3y ki\u1ec3m tra l\u1ea1i "
+            "Ph\u00e2n c\u00f4ng gi\u1ea3ng d\u1ea1y "
+            "v\u00e0 \u0110\u0103ng k\u00fd "
+            "m\u00f4n/ph\u00e2n m\u00f4n."
+        )
+        return
+
+    canonical_option_by_assignment_id = {
+        item.assignment_id: item
+        for item in canonical_assignment_options
+    }
+
+    with st.expander(
+        "Timetable data diagnostics",
+        expanded=False,
+    ):
+        st.markdown(
+            "##### 1. Active teaching assignments"
+        )
+
+        st.dataframe(
+            [
+                {
+                    "assignment_id": item.assignment_id,
+                    "class_id": item.class_id,
+                    "subject_ref": item.subject_ref,
+                    "component_ref": item.component_ref,
+                }
+                for item in assignments
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+        st.markdown(
+            "##### 1B. Full assignment details"
+        )
+
+        for item in assignments:
+            st.code(
+                "\n".join(
+                    (
+                        f"assignment_id={item.assignment_id}",
+                        f"class_id={item.class_id}",
+                        f"subject_ref={item.subject_ref}",
+                        f"component_ref={item.component_ref}",
+                        f"role={item.role.value}",
+                        f"status={item.status.value}",
+                        f"effective_from={item.effective_from}",
+                        f"effective_to={item.effective_to}",
+                        "-" * 60,
+                    )
+                ),
+                language="text",
+            )
+
+        st.markdown(
+            "##### 2. Registered canonical scopes"
+        )
+
+        st.dataframe(
+            [
+                {
+                    "subject_id": item.subject_id,
+                    "subject_name": item.subject_name,
+                    "component_id": item.component_id or "",
+                    "component_name": item.component_name or "",
+                }
+                for item in subject_scopes
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown(
+            "##### 3. Canonical bridge options"
+        )
+
+        st.dataframe(
+            [
+                {
+                    "assignment_id": item.assignment_id,
+                    "class_id": item.class_id,
+                    "subject_id": item.subject_id,
+                    "subject_name": item.subject_name,
+                    "component_id": item.component_id or "",
+                    "component_name": item.component_name or "",
+                }
+                for item in canonical_assignment_options
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    assignment_by_id = {
+        item.assignment_id: item
+        for item in assignments
+    }
+
+    try:
+        slots = timetable_repository.list_slots(
+            owner_id=user_id,
+            academic_year=academic_year,
+            status=TeacherTimetableSlotStatus.ACTIVE,
+        )
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            f"th\u1eddi kh\u00f3a bi\u1ec3u: {error}"
+        )
+        return
+
+    st.caption(
+        "M\u1ed7i \u00f4 ch\u1ecdn m\u1ed9t "
+        "ph\u00e2n c\u00f4ng theo d\u1ea1ng "
+        "L\u1edbp | M\u00f4n | Ph\u00e2n m\u00f4n."
+    )
+
+    slot_by_position = {
+        (
+            slot.weekday,
+            slot.session,
+            slot.period,
+        ): slot
+        for slot in slots
+    }
+
+    class_options = (
+        ("",)
+        + tuple(
+            dict.fromkeys(
+                item.class_id
+                for item in canonical_assignment_options
+            )
+        )
+    )
+
+    def options_for_class(
+        class_id: str,
+    ):
+        if not class_id:
+            return ()
+
+        return tuple(
+            item
+            for item in canonical_assignment_options
+            if item.class_id == class_id
+        )
+
+    def subject_ids_for_class(
+        class_id: str,
+    ) -> tuple[str, ...]:
+        if not class_id:
+            return ("",)
+
+        return (
+            ("",)
+            + tuple(
+                dict.fromkeys(
+                    item.subject_id
+                    for item in options_for_class(
+                        class_id
+                    )
+                )
+            )
+        )
+
+    def subject_name_for_id(
+        class_id: str,
+        subject_id: str,
+    ) -> str:
+        if not subject_id:
+            return "\u2014 Tr\u1ed1ng \u2014"
+
+        for item in options_for_class(
+            class_id
+        ):
+            if item.subject_id == subject_id:
+                return item.subject_name
+
+        return subject_id
+
+    def component_ids_for(
+        class_id: str,
+        subject_id: str,
+    ) -> tuple[str, ...]:
+        if (
+            not class_id
+            or not subject_id
+        ):
+            return ("",)
+
+        values = []
+
+        for item in options_for_class(
+            class_id
+        ):
+            if (
+                item.subject_id
+                != subject_id
+            ):
+                continue
+
+            if item.component_id is None:
+                continue
+
+            values.append(
+                item.component_id
+            )
+
+        return (
+            ("",)
+            + tuple(
+                dict.fromkeys(
+                    values
+                )
+            )
+        )
+
+    def component_name_for_id(
+        class_id: str,
+        subject_id: str,
+        component_id: str,
+    ) -> str:
+        if not component_id:
+            return "\u2014 Tr\u1ed1ng \u2014"
+
+        for item in options_for_class(
+            class_id
+        ):
+            if (
+                item.subject_id
+                == subject_id
+                and item.component_id
+                == component_id
+            ):
+                return (
+                    item.component_name
+                    or component_id
+                )
+
+        return component_id
+
+    def resolve_canonical_assignment_id(
+        *,
+        class_id: str,
+        subject_id: str,
+        component_id: str,
+    ) -> str:
+        if (
+            not class_id
+            or not subject_id
+        ):
+            return ""
+
+        matches = [
+            item
+            for item in options_for_class(
+                class_id
+            )
+            if (
+                item.subject_id
+                == subject_id
+                and (
+                    item.component_id
+                    or ""
+                )
+                == (
+                    component_id
+                    or ""
+                )
+            )
+        ]
+
+        if len(matches) != 1:
+            return ""
+
+        return matches[0].assignment_id
+
+    def normalized_widget_value(
+        *,
+        key: str,
+        options: tuple[str, ...],
+        default_value: str,
+        auto_single: bool = False,
+    ) -> str:
+        current = st.session_state.get(
+            key,
+            default_value,
+        )
+
+        if current not in options:
+            current = ""
+
+        non_empty = tuple(
+            value
+            for value in options
+            if value
+        )
+
+        if (
+            auto_single
+            and not current
+            and len(non_empty) == 1
+        ):
+            current = non_empty[0]
+
+        st.session_state[key] = current
+
+        return current
+
+    selections = {}
+    incomplete_positions = []
+
+    def render_period_row(
+        *,
+        weekday: int,
+        session: TeachingSession,
+        period: int,
+    ) -> None:
+        position = (
+            weekday,
+            session,
+            period,
+        )
+
+        existing = slot_by_position.get(
+            position
+        )
+
+        existing_assignment = (
+            assignment_by_id.get(
+                existing.assignment_id
+            )
+            if existing is not None
+            else None
+        )
+
+        existing_canonical_option = (
+            canonical_option_by_assignment_id.get(
+                existing.assignment_id
+            )
+            if existing is not None
+            else None
+        )
+
+        default_class = (
+            existing_canonical_option.class_id
+            if existing_canonical_option
+            else ""
+        )
+
+        default_subject = (
+            existing_canonical_option.subject_id
+            if existing_canonical_option
+            else ""
+        )
+
+        default_component = (
+            (
+                existing_canonical_option.component_id
+                or ""
+            )
+            if existing_canonical_option
+            else ""
+        )
+
+        key_prefix = (
+            "teacher_timetable_"
+            f"{session.value}_"
+            f"{weekday}_"
+            f"{period}"
+        )
+
+        class_key = (
+            f"{key_prefix}_class"
+        )
+
+        subject_key = (
+            f"{key_prefix}_subject"
+        )
+
+        component_key = (
+            f"{key_prefix}_component"
+        )
+
+        selected_class = (
+            normalized_widget_value(
+                key=class_key,
+                options=class_options,
+                default_value=default_class,
+            )
+        )
+
+        row = st.columns(
+            [0.38, 0.9, 1.15, 1.35],
+            gap="small",
+        )
+
+        row[0].markdown(
+            f"**{period}**"
+        )
+
+        with row[1]:
+            selected_class = st.selectbox(
+                "L\u1edbp",
+                options=class_options,
+                format_func=(
+                    lambda value:
+                    value or "\u2014 Tr\u1ed1ng \u2014"
+                ),
+                key=class_key,
+                label_visibility="collapsed",
+            )
+
+        subject_options = (
+            subject_ids_for_class(
+                selected_class
+            )
+        )
+
+        subject_default = (
+            default_subject
+            if selected_class == default_class
+            else ""
+        )
+
+        selected_subject = (
+            normalized_widget_value(
+                key=subject_key,
+                options=subject_options,
+                default_value=subject_default,
+                auto_single=True,
+            )
+        )
+
+        with row[2]:
+            selected_subject = st.selectbox(
+                "M\u00f4n",
+                options=subject_options,
+                format_func=(
+                    lambda value:
+                    subject_name_for_id(
+                        selected_class,
+                        value,
+                    )
+                ),
+                key=subject_key,
+                disabled=not selected_class,
+                label_visibility="collapsed",
+            )
+
+        component_options = (
+            component_ids_for(
+                selected_class,
+                selected_subject,
+            )
+        )
+
+        component_default = (
+            default_component
+            if (
+                selected_class
+                == default_class
+                and selected_subject
+                == default_subject
+            )
+            else ""
+        )
+
+        selected_component = (
+            normalized_widget_value(
+                key=component_key,
+                options=component_options,
+                default_value=component_default,
+                auto_single=True,
+            )
+        )
+
+        with row[3]:
+            selected_component = (
+                st.selectbox(
+                    "Ph\u00e2n m\u00f4n",
+                    options=component_options,
+                    format_func=(
+                        lambda value:
+                        component_name_for_id(
+                            selected_class,
+                            selected_subject,
+                            value,
+                        )
+                    ),
+                    key=component_key,
+                    disabled=(
+                        not selected_subject
+                    ),
+                    label_visibility=(
+                        "collapsed"
+                    ),
+                )
+            )
+
+        selected_assignment_id = (
+            resolve_canonical_assignment_id(
+                class_id=selected_class,
+                subject_id=selected_subject,
+                component_id=(
+                    selected_component
+                ),
+            )
+        )
+
+        if (
+            selected_class
+            and not selected_assignment_id
+        ):
+            incomplete_positions.append(
+                (
+                    weekday,
+                    session,
+                    period,
+                )
+            )
+
+        selections[position] = (
+            selected_assignment_id
+        )
+
+    def render_day_session(
+        *,
+        weekday: int,
+        session: TeachingSession,
+        title: str,
+    ) -> None:
+        st.markdown(
+            f"#### {title}"
+        )
+
+        header = st.columns(
+            [0.38, 0.9, 1.15, 1.35],
+            gap="small",
+        )
+
+        header[0].caption(
+            "Ti\u1ebft"
+        )
+        header[1].caption(
+            "L\u1edbp"
+        )
+        header[2].caption(
+            "M\u00f4n"
+        )
+        header[3].caption(
+            "Ph\u00e2n m\u00f4n"
+        )
+
+        for period in range(
+            1,
+            6,
+        ):
+            render_period_row(
+                weekday=weekday,
+                session=session,
+                period=period,
+            )
+
+    def render_day_card(
+        weekday: int,
+        label: str,
+    ) -> None:
+        with st.container(
+            border=True
+        ):
+            st.markdown(
+                f"### {label}"
+            )
+
+            render_day_session(
+                weekday=weekday,
+                session=(
+                    TeachingSession.MORNING
+                ),
+                title="\u2600\ufe0f Bu\u1ed5i s\u00e1ng",
+            )
+
+            st.divider()
+
+            render_day_session(
+                weekday=weekday,
+                session=(
+                    TeachingSession.AFTERNOON
+                ),
+                title="\U0001f319 Bu\u1ed5i chi\u1ec1u",
+            )
+
+    st.markdown(
+        "### Th\u1eddi kh\u00f3a bi\u1ec3u tu\u1ea7n"
+    )
+
+    st.caption(
+        "M\u1ed7i ng\u00e0y l\u00e0 m\u1ed9t kh\u1ed1i "
+        "ri\u00eang. Trong m\u1ed7i ti\u1ebft, "
+        "ch\u1ecdn L\u1edbp \u2192 M\u00f4n "
+        "\u2192 Ph\u00e2n m\u00f4n."
+    )
+
+    for weekday, label in _WEEKDAYS:
+        render_day_card(
+            weekday,
+            label,
+        )
+
+    st.caption(
+        "L\u1edbp \u0111\u01b0\u1ee3c l\u1ecdc theo "
+        "ph\u00e2n c\u00f4ng gi\u1ea3ng d\u1ea1y; "
+        "M\u00f4n v\u00e0 Ph\u00e2n m\u00f4n "
+        "\u0111\u01b0\u1ee3c l\u1ecdc theo "
+        "danh m\u1ee5c canonical v\u00e0 "
+        "\u0111\u0103ng k\u00fd c\u1ee7a gi\u00e1o vi\u00ean."
+    )
+
+    save_timetable = st.button(
+        "L\u01b0u th\u1eddi kh\u00f3a bi\u1ec3u",
+        type="primary",
+        use_container_width=True,
+        key="teacher_timetable_save",
+    )
+
+    if save_timetable:
+        if incomplete_positions:
+            st.error(
+                "Có tiết đã chọn Lớp "
+                "nhưng chưa xác định được "
+                "Môn/Phân môn hợp lệ. "
+                "Hãy hoàn thành các ô "
+                "trước khi lưu."
+            )
+            return
+
+        timetable_service = (
+            TeacherTimetableService(
+                timetable_repository=(
+                    timetable_repository
+                ),
+                assignment_repository=(
+                    assignment_repository
+                ),
+            )
+        )
+
+        changed_count = 0
+
+        try:
+            for (
+                weekday,
+                session,
+                period,
+            ), selected_id in selections.items():
+                position = (
+                    weekday,
+                    session,
+                    period,
+                )
+
+                existing = (
+                    slot_by_position.get(
+                        position
+                    )
+                )
+
+                if not selected_id:
+                    if existing is not None:
+                        timetable_repository.delete(
+                            slot_id=(
+                                existing.slot_id
+                            )
+                        )
+
+                        changed_count += 1
+
+                    continue
+
+                assignment = (
+                    assignment_by_id[
+                        selected_id
+                    ]
+                )
+
+                if (
+                    existing is not None
+                    and existing.assignment_id
+                    == selected_id
+                    and existing.effective_from
+                    == assignment.effective_from
+                    and existing.effective_to
+                    == assignment.effective_to
+                ):
+                    continue
+
+                slot = TeacherTimetableSlot(
+                    slot_id=(
+                        existing.slot_id
+                        if existing is not None
+                        else (
+                            "tt-"
+                            + uuid4().hex
+                        )
+                    ),
+                    owner_id=user_id,
+                    academic_year=academic_year,
+                    assignment_id=(
+                        selected_id
+                    ),
+                    weekday=weekday,
+                    session=session,
+                    period=period,
+                    effective_from=(
+                        assignment.effective_from
+                    ),
+                    effective_to=(
+                        assignment.effective_to
+                    ),
+                    status=(
+                        TeacherTimetableSlotStatus.ACTIVE
+                    ),
+                )
+
+                timetable_service.save_slot(
+                    slot=slot
+                )
+
+                changed_count += 1
+
+        except Exception as error:
+            st.error(
+                "Kh\u00f4ng th\u1ec3 l\u01b0u "
+                f"th\u1eddi kh\u00f3a bi\u1ec3u: {error}"
+            )
+            return
+
+        if changed_count:
+            st.success(
+                "\u0110\u00e3 l\u01b0u "
+                f"{changed_count} thay \u0111\u1ed5i "
+                "th\u1eddi kh\u00f3a bi\u1ec3u."
+            )
+        else:
+            st.info(
+                "Th\u1eddi kh\u00f3a bi\u1ec3u "
+                "kh\u00f4ng c\u00f3 thay \u0111\u1ed5i."
+            )
+
+        st.rerun()

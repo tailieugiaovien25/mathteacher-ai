@@ -51,6 +51,23 @@ class SupabaseTeachingAssignmentRepository(
                 "authenticated user"
             )
 
+        for field_name, value in (
+            ("class_id", assignment.class_id),
+            ("subject_ref", assignment.subject_ref),
+            ("component_ref", assignment.component_ref),
+        ):
+            if (
+                value is not None
+                and (
+                    "," in value
+                    or ";" in value
+                )
+            ):
+                raise ValueError(
+                    f"{field_name} must contain "
+                    "exactly one value"
+                )
+
         row = {
             "assignment_id": assignment.assignment_id,
             "owner_id": assignment.owner_id,

@@ -83,8 +83,12 @@ def run_contract() -> bool:
     ))
 
     tests.append((
-        "TDWR9 Update action remains disabled",
-        "disabled=True"
+        "TDWR9 Update action is conditionally disabled",
+        "disabled=("
+        in source
+        and "not is_ppct"
+        in source
+        and "on_ppct_update is None"
         in source,
     ))
 

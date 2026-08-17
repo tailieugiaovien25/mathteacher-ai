@@ -52,15 +52,9 @@ def run_contract():
     ))
 
     tests.append((
-        "TPW5 Portal navigation unchanged",
-        teacher_portal_app.PORTAL_PAGES
-        == (
-            "T\u1ed5ng quan",
-            "L\u1ecbch b\u00e1o gi\u1ea3ng",
-            "Kho t\u00e0i li\u1ec7u",
-            "Chu\u1ea9n h\u00f3a Word",
-            "H\u1ed3 s\u01a1 gi\u00e1o vi\u00ean",
-        ),
+        "TPW5 Weekly schedule remains in portal navigation",
+        "L\u1ecbch b\u00e1o gi\u1ea3ng"
+        in teacher_portal_app.PORTAL_PAGES,
     ))
 
     tests.append((

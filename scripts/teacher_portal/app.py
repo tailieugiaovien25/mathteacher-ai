@@ -20,12 +20,14 @@ from portal_v2.ui import render_admin_shell
 
 
 PORTAL_PAGES = (
-    "Tổng quan",
-    "Lịch báo giảng",
-    "Dữ liệu của tôi",
-    "Kho tài liệu",
-    "Chuẩn hóa Word",
-    "Hồ sơ giáo viên",
+    "T\u1ed5ng quan",
+    "L\u1ecbch b\u00e1o gi\u1ea3ng",
+    "Th\u1eddi kh\u00f3a bi\u1ec3u",
+    "\u0110\u0103ng k\u00fd m\u00f4n/ph\u00e2n m\u00f4n",
+    "D\u1eef li\u1ec7u c\u1ee7a t\u00f4i",
+    "Kho t\u00e0i li\u1ec7u",
+    "Chu\u1ea9n h\u00f3a Word",
+    "H\u1ed3 s\u01a1 gi\u00e1o vi\u00ean",
 )
 PORTAL_SESSION_KEYS = (
     "portal_supabase_client",
@@ -245,6 +247,9 @@ def render_profile(st, client: Any, user_id: str) -> None:
         TeachingAssignment,
         TeachingAssignmentRole,
         TeachingAssignmentStatus,
+    )
+    from educational_planning_v2.services.teaching_assignment_legacy_migration_service import (
+        TeachingAssignmentLegacyMigrationService,
     )
 
     st.title("H\u1ed3 s\u01a1 gi\u00e1o vi\u00ean")
@@ -639,6 +644,67 @@ def render_profile(st, client: Any, user_id: str) -> None:
         )
         return
 
+    migration_service = (
+        TeachingAssignmentLegacyMigrationService()
+    )
+
+    legacy_previews = tuple(
+        (
+            item,
+            migration_service.preview(item),
+        )
+        for item in assignments
+        if migration_service.preview(item).is_legacy
+    )
+
+    if legacy_previews:
+        st.warning(
+            "Ph\\u00e1t hi\\u1ec7n ph\\u00e2n c\\u00f4ng c\\u0169 "
+            "ch\\u01b0a theo c\\u1ea5u tr\\u00fac chu\\u1ea9n."
+        )
+
+        with st.expander(
+            "Ph\\u00e2n c\\u00f4ng c\\u0169 c\\u1ea7n chu\\u1ea9n h\\u00f3a",
+            expanded=True,
+        ):
+            st.info(
+                "H\\u00e3y t\\u1ea1o l\\u1ea1i c\\u00e1c ph\\u00e2n c\\u00f4ng "
+                "\\u0111\\u00fang b\\u1eb1ng bi\\u1ec3u m\\u1eabu Th\\u00eam "
+                "ph\\u00e2n c\\u00f4ng \\u1edf ph\\u00eda tr\\u00ean. "
+                "M\\u1ed7i d\\u00f2ng = 1 l\\u1edbp + 1 m\\u00f4n "
+                "+ 0/1 ph\\u00e2n m\\u00f4n."
+            )
+
+            for item, preview in legacy_previews:
+                st.markdown(
+                    f"**ID:** `{item.assignment_id}`"
+                )
+
+                st.write(
+                    {
+                        "L\\u1edbp c\\u0169":
+                            list(preview.class_refs),
+                        "M\\u00f4n c\\u0169":
+                            list(preview.subject_refs),
+                        "Ph\\u00e2n m\\u00f4n c\\u0169":
+                            list(preview.component_refs),
+                        "T\\u1ef1 \\u0111\\u1ed9ng chu\\u1ea9n h\\u00f3a":
+                            preview.can_auto_migrate,
+                        "L\\u00fd do":
+                            preview.reason,
+                    }
+                )
+
+                if not preview.can_auto_migrate:
+                    st.caption(
+                        "B\\u1ea3n ghi n\\u00e0y c\\u00f3 nhi\\u1ec1u "
+                        "chi\\u1ec1u d\\u1eef li\\u1ec7u; h\\u1ec7 th\\u1ed1ng "
+                        "kh\\u00f4ng t\\u1ef1 suy \\u0111o\\u00e1n quan h\\u1ec7 "
+                        "L\\u1edbp - M\\u00f4n - Ph\\u00e2n m\\u00f4n."
+                    )
+
+                st.divider()
+
     st.markdown(
         "#### Danh s\u00e1ch ph\u00e2n c\u00f4ng"
     )
@@ -826,6 +892,57 @@ def main() -> None:
             render_weekly_schedule_workspace,
         )
         render_weekly_schedule_workspace()
+
+
+    elif selected == "Th\u1eddi kh\u00f3a bi\u1ec3u":
+        from portal_v2.ui.teacher_timetable_streamlit import (
+            render_teacher_timetable,
+        )
+
+        render_teacher_timetable(
+            st=st,
+            client=client,
+            user_id=str(user_id),
+        )
+
+    elif selected == "\u0110\u0103ng k\u00fd m\u00f4n/ph\u00e2n m\u00f4n":
+        from portal_v2.ui.teacher_subject_registration_streamlit import (
+            render_teacher_subject_registration,
+        )
+
+        profile_repository = (
+            SupabaseTeacherProfileRepository(
+                client,
+                str(user_id),
+            )
+        )
+
+        try:
+            profile = (
+                profile_repository.get()
+            )
+        except Exception as error:
+            st.error(
+                "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+                f"h\u1ed3 s\u01a1 gi\u00e1o vi\u00ean: {error}"
+            )
+            return
+
+        if profile is None:
+            st.warning(
+                "H\u00e3y khai b\u00e1o H\u1ed3 s\u01a1 "
+                "gi\u00e1o vi\u00ean tr\u01b0\u1edbc."
+            )
+            return
+
+        render_teacher_subject_registration(
+            st=st,
+            client=client,
+            user_id=str(user_id),
+            academic_year=(
+                profile.default_academic_year
+            ),
+        )
 
     elif selected == "Dữ liệu của tôi":
         from educational_planning_v2.services.teacher_operational_data_workspace_service import (

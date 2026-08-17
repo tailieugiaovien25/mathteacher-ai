@@ -229,3 +229,101 @@ def test_migration_enables_owner_only_rls():
     assert "auth.uid()" in sql
     assert "owner_id" in sql
     assert "service_role" not in sql
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    (
+        ("class_id", "6A1, 6A2"),
+        ("subject_ref", "Toan, Ngu van"),
+        ("component_ref", "Dai so; Hinh hoc"),
+    ),
+)
+def test_repository_rejects_non_atomic_assignment_write(
+    field_name,
+    value,
+):
+    client = FakeClient()
+
+    repository = (
+        SupabaseTeachingAssignmentRepository(
+            client,
+            "user-1",
+        )
+    )
+
+    assignment = _assignment()
+
+    values = {
+        "assignment_id":
+            assignment.assignment_id,
+        "owner_id":
+            assignment.owner_id,
+        "academic_year":
+            assignment.academic_year,
+        "class_id":
+            assignment.class_id,
+        "subject_ref":
+            assignment.subject_ref,
+        "component_ref":
+            assignment.component_ref,
+        "role":
+            assignment.role,
+        "effective_from":
+            assignment.effective_from,
+        "effective_to":
+            assignment.effective_to,
+        "status":
+            assignment.status,
+    }
+
+    values[field_name] = value
+
+    non_atomic = TeachingAssignment(
+        **values
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=field_name,
+    ):
+        repository.save(
+            assignment=non_atomic,
+        )
+
+    assert client.rows == {}
+
+
+def test_repository_can_read_legacy_non_atomic_assignment():
+    client = FakeClient()
+
+    client.rows["legacy-001"] = {
+        "assignment_id": "legacy-001",
+        "owner_id": "user-1",
+        "academic_year": "2026-2027",
+        "class_id": "6A1, 6A2",
+        "subject_ref": "Toan",
+        "component_ref": "Dai so, Hinh hoc",
+        "role": "TEACHING",
+        "effective_from": "2026-09-01",
+        "effective_to": "2027-05-31",
+        "status": "ACTIVE",
+    }
+
+    repository = (
+        SupabaseTeachingAssignmentRepository(
+            client,
+            "user-1",
+        )
+    )
+
+    loaded = repository.get(
+        assignment_id="legacy-001",
+    )
+
+    assert loaded is not None
+    assert loaded.class_id == "6A1, 6A2"
+    assert (
+        loaded.component_ref
+        == "Dai so, Hinh hoc"
+    )

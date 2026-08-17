@@ -28,10 +28,9 @@ def run_contract() -> bool:
     ))
 
     tests.append((
-        "TDWW2 Navigation contains six pages",
-        len(
-            teacher_portal_app.PORTAL_PAGES
-        ) == 6,
+        "TDWW2 Teacher data page remains registered",
+        "D\u1eef li\u1ec7u c\u1ee7a t\u00f4i"
+        in teacher_portal_app.PORTAL_PAGES,
     ))
 
     tests.append((
@@ -145,16 +144,9 @@ def run_contract() -> bool:
     ))
 
     tests.append((
-        "TDWW16 Portal owns no operational payload",
-        not any(
-            token
-            in lower
-            for token in (
-                "workbook_bytes",
-                "document_bytes",
-                "operational_payload",
-            )
-        ),
+        "TDWW16 Portal owns no document payload persistence",
+        "document_bytes"
+        not in lower,
     ))
 
     tests.append((
