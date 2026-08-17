@@ -377,6 +377,44 @@ def test_list_components_filters_by_subject():
     ]
 
 
+def test_list_components_can_load_all_subjects():
+    repository = (
+        SupabaseSubjectCatalogRepository(
+            client=FakeClient()
+        )
+    )
+
+    repository.save_component(
+        component=_component(
+            component_id="math-algebra",
+            subject_id="subject-math",
+            code="ALGEBRA",
+            name="Dai so",
+            display_order=1,
+        )
+    )
+
+    repository.save_component(
+        component=_component(
+            component_id="art-music",
+            subject_id="subject-art",
+            code="MUSIC",
+            name="Am nhac",
+            display_order=2,
+        )
+    )
+
+    components = repository.list_components()
+
+    assert {
+        item.component_id
+        for item in components
+    } == {
+        "math-algebra",
+        "art-music",
+    }
+
+
 def test_list_components_filters_status():
     repository = (
         SupabaseSubjectCatalogRepository(

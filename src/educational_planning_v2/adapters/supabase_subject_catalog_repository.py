@@ -222,15 +222,18 @@ class SupabaseSubjectCatalogRepository(
     def list_components(
         self,
         *,
-        subject_id: str,
+        subject_id: str | None = None,
         status: CatalogStatus | None = None,
     ) -> tuple[SubjectComponent, ...]:
-        normalized_subject_id = (
-            self._required_text(
-                subject_id,
-                "subject_id",
+        normalized_subject_id = None
+
+        if subject_id is not None:
+            normalized_subject_id = (
+                self._required_text(
+                    subject_id,
+                    "subject_id",
+                )
             )
-        )
 
         self._validate_status(
             status
@@ -240,11 +243,13 @@ class SupabaseSubjectCatalogRepository(
             self._client
             .table(self.COMPONENT_TABLE)
             .select("*")
-            .eq(
+        )
+
+        if normalized_subject_id is not None:
+            query = query.eq(
                 "subject_id",
                 normalized_subject_id,
             )
-        )
 
         if status is not None:
             query = query.eq(

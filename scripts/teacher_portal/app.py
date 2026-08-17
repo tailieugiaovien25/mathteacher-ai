@@ -40,6 +40,7 @@ PORTAL_SESSION_KEYS = (
     "teacher_data_ppct_update_open",
     "teacher_data_ppct_view_open",
     "teacher_data_ppct_view_source_id",
+    "teacher_timetable_catalog_snapshot",
     "admin_portal_page",
     "admin_portal_navigation",
     "portal_navigation",

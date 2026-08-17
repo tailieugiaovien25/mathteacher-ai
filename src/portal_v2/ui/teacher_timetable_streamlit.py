@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -25,6 +26,9 @@ from educational_planning_v2.adapters.supabase_teaching_assignment_repository im
 from educational_planning_v2.adapters.supabase_teacher_profile_repository import (
     SupabaseTeacherProfileRepository,
 )
+from educational_planning_v2.models.subject_catalog import (
+    CatalogStatus,
+)
 from educational_planning_v2.models.teacher_timetable import (
     TeacherTimetableSlot,
     TeacherTimetableSlotStatus,
@@ -37,6 +41,57 @@ from educational_planning_v2.models.teaching_assignment import (
 from educational_planning_v2.services.teacher_timetable_service import (
     TeacherTimetableService,
 )
+
+
+_CATALOG_SNAPSHOT_SESSION_KEY = (
+    "teacher_timetable_catalog_snapshot"
+)
+
+
+class _SubjectCatalogSnapshotRepository:
+    def __init__(
+        self,
+        *,
+        subjects,
+        components,
+    ) -> None:
+        self._subjects = tuple(subjects)
+        self._components = tuple(components)
+
+    def list_subjects(
+        self,
+        *,
+        status=None,
+    ):
+        return tuple(
+            item
+            for item in self._subjects
+            if (
+                status is None
+                or item.status is status
+            )
+        )
+
+    def list_components(
+        self,
+        *,
+        subject_id=None,
+        status=None,
+    ):
+        return tuple(
+            item
+            for item in self._components
+            if (
+                (
+                    subject_id is None
+                    or item.subject_id == subject_id
+                )
+                and (
+                    status is None
+                    or item.status is status
+                )
+            )
+        )
 
 
 _WEEKDAYS = (
@@ -72,6 +127,9 @@ def render_teacher_timetable(
     client: Any,
     user_id: str,
 ) -> None:
+    _perf_started = perf_counter()
+    _perf: dict[str, float] = {}
+
     st.markdown(
         """
         <style>
@@ -155,7 +213,11 @@ def render_teacher_timetable(
     )
 
     try:
+        _perf_step = perf_counter()
         profile = profile_repository.get()
+        _perf["profile_load_ms"] = (
+            perf_counter() - _perf_step
+        ) * 1000
     except Exception as error:
         st.error(
             "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
@@ -179,6 +241,7 @@ def render_teacher_timetable(
     )
 
     try:
+        _perf_step = perf_counter()
         assignments = (
             assignment_repository.list_assignments(
                 owner_id=user_id,
@@ -187,6 +250,9 @@ def render_teacher_timetable(
                 status=TeachingAssignmentStatus.ACTIVE,
             )
         )
+        _perf["assignments_load_ms"] = (
+            perf_counter() - _perf_step
+        ) * 1000
     except Exception as error:
         st.error(
             "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
@@ -202,18 +268,78 @@ def render_teacher_timetable(
         return
 
     try:
-        subject_scopes = (
+        catalog_snapshot = st.session_state.get(
+            _CATALOG_SNAPSHOT_SESSION_KEY
+        )
+
+        if catalog_snapshot is None:
+            _catalog_perf_step = perf_counter()
+
+            snapshot_subjects = (
+                subject_catalog_repository.list_subjects(
+                    status=CatalogStatus.ACTIVE,
+                )
+            )
+
+            snapshot_components = (
+                subject_catalog_repository.list_components(
+                    status=CatalogStatus.ACTIVE,
+                )
+            )
+
+            catalog_snapshot = (
+                snapshot_subjects,
+                snapshot_components,
+            )
+
+            st.session_state[
+                _CATALOG_SNAPSHOT_SESSION_KEY
+            ] = catalog_snapshot
+
+            _perf["catalog_snapshot_build_ms"] = (
+                perf_counter() - _catalog_perf_step
+            ) * 1000
+        else:
+            _perf["catalog_snapshot_build_ms"] = 0.0
+
+        (
+            snapshot_subjects,
+            snapshot_components,
+        ) = catalog_snapshot
+
+        snapshot_catalog_repository = (
+            _SubjectCatalogSnapshotRepository(
+                subjects=snapshot_subjects,
+                components=snapshot_components,
+            )
+        )
+
+        _perf_step = perf_counter()
+
+        subject_scope_service = (
             TeacherTimetableSubjectScopeService(
                 catalog_repository=(
-                    subject_catalog_repository
+                    snapshot_catalog_repository
                 ),
                 registration_repository=(
                     subject_registration_repository
                 ),
-            ).list_scopes(
+            )
+        )
+
+        subject_scopes = (
+            subject_scope_service.list_scopes(
                 owner_id=user_id,
                 academic_year=academic_year,
             )
+        )
+
+        _perf["subject_scopes_load_ms"] = (
+            perf_counter() - _perf_step
+        ) * 1000
+
+        _perf.update(
+            subject_scope_service.performance_audit
         )
     except Exception as error:
         st.error(
@@ -233,6 +359,8 @@ def render_teacher_timetable(
         )
         return
 
+    _perf_step = perf_counter()
+
     canonical_assignment_options = (
         TeacherTimetableAssignmentBridge()
         .build_options(
@@ -240,6 +368,10 @@ def render_teacher_timetable(
             subject_scopes=subject_scopes,
         )
     )
+
+    _perf["bridge_build_ms"] = (
+        perf_counter() - _perf_step
+    ) * 1000
 
     if not canonical_assignment_options:
         st.warning(
@@ -348,17 +480,36 @@ def render_teacher_timetable(
     }
 
     try:
+        _perf_step = perf_counter()
         slots = timetable_repository.list_slots(
             owner_id=user_id,
             academic_year=academic_year,
             status=TeacherTimetableSlotStatus.ACTIVE,
         )
+        _perf["timetable_slots_load_ms"] = (
+            perf_counter() - _perf_step
+        ) * 1000
     except Exception as error:
         st.error(
             "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
             f"th\u1eddi kh\u00f3a bi\u1ec3u: {error}"
         )
         return
+
+    _perf["total_data_load_ms"] = (
+        perf_counter() - _perf_started
+    ) * 1000
+
+    with st.expander(
+        "Performance audit - temporary",
+        expanded=False,
+    ):
+        st.json(
+            {
+                key: round(value, 2)
+                for key, value in _perf.items()
+            }
+        )
 
     st.caption(
         "M\u1ed7i \u00f4 ch\u1ecdn m\u1ed9t "

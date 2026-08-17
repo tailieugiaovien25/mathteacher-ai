@@ -29,22 +29,46 @@ class FakeCatalogRepository:
             for item in components
         }
 
-    def get_subject(
+        self.list_subjects_calls = 0
+        self.list_components_calls = 0
+
+    def list_subjects(
         self,
         *,
-        subject_id,
+        status=None,
     ):
-        return self.subjects.get(
-            subject_id
+        self.list_subjects_calls += 1
+
+        return tuple(
+            item
+            for item in self.subjects.values()
+            if (
+                status is None
+                or item.status is status
+            )
         )
 
-    def get_component(
+    def list_components(
         self,
         *,
-        component_id,
+        subject_id=None,
+        status=None,
     ):
-        return self.components.get(
-            component_id
+        self.list_components_calls += 1
+
+        return tuple(
+            item
+            for item in self.components.values()
+            if (
+                (
+                    subject_id is None
+                    or item.subject_id == subject_id
+                )
+                and (
+                    status is None
+                    or item.status is status
+                )
+            )
         )
 
 
@@ -241,3 +265,71 @@ def test_missing_component_is_not_exposed():
     )
 
     assert scopes == ()
+
+
+def test_scope_service_uses_fixed_bulk_catalog_reads():
+    math = Subject(
+        subject_id="subject-math",
+        code="MATH",
+        name="Toan",
+        component_policy=(
+            SubjectComponentPolicy.OPTIONAL
+        ),
+    )
+
+    geometry = SubjectComponent(
+        component_id="component-math-geometry",
+        subject_id="subject-math",
+        code="GEOMETRY",
+        name="Hinh hoc",
+    )
+
+    algebra = SubjectComponent(
+        component_id="component-math-algebra",
+        subject_id="subject-math",
+        code="ALGEBRA",
+        name="Dai so",
+    )
+
+    catalog_repository = FakeCatalogRepository(
+        subjects=(math,),
+        components=(
+            geometry,
+            algebra,
+        ),
+    )
+
+    registrations = (
+        TeacherSubjectRegistration(
+            registration_id="registration-001",
+            owner_id="teacher-001",
+            academic_year="2026-2027",
+            subject_id="subject-math",
+            component_id="component-math-geometry",
+        ),
+        TeacherSubjectRegistration(
+            registration_id="registration-002",
+            owner_id="teacher-001",
+            academic_year="2026-2027",
+            subject_id="subject-math",
+            component_id="component-math-algebra",
+        ),
+    )
+
+    service = TeacherTimetableSubjectScopeService(
+        catalog_repository=catalog_repository,
+        registration_repository=(
+            FakeRegistrationRepository(
+                registrations
+            )
+        ),
+    )
+
+    scopes = service.list_scopes(
+        owner_id="teacher-001",
+        academic_year="2026-2027",
+    )
+
+    assert len(scopes) == 2
+    assert catalog_repository.list_subjects_calls == 1
+    assert catalog_repository.list_components_calls == 1

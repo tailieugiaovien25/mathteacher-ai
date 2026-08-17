@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 from educational_planning_v2.models.subject_catalog import (
     CatalogStatus,
@@ -59,6 +60,8 @@ class TeacherTimetableSubjectScopeService:
             registration_repository
         )
 
+        self._performance_audit: dict[str, float] = {}
+
     def list_scopes(
         self,
         *,
@@ -68,6 +71,8 @@ class TeacherTimetableSubjectScopeService:
         TeacherTimetableSubjectScope,
         ...
     ]:
+        _perf_step = perf_counter()
+
         registrations = (
             self._registration_repository.list_registrations(
                 owner_id=owner_id,
@@ -78,6 +83,50 @@ class TeacherTimetableSubjectScopeService:
             )
         )
 
+        self._performance_audit[
+            "registration_load_ms"
+        ] = (
+            perf_counter() - _perf_step
+        ) * 1000
+
+        _perf_step = perf_counter()
+
+        subjects = (
+            self._catalog_repository.list_subjects(
+                status=CatalogStatus.ACTIVE,
+            )
+        )
+
+        self._performance_audit[
+            "subjects_load_ms"
+        ] = (
+            perf_counter() - _perf_step
+        ) * 1000
+
+        _perf_step = perf_counter()
+
+        components = (
+            self._catalog_repository.list_components(
+                status=CatalogStatus.ACTIVE,
+            )
+        )
+
+        self._performance_audit[
+            "components_load_ms"
+        ] = (
+            perf_counter() - _perf_step
+        ) * 1000
+
+        subject_by_id = {
+            item.subject_id: item
+            for item in subjects
+        }
+
+        component_by_id = {
+            item.component_id: item
+            for item in components
+        }
+
         result: list[
             TeacherTimetableSubjectScope
         ] = []
@@ -87,36 +136,21 @@ class TeacherTimetableSubjectScopeService:
         ] = set()
 
         for registration in registrations:
-            subject = (
-                self._catalog_repository.get_subject(
-                    subject_id=registration.subject_id
-                )
+            subject = subject_by_id.get(
+                registration.subject_id
             )
 
             if subject is None:
                 continue
 
-            if subject.status is not CatalogStatus.ACTIVE:
-                continue
-
             component = None
 
             if registration.component_id is not None:
-                component = (
-                    self._catalog_repository.get_component(
-                        component_id=(
-                            registration.component_id
-                        )
-                    )
+                component = component_by_id.get(
+                    registration.component_id
                 )
 
                 if component is None:
-                    continue
-
-                if (
-                    component.status
-                    is not CatalogStatus.ACTIVE
-                ):
                     continue
 
                 if (
@@ -157,3 +191,11 @@ class TeacherTimetableSubjectScopeService:
             )
 
         return tuple(result)
+
+    @property
+    def performance_audit(
+        self,
+    ) -> dict[str, float]:
+        return dict(
+            self._performance_audit
+        )

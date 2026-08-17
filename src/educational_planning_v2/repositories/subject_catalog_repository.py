@@ -54,7 +54,7 @@ class SubjectCatalogRepository(ABC):
     def list_components(
         self,
         *,
-        subject_id: str,
+        subject_id: str | None = None,
         status: CatalogStatus | None = None,
     ) -> tuple[SubjectComponent, ...]:
         raise NotImplementedError
