@@ -35,6 +35,7 @@ PORTAL_SESSION_KEYS = (
     "portal_user_email",
     "portal_user_role",
     "portal_workspace",
+    "notification_repository",
     "operational_data_source_repository",
     "operational_payload_repository",
     "teacher_data_ppct_update_open",
@@ -89,6 +90,17 @@ def connect_feature_repositories(session_state: Any, client: Any, user_id: str) 
     session_state["portal_supabase_client"] = client
     session_state["portal_user_id"] = user_id
 
+    from notification_v2.adapters.supabase_notification_repository import (
+        SupabaseNotificationRepository,
+    )
+
+    session_state["notification_repository"] = (
+        SupabaseNotificationRepository(
+            client=client,
+            owner_id=user_id,
+        )
+    )
+
     from educational_planning_v2.adapters.supabase_operational_data_source_repository import (
         SupabaseOperationalDataSourceRepository,
     )
@@ -123,6 +135,22 @@ def connect_feature_repositories(session_state: Any, client: Any, user_id: str) 
 def clear_portal_session(session_state: Any) -> None:
     for key in PORTAL_SESSION_KEYS:
         session_state.pop(key, None)
+
+
+def has_complete_portal_session(
+    session_state: Any,
+) -> bool:
+    return bool(
+        session_state.get(
+            "portal_supabase_client"
+        )
+        and session_state.get(
+            "portal_user_id"
+        )
+        and session_state.get(
+            "portal_user_email"
+        )
+    )
 
 
 def select_portal_page(session_state: Any, page: str) -> None:
@@ -838,8 +866,17 @@ def main() -> None:
     settings = supabase_settings()
     client = st.session_state.get("portal_supabase_client")
     user_id = st.session_state.get("portal_user_id")
-    if client is None or not user_id:
-        render_login(st, settings)
+
+    if not has_complete_portal_session(
+        st.session_state
+    ):
+        clear_portal_session(
+            st.session_state
+        )
+        render_login(
+            st,
+            settings,
+        )
         return
 
     if st.query_params.get("code") or st.query_params.get("error"):
@@ -888,6 +925,7 @@ def main() -> None:
 
     if selected == "Tổng quan":
         render_dashboard(st)
+
     elif selected == "Lịch báo giảng":
         from portal_v2.ui.weekly_schedule_streamlit import (
             render_weekly_schedule_workspace,
