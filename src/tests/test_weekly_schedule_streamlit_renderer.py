@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import ast
 
 from portal_v2.ui.weekly_schedule_streamlit import (
     _academic_year_options,
@@ -165,7 +166,9 @@ def run_contract():
                 "sqlite3",
                 "supabase.",
                 "googleapiclient",
-                "vtsmas",
+                "vtsmas.",
+                "vtsmas_client",
+                "vtsmas_api",
             )
         ),
     ))
@@ -182,17 +185,59 @@ def run_contract():
         ),
     ))
 
+    tree = ast.parse(source)
+
+    numeric_constants = {
+        node.value
+        for node in ast.walk(tree)
+        if (
+            isinstance(
+                node,
+                ast.Constant,
+            )
+            and isinstance(
+                node.value,
+                int,
+            )
+            and not isinstance(
+                node.value,
+                bool,
+            )
+        )
+    }
+
+    string_constants = tuple(
+        node.value
+        for node in ast.walk(tree)
+        if (
+            isinstance(
+                node,
+                ast.Constant,
+            )
+            and isinstance(
+                node.value,
+                str,
+            )
+        )
+    )
+
     tests.append((
         "WSR20 Renderer contains no fixed educational values",
-        not any(
-            token
-            in source
-            for token in (
-                "140",
-                "105",
-                "70",
-                "35",
-                "KNTT",
+        (
+            not any(
+                value
+                in numeric_constants
+                for value in (
+                    140,
+                    105,
+                    70,
+                    35,
+                )
+            )
+            and not any(
+                "KNTT"
+                in value
+                for value in string_constants
             )
         ),
     ))

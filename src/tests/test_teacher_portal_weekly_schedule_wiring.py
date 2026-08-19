@@ -47,8 +47,14 @@ def run_contract():
 
     tests.append((
         "TPW4 Weekly page invokes V2 renderer",
-        "render_weekly_schedule_workspace()"
-        in source,
+        (
+            "render_weekly_schedule_workspace("
+            in source
+            and "client=client"
+            in source
+            and "user_id=str(user_id)"
+            in source
+        ),
     ))
 
     tests.append((
