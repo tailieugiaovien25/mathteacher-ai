@@ -12,6 +12,7 @@ from educational_planning_v2.models.operational_data_io import (
 from educational_planning_v2.services.local_weekly_schedule_generation_service import (
     LocalWeeklyScheduleGenerationService,
     WeeklyScheduleGenerationRequest,
+    WeeklyScheduleGenerationResult,
 )
 from educational_planning_v2.services.operational_input_selection_service import (
     OperationalInputSelection,
@@ -21,6 +22,32 @@ from educational_planning_v2.services.weekly_schedule_output_service import (
 )
 from portal_v2.ui.weekly_schedule_portal import (
     WeeklySchedulePortalPresenter,
+)
+from educational_planning_v2.adapters.supabase_teaching_assignment_repository import (
+    SupabaseTeachingAssignmentRepository,
+)
+from educational_planning_v2.adapters.supabase_class_catalog_repository import (
+    SupabaseClassCatalogRepository,
+)
+from educational_planning_v2.adapters.supabase_subject_catalog_repository import (
+    SupabaseSubjectCatalogRepository,
+)
+from educational_planning_v2.adapters.supabase_academic_year_configuration_repository import (
+    SupabaseAcademicYearConfigurationRepository,
+)
+from educational_planning_v2.adapters.supabase_academic_week_repository import (
+    SupabaseAcademicWeekRepository,
+)
+from educational_planning_v2.models.teaching_assignment import (
+    TeachingAssignmentRole,
+    TeachingAssignmentStatus,
+)
+from educational_planning_v2.services.ppct_scope_resolver import (
+    PPCTScopeMappingRule,
+)
+from portal_v2.runtime.system_weekly_schedule_runtime import (
+    SystemWeeklyScheduleRuntime,
+    SystemWeeklyScheduleRuntimeRequest,
 )
 
 _VIEW_STATE_KEY = "weekly_schedule_portal_view"
@@ -72,45 +99,679 @@ def _teacher_options(intake) -> tuple[str, ...]:
     )
 
 
-def _preview_rows(view) -> list[dict]:
+def _resolve_lbg_display_names(
+    *,
+    client,
+    view,
+) -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+]:
+    class_names: dict[str, str] = {}
+    subject_names: dict[str, str] = {}
+    component_names: dict[str, str] = {}
+
+    if client is None:
+        return (
+            class_names,
+            subject_names,
+            component_names,
+        )
+
+    class_repository = (
+        SupabaseClassCatalogRepository(
+            client=client,
+        )
+    )
+
+    subject_repository = (
+        SupabaseSubjectCatalogRepository(
+            client=client,
+        )
+    )
+
+    class_ids = {
+        row.class_id
+        for row in view.rows
+        if row.class_id
+    }
+
+    subject_ids = {
+        row.subject_ref
+        for row in view.rows
+        if row.subject_ref
+    }
+
+    component_ids = {
+        row.component_ref
+        for row in view.rows
+        if row.component_ref
+    }
+
+    for class_id in class_ids:
+        try:
+            item = class_repository.get(
+                class_id=class_id,
+            )
+
+            if item is not None:
+                class_names[class_id] = (
+                    item.display_name
+                )
+
+        except Exception:
+            pass
+
+    for subject_id in subject_ids:
+        try:
+            item = (
+                subject_repository.get_subject(
+                    subject_id=subject_id,
+                )
+            )
+
+            if item is not None:
+                subject_names[subject_id] = (
+                    item.name
+                )
+
+        except Exception:
+            pass
+
+    for component_id in component_ids:
+        try:
+            item = (
+                subject_repository.get_component(
+                    component_id=component_id,
+                )
+            )
+
+            if item is not None:
+                component_names[component_id] = (
+                    item.name
+                )
+
+        except Exception:
+            pass
+
+    return (
+        class_names,
+        subject_names,
+        component_names,
+    )
+
+
+def _preview_rows(
+    view,
+    *,
+    class_names: dict[str, str] | None = None,
+    subject_names: dict[str, str] | None = None,
+    component_names: dict[str, str] | None = None,
+) -> list[dict]:
+    class_names = class_names or {}
+    subject_names = subject_names or {}
+    component_names = component_names or {}
+
     return [
         {
-            "Ngày dạy": row.teaching_date.strftime("%d/%m/%Y"),
-            "Thứ": row.weekday,
-            "Tiết TKB": row.timetable_period,
-            "Lớp": row.class_id,
-            "Môn": row.subject_ref,
-            "Phân môn": row.component_ref or "",
-            "Tiết PPCT": row.curriculum_period,
-            "Mã bài": row.lesson_id,
-            "Tên bài": row.lesson_title,
-            "Tiết trong bài": row.period_in_lesson,
-            "Thiết bị": ", ".join(row.teaching_equipment),
+            "Th\u1ee9/ng\u00e0y":
+                (
+                    f"{row.weekday} - "
+                    f"{row.teaching_date.strftime('%d/%m/%Y')}"
+                ),
+
+            "Ti\u1ebft TKB":
+                row.timetable_period,
+
+            "M\u00f4n/Ph\u00e2n m\u00f4n":
+                (
+                    component_names.get(
+                        row.component_ref,
+                        row.component_ref,
+                    )
+                    if row.component_ref
+                    else subject_names.get(
+                        row.subject_ref,
+                        row.subject_ref,
+                    )
+                    or ""
+                ),
+
+            "L\u1edbp":
+                class_names.get(
+                    row.class_id,
+                    row.class_id,
+                ),
+
+            "Ti\u1ebft PPCT":
+                row.curriculum_period,
+
+            "T\u00ean b\u00e0i d\u1ea1y":
+                row.lesson_title,
+
+            "Chu\u1ea9n b\u1ecb, \u0111i\u1ec1u ch\u1ec9nh":
+                ", ".join(
+                    row.teaching_equipment
+                ),
+
+            "Ghi ch\u00fa":
+                "",
         }
         for row in view.rows
     ]
 
 
-def render_weekly_schedule_workspace() -> None:
-    st.title("Lịch báo giảng tự động theo tuần")
+def _render_lbg_table(
+    view,
+    *,
+    client=None,
+) -> None:
+    (
+        class_names,
+        subject_names,
+        component_names,
+    ) = _resolve_lbg_display_names(
+        client=client,
+        view=view,
+    )
+
+    rows = _preview_rows(
+        view,
+        class_names=class_names,
+        subject_names=subject_names,
+        component_names=component_names,
+    )
+
+    if not rows:
+        st.info(
+            "Tu\u1ea7n n\u00e0y ch\u01b0a c\u00f3 "
+            "ti\u1ebft d\u1ea1y trong L\u1ecbch b\u00e1o gi\u1ea3ng."
+        )
+        return
+
+    st.data_editor(
+        rows,
+        width="stretch",
+        hide_index=True,
+        disabled=(
+            "Th\u1ee9/ng\u00e0y",
+            "Ti\u1ebft TKB",
+            "M\u00f4n/Ph\u00e2n m\u00f4n",
+            "L\u1edbp",
+            "Ti\u1ebft PPCT",
+            "T\u00ean b\u00e0i d\u1ea1y",
+        ),
+        key=(
+            "lbg_user_editor_"
+            + str(view.week_number)
+        ),
+    )
+
+
+def _render_weekly_schedule_technical_workspace(
+    *,
+    client=None,
+    user_id: str | None = None,
+) -> None:
+    st.title(
+        "\U0001f4c5 L\u1ecbch b\u00e1o gi\u1ea3ng"
+    )
 
     st.caption(
-        "Tải dữ liệu lên, chọn năm học, tuần và giáo viên "
-        "để hệ thống tạo lịch báo giảng."
+        "L\u1eadp v\u00e0 qu\u1ea3n l\u00fd "
+        "l\u1ecbch b\u00e1o gi\u1ea3ng "
+        "theo t\u1eebng tu\u1ea7n h\u1ecdc."
     )
 
     source_label = st.radio(
-        "Nguồn dữ liệu",
-        ("Tải từ máy", "Lấy từ hệ thống"),
+        "\u004e\u0067\u0075\u1ed3\u006e "
+        "\u0064\u1eef "
+        "\u006c\u0069\u1ec7\u0075",
+        (
+            "\u0054\u1ea3\u0069 "
+            "\u0074\u1eeb "
+            "\u006d\u00e1\u0079",
+            "\u004c\u1ea5\u0079 "
+            "\u0074\u1eeb "
+            "\u0068\u1ec7 "
+            "\u0074\u0068\u1ed1\u006e\u0067",
+        ),
         horizontal=True,
         key="weekly_schedule_source",
     )
 
-    if source_label == "Lấy từ hệ thống":
-        st.info(
-            "Nguồn dữ liệu trong hệ thống sẽ được kết nối "
-            "ở bước tiếp theo."
+    if (
+        source_label
+        == (
+            "\u004c\u1ea5\u0079 "
+            "\u0074\u1eeb "
+            "\u0068\u1ec7 "
+            "\u0074\u0068\u1ed1\u006e\u0067"
         )
+    ):
+        if client is None or not user_id:
+            st.error(
+                "\u0050\u0068\u0069\u00ea\u006e "
+                "\u0111\u0103\u006e\u0067 "
+                "\u006e\u0068\u1ead\u0070 "
+                "\u0063\u0068\u01b0\u0061 "
+                "\u0063\u00f3 "
+                "\u006e\u0067\u1eef "
+                "\u0063\u1ea3\u006e\u0068 "
+                "\u0064\u1eef "
+                "\u006c\u0069\u1ec7\u0075 "
+                "\u0068\u1ec7 "
+                "\u0074\u0068\u1ed1\u006e\u0067."
+            )
+            return
+
+        st.subheader(
+            "\u0054\u1ea1\u006f "
+            "\u006c\u1ecb\u0063\u0068 "
+            "\u0074\u1eeb "
+            "\u0064\u1eef "
+            "\u006c\u0069\u1ec7\u0075 "
+            "\u0111\u00e3 "
+            "\u006c\u01b0\u0075"
+        )
+
+        academic_year = st.text_input(
+            "\u004e\u0103\u006d "
+            "\u0068\u1ecdc",
+            value=st.session_state.get(
+                "portal_academic_year",
+                "",
+            ),
+            key="system_weekly_academic_year",
+        ).strip()
+
+        week_number = st.selectbox(
+            "Tu\u1ea7n h\u1ecdc",
+            options=tuple(
+                range(1, 41)
+            ),
+            format_func=lambda value: (
+                f"Tu\u1ea7n {value}"
+            ),
+            key="system_weekly_week_number",
+        )
+
+        if not academic_year:
+            st.info(
+                "\u0048\u00e3\u0079 "
+                "\u006e\u0068\u1ead\u0070 "
+                "\u006e\u0103\u006d "
+                "\u0068\u1ecdc "
+                "\u0111\u1ec3 "
+                "\u0074\u0069\u1ebf\u0070 "
+                "\u0074\u1ee5\u0063."
+            )
+            return
+
+        try:
+            assignment_repository = (
+                SupabaseTeachingAssignmentRepository(
+                    client=client,
+                    user_id=str(user_id),
+                )
+            )
+
+            assignments = (
+                assignment_repository.list_assignments(
+                    owner_id=str(user_id),
+                    academic_year=academic_year,
+                    role=TeachingAssignmentRole.TEACHING,
+                    status=TeachingAssignmentStatus.ACTIVE,
+                )
+            )
+
+        except Exception as error:
+            st.error(
+                "\u004b\u0068\u00f4\u006e\u0067 "
+                "\u0074\u0068\u1ec3 "
+                "\u0111\u1ecdc "
+                "\u0070\u0068\u00e2\u006e "
+                "\u0063\u00f4\u006e\u0067 "
+                "\u0067\u0069\u1ea3\u006e\u0067 "
+                "\u0064\u1ea1\u0079: "
+                f"{error}"
+            )
+            return
+
+        if not assignments:
+            st.warning(
+                "\u0043\u0068\u01b0\u0061 "
+                "\u0063\u00f3 "
+                "\u0070\u0068\u00e2\u006e "
+                "\u0063\u00f4\u006e\u0067 "
+                "\u0067\u0069\u1ea3\u006e\u0067 "
+                "\u0064\u1ea1\u0079 "
+                "\u0111\u0061\u006e\u0067 "
+                "\u0068\u0069\u1ec7\u0075 "
+                "\u006c\u1ef1\u0063 "
+                "\u0063\u0068\u006f "
+                "\u006e\u0103\u006d "
+                "\u0068\u1ecdc "
+                "\u006e\u00e0\u0079."
+            )
+            return
+
+        st.caption(
+            "\u0047\u0068\u00e9\u0070 "
+            "\u006d\u1ed7\u0069 "
+            "\u0070\u0068\u00e2\u006e "
+            "\u0063\u00f4\u006e\u0067 "
+            "\u0076\u1edb\u0069 "
+            "\u006e\u0068\u00f3\u006d "
+            "\u0064\u1eef "
+            "\u006c\u0069\u1ec7\u0075 "
+            "\u0050\u0050\u0043\u0054 "
+            "\u0074\u01b0\u01a1\u006e\u0067 "
+            "\u1ee9\u006e\u0067."
+        )
+
+        try:
+            runtime = (
+                SystemWeeklyScheduleRuntime(
+                    client=client,
+                    user_id=str(user_id),
+                )
+            )
+
+            ppct_scope_options = (
+                runtime.list_ppct_scope_options(
+                    academic_year=academic_year,
+                )
+            )
+
+        except Exception as error:
+            st.error(
+                "\u004b\u0068\u00f4\u006e\u0067 "
+                "\u0074\u0068\u1ec3 "
+                "\u0111\u1ecdc "
+                "\u0064\u0061\u006e\u0068 "
+                "\u0073\u00e1\u0063\u0068 "
+                "\u006e\u0068\u00f3\u006d "
+                "\u0050\u0050\u0043\u0054: "
+                f"{error}"
+            )
+            return
+
+        if not ppct_scope_options:
+            st.warning(
+                "\u0050\u0050\u0043\u0054 "
+                "\u0111\u0061\u006e\u0067 "
+                "\u0068\u0069\u1ec7\u0075 "
+                "\u006c\u1ef1\u0063 "
+                "\u006b\u0068\u00f4\u006e\u0067 "
+                "\u0063\u00f3 "
+                "\u006e\u0068\u00f3\u006d "
+                "\u0064\u1eef "
+                "\u006c\u0069\u1ec7\u0075 "
+                "\u0068\u1ee3\u0070 "
+                "\u006c\u1ec7."
+            )
+            return
+
+        scope_rules = []
+
+        option_by_label = {
+            option.label: option
+            for option in ppct_scope_options
+        }
+
+        option_labels = (
+            "\u2014 "
+            "\u0043\u0068\u1ecdn "
+            "\u006e\u0068\u00f3\u006d "
+            "\u0050\u0050\u0043\u0054 "
+            "\u2014",
+            *tuple(
+                option_by_label.keys()
+            ),
+        )
+
+        for assignment in assignments:
+            with st.container(
+                border=True
+            ):
+                st.write(
+                    " | ".join(
+                        part
+                        for part in (
+                            assignment.class_id,
+                            assignment.subject_ref,
+                            assignment.component_ref,
+                        )
+                        if part
+                    )
+                )
+
+                selected_label = st.selectbox(
+                    "\u004e\u0068\u00f3\u006d "
+                    "\u0050\u0050\u0043\u0054",
+                    option_labels,
+                    key=(
+                        "weekly_ppct_scope_"
+                        + assignment.assignment_id
+                    ),
+                )
+
+                if (
+                    selected_label
+                    != option_labels[0]
+                ):
+                    selected = (
+                        option_by_label[
+                            selected_label
+                        ]
+                    )
+
+                    scope_rules.append(
+                        PPCTScopeMappingRule(
+                            class_id=assignment.class_id,
+                            subject_ref=(
+                                assignment.subject_ref
+                                or ""
+                            ),
+                            component_ref=(
+                                assignment.component_ref
+                            ),
+                            subject_grade=(
+                                selected.subject_grade
+                            ),
+                            sub_subject=(
+                                selected.sub_subject
+                            ),
+                        )
+                    )
+
+        if st.button(
+            "C\u1eadp nh\u1eadt "
+            "L\u1ecbch b\u00e1o gi\u1ea3ng",
+            type="primary",
+            width="stretch",
+            key="system_weekly_generate",
+        ):
+            if (
+                len(scope_rules)
+                != len(assignments)
+            ):
+                st.error(
+                    "\u0048\u00e3\u0079 "
+                    "\u006b\u0068\u0061\u0069 "
+                    "\u0062\u00e1\u006f "
+                    "\u006e\u0068\u00f3\u006d "
+                    "\u0050\u0050\u0043\u0054 "
+                    "\u0063\u0068\u006f "
+                    "\u0074\u1ea5\u0074 "
+                    "\u0063\u1ea3 "
+                    "\u0070\u0068\u00e2\u006e "
+                    "\u0063\u00f4\u006e\u0067."
+                )
+                return
+
+            try:
+                schedule_id = (
+                    "SYSTEM-"
+                    + str(user_id)
+                    + "-"
+                    + academic_year
+                    + "-W"
+                    + str(week_number)
+                )
+
+                runtime = (
+                    SystemWeeklyScheduleRuntime(
+                        client=client,
+                        user_id=str(user_id),
+                    )
+                )
+
+                schedule = runtime.generate(
+                    request=(
+                        SystemWeeklyScheduleRuntimeRequest(
+                            schedule_id=schedule_id,
+                            academic_year=academic_year,
+                            week_number=week_number,
+                            ppct_scope_rules=tuple(
+                                scope_rules
+                            ),
+                        )
+                    )
+                )
+
+                generation = (
+                    WeeklyScheduleGenerationResult(
+                        request=(
+                            WeeklyScheduleGenerationRequest(
+                                schedule_id=schedule_id,
+                                teacher_id=str(user_id),
+                                academic_year=academic_year,
+                                week_number=week_number,
+                            )
+                        ),
+                        schedule=schedule,
+                    )
+                )
+
+                output = (
+                    WeeklyScheduleOutputService()
+                    .export_excel(
+                        generation=generation
+                    )
+                )
+
+                view = (
+                    WeeklySchedulePortalPresenter()
+                    .present(
+                        output=output
+                    )
+                )
+
+                st.session_state[
+                    _VIEW_STATE_KEY
+                ] = view
+
+            except Exception as error:
+                st.error(
+                    "\u004b\u0068\u00f4\u006e\u0067 "
+                    "\u0074\u0068\u1ec3 "
+                    "\u0074\u1ea1\u006f "
+                    "\u006c\u1ecb\u0063\u0068 "
+                    "\u0062\u00e1\u006f "
+                    "\u0067\u0069\u1ea3\u006e\u0067 "
+                    "\u0074\u1eeb "
+                    "\u0064\u1eef "
+                    "\u006c\u0069\u1ec7\u0075 "
+                    "\u0068\u1ec7 "
+                    "\u0074\u0068\u1ed1\u006e\u0067: "
+                    f"{error}"
+                )
+                return
+
+        view = st.session_state.get(
+            _VIEW_STATE_KEY
+        )
+
+        if view is None:
+            return
+
+        st.success(
+            "\u0110\u00e3 "
+            "\u0074\u1ea1\u006f "
+            "\u006c\u1ecb\u0063\u0068 "
+            "\u0062\u00e1\u006f "
+            "\u0067\u0069\u1ea3\u006e\u0067 "
+            "\u0074\u1eeb "
+            "\u0064\u1eef "
+            "\u006c\u0069\u1ec7\u0075 "
+            "\u0068\u1ec7 "
+            "\u0074\u0068\u1ed1\u006e\u0067."
+        )
+
+        st.subheader(
+            f"\u004c\u1ecb\u0063\u0068 "
+            f"\u0062\u00e1\u006f "
+            f"\u0067\u0069\u1ea3\u006e\u0067 "
+            f"- "
+            f"\u0054\u0075\u1ea7\u006e "
+            f"{view.week_number}"
+        )
+
+        rows = _preview_rows(
+            view
+        )
+
+        if rows:
+            st.data_editor(
+                rows,
+                width="stretch",
+                hide_index=True,
+                disabled=(
+                    "Th\u1ee9/ng\u00e0y",
+                    "Ti\u1ebft TKB",
+                    "M\u00f4n/Ph\u00e2n m\u00f4n",
+                    "L\u1edbp",
+                    "Ti\u1ebft PPCT",
+                    "T\u00ean b\u00e0i d\u1ea1y",
+                ),
+                key=(
+                    "system_weekly_schedule_editor_"
+                    + str(view.week_number)
+                ),
+            )
+        else:
+            st.warning(
+                "\u004c\u1ecb\u0063\u0068 "
+                "\u0111\u01b0\u1ee3\u0063 "
+                "\u0074\u1ea1\u006f "
+                "\u006e\u0068\u01b0\u006e\u0067 "
+                "\u006b\u0068\u00f4\u006e\u0067 "
+                "\u0063\u00f3 "
+                "\u0074\u0069\u1ebf\u0074 "
+                "\u0064\u1ea1\u0079 "
+                "\u0070\u0068\u00f9 "
+                "\u0068\u1ee3\u0070 "
+                "\u0074\u0072\u006f\u006e\u0067 "
+                "\u0074\u0075\u1ea7\u006e "
+                "\u006e\u00e0\u0079."
+            )
+
+        st.download_button(
+            "\u0054\u1ea3\u0069 "
+            "\u006c\u1ecb\u0063\u0068 "
+            "\u0062\u00e1\u006f "
+            "\u0067\u0069\u1ea3\u006e\u0067 "
+            "\u0045\u0078\u0063\u0065\u006c",
+            data=view.download.content,
+            file_name=view.download.file_name,
+            mime=view.download.mime_type,
+            use_container_width=True,
+            key="system_weekly_download",
+        )
+
         return
 
     uploaded = st.file_uploader(
@@ -249,3 +910,404 @@ def render_weekly_schedule_workspace() -> None:
         use_container_width=True,
         key="weekly_schedule_download",
     )
+
+
+# =========================================================
+# USER WEEKLY SCHEDULE WORKSPACE
+# =========================================================
+
+def render_weekly_schedule_workspace(
+    *,
+    client=None,
+    user_id: str | None = None,
+) -> None:
+    if client is None or not user_id:
+        st.error(
+            "Phi\u00ean \u0111\u0103ng nh\u1eadp "
+            "ch\u01b0a s\u1eb5n s\u00e0ng."
+        )
+        return
+
+    st.title(
+        "\U0001f4c5 L\u1ecbch b\u00e1o gi\u1ea3ng"
+    )
+
+    st.caption(
+        "L\u1eadp v\u00e0 qu\u1ea3n l\u00fd "
+        "L\u1ecbch b\u00e1o gi\u1ea3ng "
+        "theo t\u1eebng tu\u1ea7n h\u1ecdc."
+    )
+
+    try:
+        academic_year_repository = (
+            SupabaseAcademicYearConfigurationRepository(
+                client=client,
+            )
+        )
+
+        current_year = (
+            academic_year_repository.get_current()
+        )
+
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            "c\u1ea5u h\u00ecnh n\u0103m h\u1ecdc "
+            f"hi\u1ec7n h\u00e0nh: {error}"
+        )
+        return
+
+    if current_year is None:
+        st.warning(
+            "Ch\u01b0a c\u00f3 n\u0103m h\u1ecdc "
+            "hi\u1ec7n h\u00e0nh trong h\u1ec7 th\u1ed1ng."
+        )
+        return
+
+    academic_year = (
+        current_year.academic_year
+    )
+
+    # =====================================================
+    # CANONICAL ACADEMIC WEEKS FROM ADMIN
+    # =====================================================
+
+    try:
+        academic_week_repository = (
+            SupabaseAcademicWeekRepository(
+                client=client,
+            )
+        )
+
+        academic_weeks = (
+            academic_week_repository.list_weeks(
+                academic_year_id=(
+                    current_year.academic_year_id
+                )
+            )
+        )
+
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            "l\u1ecbch tu\u1ea7n t\u1eeb ADMIN: "
+            f"{error}"
+        )
+        return
+
+    active_weeks = tuple(
+        item
+        for item in academic_weeks
+        if item.status.value == "ACTIVE"
+    )
+
+    if not active_weeks:
+        st.warning(
+            "ADMIN ch\u01b0a thi\u1ebft l\u1eadp "
+            "l\u1ecbch tu\u1ea7n cho "
+            f"n\u0103m h\u1ecdc {academic_year}."
+        )
+        return
+
+    week_by_number = {
+        item.week_number: item
+        for item in active_weeks
+    }
+
+    week_numbers = tuple(
+        week_by_number.keys()
+    )
+
+    # -----------------------------------------------------
+    # FILTER BAR
+    # -----------------------------------------------------
+
+    controls = st.columns(
+        [1.25, 1.1, 1.1, 1.1, 0.9],
+        gap="medium",
+    )
+
+    with controls[0]:
+        st.text_input(
+            "N\u0103m h\u1ecdc",
+            value=academic_year,
+            disabled=True,
+            key="lbg_user_academic_year",
+        )
+
+    with controls[1]:
+        week_number = st.selectbox(
+            "Tu\u1ea7n h\u1ecdc",
+            options=week_numbers,
+            format_func=lambda value: (
+                f"Tu\u1ea7n {value}"
+            ),
+            key="lbg_user_week_number",
+        )
+
+    selected_academic_week = (
+        week_by_number[
+            week_number
+        ]
+    )
+
+    with controls[2]:
+        st.text_input(
+            "T\u1eeb ng\u00e0y",
+            value=(
+                selected_academic_week
+                .start_date
+                .strftime("%d/%m/%Y")
+            ),
+            disabled=True,
+            key="lbg_user_from_date",
+        )
+
+    with controls[3]:
+        st.text_input(
+            "\u0110\u1ebfn ng\u00e0y",
+            value=(
+                selected_academic_week
+                .end_date
+                .strftime("%d/%m/%Y")
+            ),
+            disabled=True,
+            key="lbg_user_to_date",
+        )
+
+    with controls[4]:
+        st.markdown(
+            "<div style='height:28px'></div>",
+            unsafe_allow_html=True,
+        )
+
+        reload_data = st.button(
+            "\U0001f504 T\u1ea3i l\u1ea1i d\u1eef li\u1ec7u",
+            width="stretch",
+            key="lbg_user_reload",
+        )
+
+    if reload_data:
+        st.session_state.pop(
+            _VIEW_STATE_KEY,
+            None,
+        )
+        st.rerun()
+
+    # -----------------------------------------------------
+    # TEACHER INFO
+    # -----------------------------------------------------
+
+    st.info(
+        "Gi\u00e1o vi\u00ean: "
+        + str(user_id)
+    )
+
+    # -----------------------------------------------------
+    # CURRENT WEEKLY SCHEDULE VIEW
+    # -----------------------------------------------------
+
+    view = st.session_state.get(
+        _VIEW_STATE_KEY
+    )
+
+    if (
+        view is not None
+        and (
+            str(view.academic_year)
+            != academic_year
+            or int(view.week_number)
+            != int(week_number)
+        )
+    ):
+        view = None
+
+    if view is None:
+        st.info(
+            "Ch\u01b0a c\u00f3 L\u1ecbch b\u00e1o gi\u1ea3ng "
+            f"cho Tu\u1ea7n {week_number}. "
+            "H\u1ec7 th\u1ed1ng s\u1ebd t\u1ef1 \u0111\u1ed9ng "
+            "t\u1ea1o t\u1eeb TKB, Ph\u00e2n c\u00f4ng "
+            "v\u00e0 PPCT sau khi ho\u00e0n thi\u1ec7n "
+            "b\u01b0\u1edbc k\u1ebft n\u1ed1i d\u1eef li\u1ec7u."
+        )
+    else:
+        _render_lbg_table(
+            view,
+            client=client,
+        )
+
+    # -----------------------------------------------------
+    # REVIEW / APPROVAL
+    # -----------------------------------------------------
+
+    st.text_area(
+        (
+            "Ki\u1ec3m tra, nh\u1eadn x\u00e9t "
+            "c\u1ee7a t\u1ed5 chuy\u00ean m\u00f4n / "
+            "Ban gi\u00e1m hi\u1ec7u (n\u1ebfu c\u00f3)"
+        ),
+        placeholder=(
+            "Nh\u1eadp nh\u1eadn x\u00e9t, "
+            "\u0111\u00e1nh gi\u00e1..."
+        ),
+        key=(
+            "lbg_user_review_"
+            + str(week_number)
+        ),
+    )
+
+    # -----------------------------------------------------
+    # ACTION BUTTONS
+    # -----------------------------------------------------
+
+    actions = st.columns(
+        [1.25, 1.05, 1.15, 1.25],
+        gap="small",
+    )
+
+    with actions[0]:
+        st.button(
+            "\U0001f4c1 L\u01b0u tr\u00ean Google Drive",
+            width="stretch",
+            key="lbg_user_google_drive",
+            disabled=(
+                view is None
+            ),
+        )
+
+    with actions[1]:
+        if (
+            view is not None
+            and getattr(
+                view,
+                "download",
+                None,
+            )
+        ):
+            st.download_button(
+                "\U0001f4ca Xu\u1ea5t ra file Excel",
+                data=view.download.content,
+                file_name=(
+                    view.download.file_name
+                ),
+                mime=(
+                    view.download.mime_type
+                ),
+                width="stretch",
+                key="lbg_user_excel",
+            )
+        else:
+            st.button(
+                "\U0001f4ca Xu\u1ea5t ra file Excel",
+                width="stretch",
+                disabled=True,
+                key="lbg_user_excel_disabled",
+            )
+
+    with actions[2]:
+        st.button(
+            "\u270d\ufe0f Tr\u00ecnh k\u00ed tr\u00ean VTsmas",
+            width="stretch",
+            key="lbg_user_vtsmas",
+            disabled=(
+                view is None
+            ),
+        )
+
+    with actions[3]:
+        update_clicked = st.button(
+            "\U0001f4be C\u1eadp nh\u1eadt "
+            "L\u1ecbch b\u00e1o gi\u1ea3ng",
+            type="primary",
+            width="stretch",
+            key="lbg_user_update",
+        )
+
+    if update_clicked:
+        try:
+            with st.spinner(
+                "\u0110ang t\u1ea1o L\u1ecbch b\u00e1o gi\u1ea3ng "
+                f"Tu\u1ea7n {week_number}..."
+            ):
+                runtime = (
+                    SystemWeeklyScheduleRuntime(
+                        client=client,
+                        user_id=str(user_id),
+                    )
+                )
+
+                schedule = runtime.generate(
+                    request=(
+                        SystemWeeklyScheduleRuntimeRequest(
+                            schedule_id=(
+                                f"lbg-{user_id}-"
+                                f"{academic_year}-"
+                                f"{week_number}"
+                            ),
+                            academic_year=academic_year,
+                            week_number=int(
+                                week_number
+                            ),
+                            ppct_scope_rules=(),
+                        )
+                    )
+                )
+
+                generation_result = (
+                    WeeklyScheduleGenerationResult(
+                        request=(
+                            WeeklyScheduleGenerationRequest(
+                                schedule_id=(
+                                    f"lbg-{user_id}-"
+                                    f"{academic_year}-"
+                                    f"{week_number}"
+                                ),
+                                teacher_id=str(
+                                    user_id
+                                ),
+                                academic_year=academic_year,
+                                week_number=int(
+                                    week_number
+                                ),
+                            )
+                        ),
+                        schedule=schedule,
+                    )
+                )
+
+                output = (
+                    WeeklyScheduleOutputService()
+                    .export_excel(
+                        generation=(
+                            generation_result
+                        )
+                    )
+                )
+
+                presenter = (
+                    WeeklySchedulePortalPresenter()
+                )
+
+                generated_view = (
+                    presenter.present(
+                        output=output,
+                    )
+                )
+
+                st.session_state[
+                    _VIEW_STATE_KEY
+                ] = generated_view
+
+            st.success(
+                "\u0110\u00e3 c\u1eadp nh\u1eadt L\u1ecbch b\u00e1o gi\u1ea3ng "
+                f"Tu\u1ea7n {week_number}."
+            )
+
+            st.rerun()
+
+        except Exception as error:
+            st.error(
+                "Kh\u00f4ng th\u1ec3 t\u1ea1o L\u1ecbch b\u00e1o gi\u1ea3ng "
+                f"Tu\u1ea7n {week_number}: {error}"
+            )
