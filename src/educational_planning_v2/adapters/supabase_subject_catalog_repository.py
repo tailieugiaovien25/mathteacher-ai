@@ -271,6 +271,49 @@ class SupabaseSubjectCatalogRepository(
             )
         )
 
+    def delete_subject(
+        self,
+        *,
+        subject_id: str,
+    ) -> None:
+        normalized_id = self._required_text(
+            subject_id,
+            "subject_id",
+        )
+
+        (
+            self._client
+            .table(self.SUBJECT_TABLE)
+            .delete()
+            .eq(
+                "subject_id",
+                normalized_id,
+            )
+            .execute()
+        )
+
+    def delete_component(
+        self,
+        *,
+        component_id: str,
+    ) -> None:
+        normalized_id = self._required_text(
+            component_id,
+            "component_id",
+        )
+
+        (
+            self._client
+            .table(self.COMPONENT_TABLE)
+            .delete()
+            .eq(
+                "component_id",
+                normalized_id,
+            )
+            .execute()
+        )
+
+
     @staticmethod
     def _subject_from_row(
         row: dict[str, Any],

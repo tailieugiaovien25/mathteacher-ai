@@ -9,6 +9,10 @@ ADMIN_PAGE_TIME_ALLOCATION = "time_allocation"
 ADMIN_PAGE_SOURCES = "sources_provenance"
 ADMIN_PAGE_USERS = "users_permissions"
 ADMIN_PAGE_SYSTEM_HEALTH = "system_health"
+ADMIN_PAGE_SUBJECT_CATALOG = "subject_catalog"
+ADMIN_PAGE_CLASS_CATALOG = "class_catalog"
+ADMIN_PAGE_ASSIGNMENTS = "assignments"
+ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION = "academic_year_configuration"
 
 
 @dataclass(frozen=True)
@@ -47,6 +51,22 @@ ADMIN_PORTAL_PAGES = (
     AdminPortalPage(ADMIN_PAGE_SOURCES, "Sources & Provenance"),
     AdminPortalPage(ADMIN_PAGE_USERS, "Users & Permissions"),
     AdminPortalPage(ADMIN_PAGE_SYSTEM_HEALTH, "System Health"),
+    AdminPortalPage(
+        ADMIN_PAGE_SUBJECT_CATALOG,
+        "M\u00f4n & Ph\u00e2n m\u00f4n",
+    ),
+    AdminPortalPage(
+        ADMIN_PAGE_CLASS_CATALOG,
+        "Danh s\u00e1ch l\u1edbp",
+    ),
+    AdminPortalPage(
+        ADMIN_PAGE_ASSIGNMENTS,
+        "Ph\u00e2n c\u00f4ng",
+    ),
+    AdminPortalPage(
+        ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION,
+        "C\u1ea5u h\u00ecnh n\u0103m h\u1ecdc",
+    ),
 )
 
 

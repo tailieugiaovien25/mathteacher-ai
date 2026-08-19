@@ -75,6 +75,9 @@ class SupabaseTeachingAssignmentRepository(
             "class_id": assignment.class_id,
             "subject_ref": assignment.subject_ref,
             "component_ref": assignment.component_ref,
+            "assignment_round_id": (
+                assignment.assignment_round_id
+            ),
             "role": assignment.role.value,
             "effective_from": (
                 assignment.effective_from.isoformat()
@@ -270,6 +273,9 @@ class SupabaseTeachingAssignmentRepository(
             ),
             component_ref=row.get(
                 "component_ref"
+            ),
+            assignment_round_id=row.get(
+                "assignment_round_id"
             ),
             role=TeachingAssignmentRole(
                 row["role"]

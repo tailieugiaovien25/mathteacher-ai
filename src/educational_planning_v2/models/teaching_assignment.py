@@ -79,6 +79,7 @@ class TeachingAssignment:
     effective_to: date
     subject_ref: str | None = None
     component_ref: str | None = None
+    assignment_round_id: str | None = None
     status: TeachingAssignmentStatus = (
         TeachingAssignmentStatus.ACTIVE
     )
@@ -141,6 +142,17 @@ class TeachingAssignment:
                 self.component_ref,
                 "component_ref",
                 100,
+            ),
+        )
+
+
+        object.__setattr__(
+            self,
+            "assignment_round_id",
+            _optional_text(
+                self.assignment_round_id,
+                "assignment_round_id",
+                120,
             ),
         )
 

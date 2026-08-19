@@ -3,10 +3,27 @@
 from typing import Any
 
 from portal_v2.authorization import PortalAuthorizationContext
+from portal_v2.ui.admin_subject_catalog_streamlit import (
+    render_admin_subject_catalog,
+)
+from portal_v2.ui.admin_class_catalog_streamlit import (
+    render_admin_class_catalog,
+)
+from portal_v2.ui.admin_assignment_workspace_streamlit import (
+    render_admin_assignment_workspace,
+)
+from portal_v2.ui.admin_academic_year_configuration_streamlit import (
+    render_admin_academic_year_configuration,
+)
+
 from portal_v2.ui.admin_navigation import (
+    ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION,
     ADMIN_PAGE_DASHBOARD,
     ADMIN_PAGE_SOURCES,
     ADMIN_PAGE_SYSTEM_HEALTH,
+    ADMIN_PAGE_SUBJECT_CATALOG,
+    ADMIN_PAGE_CLASS_CATALOG,
+    ADMIN_PAGE_ASSIGNMENTS,
     ADMIN_PAGE_TIME_ALLOCATION,
     ADMIN_PAGE_TRUSTED_DATA,
     ADMIN_PAGE_USERS,
@@ -109,8 +126,55 @@ def _render_system_health(st) -> None:
     st.info("Health services sẽ được nối sau khi UI shell được khóa.")
 
 
-def render_admin_page(st, *, page_id: str) -> None:
-    page = resolve_admin_portal_page(page_id=page_id)
+def render_admin_page(
+    st,
+    *,
+    page_id: str,
+    client=None,
+) -> None:
+    page = resolve_admin_portal_page(
+        page_id=page_id
+    )
+
+    if (
+        page.page_id
+        == ADMIN_PAGE_SUBJECT_CATALOG
+    ):
+        render_admin_subject_catalog(
+            st,
+            client=client,
+        )
+        return
+
+    if (
+        page.page_id
+        == ADMIN_PAGE_CLASS_CATALOG
+    ):
+        render_admin_class_catalog(
+            st,
+            client=client,
+        )
+        return
+
+    if (
+        page.page_id
+        == ADMIN_PAGE_ASSIGNMENTS
+    ):
+        render_admin_assignment_workspace(
+            st,
+            client=client,
+        )
+        return
+
+    if (
+        page.page_id
+        == ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION
+    ):
+        render_admin_academic_year_configuration(
+            st,
+            client=client,
+        )
+        return
 
     renderers = {
         ADMIN_PAGE_DASHBOARD: _render_admin_dashboard,
@@ -127,6 +191,8 @@ def render_admin_page(st, *, page_id: str) -> None:
 def render_admin_shell(
     st,
     authorization: PortalAuthorizationContext,
+    *,
+    client=None,
 ) -> None:
     if not isinstance(authorization, PortalAuthorizationContext):
         raise TypeError(
@@ -177,4 +243,5 @@ def render_admin_shell(
     render_admin_page(
         st,
         page_id=selected_page_id,
+        client=client,
     )

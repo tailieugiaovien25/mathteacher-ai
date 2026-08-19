@@ -58,3 +58,19 @@ class SubjectCatalogRepository(ABC):
         status: CatalogStatus | None = None,
     ) -> tuple[SubjectComponent, ...]:
         raise NotImplementedError
+
+    @abstractmethod
+    def delete_subject(
+        self,
+        *,
+        subject_id: str,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_component(
+        self,
+        *,
+        component_id: str,
+    ) -> None:
+        raise NotImplementedError
