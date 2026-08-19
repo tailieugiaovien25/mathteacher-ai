@@ -7,11 +7,11 @@ from uuid import uuid4
 from educational_planning_v2.adapters.supabase_subject_catalog_repository import (
     SupabaseSubjectCatalogRepository,
 )
-from educational_planning_v2.adapters.supabase_teacher_subject_registration_repository import (
-    SupabaseTeacherSubjectRegistrationRepository,
+from educational_planning_v2.adapters.supabase_class_catalog_repository import (
+    SupabaseClassCatalogRepository,
 )
 from educational_planning_v2.services.teacher_timetable_subject_scope_service import (
-    TeacherTimetableSubjectScopeService,
+    TeacherTimetableSubjectScope,
 )
 from educational_planning_v2.services.teacher_timetable_assignment_bridge import (
     TeacherTimetableAssignmentBridge,
@@ -205,13 +205,6 @@ def render_teacher_timetable(
         )
     )
 
-    subject_registration_repository = (
-        SupabaseTeacherSubjectRegistrationRepository(
-            client,
-            user_id,
-        )
-    )
-
     try:
         _perf_step = perf_counter()
         profile = profile_repository.get()
@@ -307,55 +300,93 @@ def render_teacher_timetable(
             snapshot_components,
         ) = catalog_snapshot
 
-        snapshot_catalog_repository = (
-            _SubjectCatalogSnapshotRepository(
-                subjects=snapshot_subjects,
-                components=snapshot_components,
-            )
-        )
-
         _perf_step = perf_counter()
 
-        subject_scope_service = (
-            TeacherTimetableSubjectScopeService(
-                catalog_repository=(
-                    snapshot_catalog_repository
-                ),
-                registration_repository=(
-                    subject_registration_repository
-                ),
+        active_components_by_subject = {}
+
+        for component in snapshot_components:
+            if (
+                component.status
+                is not CatalogStatus.ACTIVE
+            ):
+                continue
+
+            active_components_by_subject.setdefault(
+                component.subject_id,
+                [],
+            ).append(
+                component
             )
+
+        subject_scopes_list = []
+
+        for subject in snapshot_subjects:
+            if (
+                subject.status
+                is not CatalogStatus.ACTIVE
+            ):
+                continue
+
+            components = (
+                active_components_by_subject.get(
+                    subject.subject_id,
+                    [],
+                )
+            )
+
+            if components:
+                for component in components:
+                    subject_scopes_list.append(
+                        TeacherTimetableSubjectScope(
+                            subject_id=(
+                                subject.subject_id
+                            ),
+                            subject_name=(
+                                subject.name
+                            ),
+                            component_id=(
+                                component.component_id
+                            ),
+                            component_name=(
+                                component.name
+                            ),
+                        )
+                    )
+            else:
+                subject_scopes_list.append(
+                    TeacherTimetableSubjectScope(
+                        subject_id=(
+                            subject.subject_id
+                        ),
+                        subject_name=(
+                            subject.name
+                        ),
+                        component_id=None,
+                        component_name=None,
+                    )
+                )
+
+        subject_scopes = tuple(
+            subject_scopes_list
         )
 
-        subject_scopes = (
-            subject_scope_service.list_scopes(
-                owner_id=user_id,
-                academic_year=academic_year,
-            )
-        )
-
-        _perf["subject_scopes_load_ms"] = (
+        _perf["catalog_scopes_build_ms"] = (
             perf_counter() - _perf_step
         ) * 1000
 
-        _perf.update(
-            subject_scope_service.performance_audit
-        )
     except Exception as error:
         st.error(
             "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
-            "danh s\u00e1ch m\u00f4n/ph\u00e2n m\u00f4n "
-            f"\u0111\u00e3 \u0111\u0103ng k\u00fd: {error}"
+            "danh m\u1ee5c M\u00f4n/Ph\u00e2n m\u00f4n "
+            f"canonical: {error}"
         )
         return
 
     if not subject_scopes:
         st.warning(
-            "Ch\u01b0a c\u00f3 m\u00f4n ho\u1eb7c ph\u00e2n m\u00f4n "
-            "\u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd cho n\u0103m h\u1ecdc n\u00e0y. "
-            "H\u00e3y th\u1ef1c hi\u1ec7n \u0110\u0103ng k\u00fd "
-            "m\u00f4n/ph\u00e2n m\u00f4n tr\u01b0\u1edbc khi "
-            "l\u1eadp th\u1eddi kh\u00f3a bi\u1ec3u."
+            "Ch\u01b0a c\u00f3 M\u00f4n ho\u1eb7c "
+            "Ph\u00e2n m\u00f4n ACTIVE trong "
+            "danh m\u1ee5c canonical."
         )
         return
 
@@ -376,13 +407,11 @@ def render_teacher_timetable(
     if not canonical_assignment_options:
         st.warning(
             "Kh\u00f4ng c\u00f3 ph\u00e2n c\u00f4ng "
-            "gi\u1ea3ng d\u1ea1y n\u00e0o ph\u00f9 h\u1ee3p "
-            "v\u1edbi m\u00f4n/ph\u00e2n m\u00f4n "
-            "\u0111\u00e3 \u0111\u0103ng k\u00fd. "
+            "gi\u1ea3ng d\u1ea1y ACTIVE n\u00e0o "
+            "kh\u1edbp v\u1edbi danh m\u1ee5c "
+            "M\u00f4n/Ph\u00e2n m\u00f4n canonical. "
             "H\u00e3y ki\u1ec3m tra l\u1ea1i "
-            "Ph\u00e2n c\u00f4ng gi\u1ea3ng d\u1ea1y "
-            "v\u00e0 \u0110\u0103ng k\u00fd "
-            "m\u00f4n/ph\u00e2n m\u00f4n."
+            "Ph\u00e2n c\u00f4ng trong khu v\u1ef1c ADMIN."
         )
         return
 
@@ -437,7 +466,7 @@ def render_teacher_timetable(
             )
 
         st.markdown(
-            "##### 2. Registered canonical scopes"
+            "##### 2. Canonical catalog scopes"
         )
 
         st.dataframe(
@@ -526,6 +555,38 @@ def render_teacher_timetable(
         for slot in slots
     }
 
+    # =====================================================
+    # CLASS CATALOG LABELS
+    # class_id van la gia tri canonical dung de luu.
+    # USER chi nhin thay ten/ma lop de doc.
+    # =====================================================
+
+    try:
+        class_repository = (
+            SupabaseClassCatalogRepository(
+                client=client,
+            )
+        )
+
+        class_catalog_items = (
+            class_repository.list_classes(
+                academic_year=academic_year,
+            )
+        )
+
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+            "danh m\u1ee5c l\u1edbp: "
+            f"{error}"
+        )
+        return
+
+    class_catalog_by_id = {
+        item.class_id: item
+        for item in class_catalog_items
+    }
+
     class_options = (
         ("",)
         + tuple(
@@ -535,6 +596,56 @@ def render_teacher_timetable(
             )
         )
     )
+
+    def class_name_for_id(
+        class_id: str,
+    ) -> str:
+        if not class_id:
+            return "\u2014 Tr\u1ed1ng \u2014"
+
+        class_item = (
+            class_catalog_by_id.get(
+                class_id
+            )
+        )
+
+        if class_item is None:
+            # Bao toan du lieu TKB/phan cong cu.
+            # Neu class_id cu khong con trong catalog,
+            # van cho phep USER nhin thay gia tri do.
+            return class_id
+
+        class_code = (
+            class_item.class_code.strip()
+            if class_item.class_code
+            else ""
+        )
+
+        class_name = (
+            class_item.class_name.strip()
+            if class_item.class_name
+            else ""
+        )
+
+        # Neu Ten lop va Ma lop giong nhau,
+        # chi hien mot gia tri.
+        if (
+            class_name
+            and class_code
+            and class_name.casefold()
+            == class_code.casefold()
+        ):
+            return class_name
+
+        # Uu tien Ten lop theo yeu cau giao dien USER.
+        if class_name:
+            return class_name
+
+        if class_code:
+            return class_code
+
+        return class_id
+
 
     def options_for_class(
         class_id: str,
@@ -807,8 +918,7 @@ def render_teacher_timetable(
                 "L\u1edbp",
                 options=class_options,
                 format_func=(
-                    lambda value:
-                    value or "\u2014 Tr\u1ed1ng \u2014"
+                    class_name_for_id
                 ),
                 key=class_key,
                 label_visibility="collapsed",
@@ -1005,6 +1115,21 @@ def render_teacher_timetable(
         "\u2192 Ph\u00e2n m\u00f4n."
     )
 
+    selected_week = st.selectbox(
+        "Tu\u1ea7n h\u1ecdc",
+        options=tuple(
+            range(1, 41)
+        ),
+        format_func=lambda value: (
+            f"Tu\u1ea7n {value}"
+        ),
+        key="teacher_timetable_week_number",
+    )
+
+    st.caption(
+        f"\u0110ang ch\u1ecdn: Tu\u1ea7n {selected_week}"
+    )
+
     for weekday, label in _WEEKDAYS:
         render_day_card(
             weekday,
@@ -1021,9 +1146,9 @@ def render_teacher_timetable(
     )
 
     save_timetable = st.button(
-        "L\u01b0u th\u1eddi kh\u00f3a bi\u1ec3u",
+        "C\u1eadp nh\u1eadt Th\u1eddi kh\u00f3a bi\u1ec3u",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="teacher_timetable_save",
     )
 

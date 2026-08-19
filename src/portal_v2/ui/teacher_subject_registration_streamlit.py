@@ -6,8 +6,14 @@ from uuid import uuid4
 from educational_planning_v2.adapters.supabase_subject_catalog_repository import (
     SupabaseSubjectCatalogRepository,
 )
+from educational_planning_v2.adapters.supabase_teacher_subject_assignment_repository import (
+    SupabaseTeacherSubjectAssignmentRepository,
+)
 from educational_planning_v2.adapters.supabase_teacher_subject_registration_repository import (
     SupabaseTeacherSubjectRegistrationRepository,
+)
+from educational_planning_v2.adapters.supabase_teaching_assignment_repository import (
+    SupabaseTeachingAssignmentRepository,
 )
 from educational_planning_v2.models.subject_catalog import (
     CatalogStatus,
@@ -17,8 +23,17 @@ from educational_planning_v2.models.teacher_subject_registration import (
     TeacherSubjectRegistration,
     TeacherSubjectRegistrationStatus,
 )
+from educational_planning_v2.models.teacher_subject_assignment import (
+    TeacherSubjectAssignmentStatus,
+)
 from educational_planning_v2.services.teacher_subject_registration_service import (
     TeacherSubjectRegistrationService,
+)
+from educational_planning_v2.services.teacher_subject_registration_lifecycle_service import (
+    TeacherSubjectRegistrationLifecycleService,
+)
+from portal_v2.runtime.teacher_subject_assignment_consistency_runtime import (
+    TeacherSubjectAssignmentConsistencyRuntime,
 )
 
 
@@ -30,7 +45,7 @@ def render_teacher_subject_registration(
     academic_year: str,
 ) -> None:
     st.title(
-        "\u0110\u0103ng k\u00fd m\u00f4n v\u00e0 ph\u00e2n m\u00f4n"
+        "M\u00f4n \u0111\u01b0\u1ee3c ph\u00e2n c\u00f4ng v\u00e0 \u0111\u0103ng k\u00fd ph\u00e2n m\u00f4n"
     )
 
     st.caption(
@@ -42,6 +57,12 @@ def render_teacher_subject_registration(
 
     catalog_repository = (
         SupabaseSubjectCatalogRepository(
+            client=client,
+        )
+    )
+
+    subject_assignment_repository = (
+        SupabaseTeacherSubjectAssignmentRepository(
             client=client,
         )
     )
@@ -61,28 +82,124 @@ def render_teacher_subject_registration(
         )
     )
 
+    assignment_repository = (
+        SupabaseTeachingAssignmentRepository(
+            client=client,
+            user_id=user_id,
+        )
+    )
+
+    lifecycle_service = (
+        TeacherSubjectRegistrationLifecycleService(
+            registration_repository=(
+                registration_repository
+            ),
+            assignment_repository=(
+                assignment_repository
+            ),
+        )
+    )
+
+    consistency_runtime = (
+        TeacherSubjectAssignmentConsistencyRuntime(
+            client=client,
+            user_id=user_id,
+        )
+    )
+
     # --------------------------------------------------------
-    # LOAD ACTIVE CANONICAL SUBJECTS
+    # LOAD ADMIN-ASSIGNED SUBJECT SCOPE
     # --------------------------------------------------------
 
     try:
-        subjects = (
+        subject_assignments = (
+            subject_assignment_repository.list_assignments(
+                teacher_id=user_id,
+                academic_year=academic_year,
+                status=(
+                    TeacherSubjectAssignmentStatus.ACTIVE
+                ),
+            )
+        )
+    except Exception as error:
+        st.error(
+            "\u004b\u0068\u00f4\u006e\u0067 "
+            "\u0074\u0068\u1ec3 "
+            "\u0111\u1ecdc "
+            "\u0070\u0068\u00e2\u006e "
+            "\u0063\u00f4\u006e\u0067 "
+            "\u004d\u00f4\u006e "
+            "\u0063\u1ee7\u0061 "
+            "\u0041\u0044\u004d\u0049\u004e: "
+            f"{error}"
+        )
+        return
+
+    if not subject_assignments:
+        st.warning(
+            "\u0041\u0044\u004d\u0049\u004e "
+            "\u0063\u0068\u01b0\u0061 "
+            "\u0070\u0068\u00e2\u006e "
+            "\u0063\u00f4\u006e\u0067 "
+            "\u004d\u00f4\u006e "
+            "\u0063\u0068\u006f "
+            "\u0062\u1ea1\u006e "
+            "\u0074\u0072\u006f\u006e\u0067 "
+            "\u006e\u0103\u006d "
+            "\u0068\u1ecdc "
+            "\u006e\u00e0\u0079."
+        )
+        return
+
+    assigned_subject_ids = {
+        item.subject_id
+        for item in subject_assignments
+    }
+
+    try:
+        active_catalog_subjects = (
             catalog_repository.list_subjects(
                 status=CatalogStatus.ACTIVE,
             )
         )
     except Exception as error:
         st.error(
-            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
-            "danh m\u1ee5c m\u00f4n h\u1ecdc: "
+            "\u004b\u0068\u00f4\u006e\u0067 "
+            "\u0074\u0068\u1ec3 "
+            "\u0111\u1ecdc "
+            "\u0064\u0061\u006e\u0068 "
+            "\u006d\u1ee5\u0063 "
+            "\u004d\u00f4\u006e: "
             f"{error}"
         )
         return
 
+    subjects = tuple(
+        subject
+        for subject in active_catalog_subjects
+        if (
+            subject.subject_id
+            in assigned_subject_ids
+        )
+    )
+
     if not subjects:
-        st.warning(
-            "ADMIN ch\u01b0a thi\u1ebft l\u1eadp "
-            "danh m\u1ee5c m\u00f4n h\u1ecdc ACTIVE."
+        st.error(
+            "\u0043\u00f3 "
+            "\u0070\u0068\u00e2\u006e "
+            "\u0063\u00f4\u006e\u0067 "
+            "\u004d\u00f4\u006e "
+            "\u006e\u0068\u01b0\u006e\u0067 "
+            "\u006b\u0068\u00f4\u006e\u0067 "
+            "\u0074\u00ec\u006d "
+            "\u0074\u0068\u1ea5\u0079 "
+            "\u004d\u00f4\u006e "
+            "\u0041\u0043\u0054\u0049\u0056\u0045 "
+            "\u0074\u01b0\u01a1\u006e\u0067 "
+            "\u1ee9\u006e\u0067 "
+            "\u0074\u0072\u006f\u006e\u0067 "
+            "\u0053\u0075\u0062\u006a\u0065\u0063\u0074 "
+            "\u0043\u0061\u0074\u0061\u006c\u006f\u0067."
         )
         return
 
@@ -108,14 +225,150 @@ def render_teacher_subject_registration(
     except Exception as error:
         st.error(
             "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
-            "\u0111\u0103ng k\u00fd m\u00f4n h\u1ecdc: "
+            "\u0111\u0103ng k\u00fd ph\u00e2n m\u00f4n: "
             f"{error}"
         )
         return
 
+    registrations = tuple(
+        registration
+        for registration in registrations
+        if (
+            registration.subject_id
+            in assigned_subject_ids
+            and registration.component_id
+            is not None
+        )
+    )
+
     st.subheader(
         f"N\u0103m h\u1ecdc: {academic_year}"
     )
+
+    try:
+        consistency_result = (
+            consistency_runtime.audit(
+                academic_year=academic_year,
+            )
+        )
+    except Exception as error:
+        st.warning(
+            "\u004b\u0068\u00f4\u006e\u0067 "
+            "\u0074\u0068\u1ec3 "
+            "\u006b\u0069\u1ec3\u006d "
+            "\u0074\u0072\u0061 "
+            "\u0074\u00ed\u006e\u0068 "
+            "\u006e\u0068\u1ea5\u0074 "
+            "\u0071\u0075\u00e1\u006e "
+            "\u0067\u0069\u1eef\u0061 "
+            "\u0111\u0103\u006e\u0067 "
+            "\u006b\u00fd "
+            "\u0076\u00e0 "
+            "\u0070\u0068\u00e2\u006e "
+            "\u0063\u00f4\u006e\u0067: "
+            f"{error}"
+        )
+    else:
+        if consistency_result.is_consistent:
+            st.success(
+                "\u0110\u0103\u006e\u0067 "
+                "\u006b\u00fd "
+                "\u006d\u00f4\u006e/"
+                "\u0070\u0068\u00e2\u006e "
+                "\u006d\u00f4\u006e "
+                "\u0076\u00e0 "
+                "\u0070\u0068\u00e2\u006e "
+                "\u0063\u00f4\u006e\u0067 "
+                "\u0067\u0069\u1ea3\u006e\u0067 "
+                "\u0064\u1ea1\u0079 "
+                "\u0111\u0061\u006e\u0067 "
+                "\u006e\u0068\u1ea5\u0074 "
+                "\u0071\u0075\u00e1\u006e."
+            )
+        else:
+            st.error(
+                "\u0050\u0068\u00e1\u0074 "
+                "\u0068\u0069\u1ec7\u006e "
+                "\u0064\u1eef "
+                "\u006c\u0069\u1ec7\u0075 "
+                "\u006d\u00e2\u0075 "
+                "\u0074\u0068\u0075\u1eab\u006e: "
+                "\u0063\u00f3 "
+                "\u0070\u0068\u00e2\u006e "
+                "\u0063\u00f4\u006e\u0067 "
+                "\u0067\u0069\u1ea3\u006e\u0067 "
+                "\u0064\u1ea1\u0079 "
+                "\u0111\u0061\u006e\u0067 "
+                "\u0068\u006f\u1ea1\u0074 "
+                "\u0111\u1ed9\u006e\u0067 "
+                "\u006e\u0068\u01b0\u006e\u0067 "
+                "\u006b\u0068\u00f4\u006e\u0067 "
+                "\u0063\u00f3 "
+                "\u0111\u0103\u006e\u0067 "
+                "\u006b\u00fd "
+                "\u006d\u00f4\u006e/"
+                "\u0070\u0068\u00e2\u006e "
+                "\u006d\u00f4\u006e "
+                "\u0041\u0043\u0054\u0049\u0056\u0045 "
+                "\u0074\u01b0\u01a1\u006e\u0067 "
+                "\u1ee9\u006e\u0067."
+            )
+
+            issue_rows = []
+
+            for issue in consistency_result.issues:
+                assignment = issue.assignment
+
+                issue_rows.append(
+                    {
+                        "\u004c\u1edb\u0070": (
+                            assignment.class_id
+                        ),
+                        "\u004d\u00f4\u006e": (
+                            assignment.subject_ref
+                            or "\u2014"
+                        ),
+                        "\u0050\u0068\u00e2\u006e "
+                        "\u006d\u00f4\u006e": (
+                            assignment.component_ref
+                            or "\u2014"
+                        ),
+                        "\u004d\u00e3 "
+                        "\u0070\u0068\u00e2\u006e "
+                        "\u0063\u00f4\u006e\u0067": (
+                            assignment.assignment_id
+                        ),
+                    }
+                )
+
+            st.dataframe(
+                issue_rows,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.info(
+                "\u0048\u00e3\u0079 "
+                "\u0078\u1eed "
+                "\u006c\u00fd "
+                "\u0063\u00e1\u0063 "
+                "\u0070\u0068\u00e2\u006e "
+                "\u0063\u00f4\u006e\u0067 "
+                "\u006d\u00e2\u0075 "
+                "\u0074\u0068\u0075\u1eab\u006e "
+                "\u0074\u0072\u01b0\u1edb\u0063 "
+                "\u006b\u0068\u0069 "
+                "\u0074\u0069\u1ebf\u0070 "
+                "\u0074\u1ee5\u0063 "
+                "\u0073\u1eed "
+                "\u0064\u1ee5\u006e\u0067 "
+                "\u0063\u00e1\u0063 "
+                "\u0063\u0068\u1ee9\u0063 "
+                "\u006e\u0103\u006e\u0067 "
+                "\u006c\u1ead\u0070 "
+                "\u006b\u1ebf "
+                "\u0068\u006f\u1ea1\u0063\u0068."
+            )
 
     subject_options = [
         item.subject_id
@@ -177,10 +430,15 @@ def render_teacher_subject_registration(
     )
 
     selected_component_id = st.selectbox(
-        "Ph\u00e2n m\u00f4n",
+        "\u0050\u0068\u00e2\u006e "
+        "\u006d\u00f4\u006e",
         options=component_options,
         format_func=lambda value: (
-            "\u2014 Kh\u00f4ng ch\u1ecdn ph\u00e2n m\u00f4n \u2014"
+            "\u2014 "
+            "\u0043\u0068\u1ecdn "
+            "\u0070\u0068\u00e2\u006e "
+            "\u006d\u00f4\u006e "
+            "\u2014"
             if not value
             else component_by_id[value].name
         ),
@@ -198,25 +456,53 @@ def render_teacher_subject_registration(
         selected_component_id = ""
 
         st.info(
-            "M\u00f4n n\u00e0y kh\u00f4ng s\u1eed d\u1ee5ng "
-            "ph\u00e2n m\u00f4n. \u0110\u0103ng k\u00fd "
-            "s\u1ebd \u0111\u01b0\u1ee3c l\u01b0u \u1edf c\u1ea5p m\u00f4n."
+            "\u004d\u00f4\u006e "
+            "\u006e\u00e0\u0079 "
+            "\u006b\u0068\u00f4\u006e\u0067 "
+            "\u0063\u00f3 "
+            "\u0070\u0068\u00e2\u006e "
+            "\u006d\u00f4\u006e. "
+            "\u0042\u1ea1\u006e "
+            "\u0111\u00e3 "
+            "\u0111\u01b0\u1ee3\u0063 "
+            "\u0041\u0044\u004d\u0049\u004e "
+            "\u0070\u0068\u00e2\u006e "
+            "\u0063\u00f4\u006e\u0067 "
+            "\u004d\u00f4\u006e "
+            "\u006e\u00e0\u0079 "
+            "\u0076\u00e0 "
+            "\u006b\u0068\u00f4\u006e\u0067 "
+            "\u0063\u1ea7\u006e "
+            "\u0111\u0103\u006e\u0067 "
+            "\u006b\u00fd "
+            "\u0074\u0068\u00ea\u006d."
         )
 
-    elif (
-        selected_subject.component_policy
-        is SubjectComponentPolicy.REQUIRED
-    ):
-        st.info(
-            "M\u00f4n n\u00e0y b\u1eaft bu\u1ed9c "
-            "ph\u1ea3i ch\u1ecdn ph\u00e2n m\u00f4n."
+    elif not components:
+        st.warning(
+            "\u004d\u00f4\u006e "
+            "\u006e\u00e0\u0079 "
+            "\u0063\u0068\u01b0\u0061 "
+            "\u0063\u00f3 "
+            "\u0050\u0068\u00e2\u006e "
+            "\u006d\u00f4\u006e "
+            "\u0041\u0043\u0054\u0049\u0056\u0045."
         )
 
     else:
         st.info(
-            "C\u00f3 th\u1ec3 \u0111\u0103ng k\u00fd "
-            "\u1edf c\u1ea5p m\u00f4n ho\u1eb7c "
-            "ch\u1ecdn m\u1ed9t ph\u00e2n m\u00f4n c\u1ee5 th\u1ec3."
+            "\u0043\u0068\u1ec9 "
+            "\u0111\u0103\u006e\u0067 "
+            "\u006b\u00fd "
+            "\u0050\u0068\u00e2\u006e "
+            "\u006d\u00f4\u006e "
+            "\u0074\u0068\u0075\u1ed9\u0063 "
+            "\u004d\u00f4\u006e "
+            "\u0111\u00e3 "
+            "\u0111\u01b0\u1ee3\u0063 "
+            "\u0041\u0044\u004d\u0049\u004e "
+            "\u0070\u0068\u00e2\u006e "
+            "\u0063\u00f4\u006e\u0067."
         )
 
     # --------------------------------------------------------
@@ -267,19 +553,19 @@ def render_teacher_subject_registration(
             "\u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd."
         )
 
-    required_component_missing = (
+    component_registration_unavailable = (
         selected_subject.component_policy
-        is SubjectComponentPolicy.REQUIRED
-        and not selected_component_id
+        is SubjectComponentPolicy.NONE
+        or not selected_component_id
     )
 
     if st.button(
-        "\u0110\u0103ng k\u00fd m\u00f4n / ph\u00e2n m\u00f4n",
+        "\u0110\u0103ng k\u00fd ph\u00e2n m\u00f4n",
         type="primary",
         use_container_width=True,
         disabled=(
             already_registered
-            or required_component_missing
+            or component_registration_unavailable
         ),
     ):
         registration = (
@@ -411,3 +697,185 @@ def render_teacher_subject_registration(
         use_container_width=True,
         hide_index=True,
     )
+
+
+    st.markdown(
+        "#### \u0051\u0075\u1ea3\u006e "
+        "\u006c\u00fd "
+        "\u0111\u0103\u006e\u0067 "
+        "\u006b\u00fd"
+    )
+
+    st.caption(
+        "\u0043\u0068\u1ec9 "
+        "\u006e\u0067\u1eeb\u006e\u0067 "
+        "\u0111\u0103\u006e\u0067 "
+        "\u006b\u00fd "
+        "\u006b\u0068\u0069 "
+        "\u006d\u00f4\u006e/"
+        "\u0070\u0068\u00e2\u006e "
+        "\u006d\u00f4\u006e "
+        "\u006b\u0068\u00f4\u006e\u0067 "
+        "\u0063\u00f2\u006e "
+        "\u0111\u01b0\u1ee3\u0063 "
+        "\u0073\u1eed "
+        "\u0064\u1ee5\u006e\u0067 "
+        "\u0062\u1edf\u0069 "
+        "\u0070\u0068\u00e2\u006e "
+        "\u0063\u00f4\u006e\u0067 "
+        "\u0067\u0069\u1ea3\u006e\u0067 "
+        "\u0064\u1ea1\u0079 "
+        "\u0111\u0061\u006e\u0067 "
+        "\u0068\u006f\u1ea1\u0074 "
+        "\u0111\u1ed9\u006e\u0067."
+    )
+
+    for registration in registrations:
+        subject = subject_by_id.get(
+            registration.subject_id
+        )
+
+        subject_name = (
+            subject.name
+            if subject is not None
+            else registration.subject_id
+        )
+
+        component_name = "\u2014"
+
+        if registration.component_id:
+            if (
+                registration.subject_id
+                not in component_cache
+            ):
+                try:
+                    component_cache[
+                        registration.subject_id
+                    ] = (
+                        catalog_repository.list_components(
+                            subject_id=(
+                                registration.subject_id
+                            )
+                        )
+                    )
+                except Exception:
+                    component_cache[
+                        registration.subject_id
+                    ] = ()
+
+            matched = next(
+                (
+                    item
+                    for item in component_cache[
+                        registration.subject_id
+                    ]
+                    if (
+                        item.component_id
+                        == registration.component_id
+                    )
+                ),
+                None,
+            )
+
+            component_name = (
+                matched.name
+                if matched is not None
+                else registration.component_id
+            )
+
+        with st.container(
+            border=True
+        ):
+            columns = st.columns(
+                [3, 2, 1]
+            )
+
+            columns[0].write(
+                f"**{subject_name}**"
+            )
+
+            columns[1].write(
+                component_name
+            )
+
+            if columns[2].button(
+                "\u004e\u0067\u1eeb\u006e\u0067 "
+                "\u0111\u0103\u006e\u0067 "
+                "\u006b\u00fd",
+                key=(
+                    "deactivate_subject_registration_"
+                    + registration.registration_id
+                ),
+                use_container_width=True,
+            ):
+                try:
+                    lifecycle_service.deactivate(
+                        registration_id=(
+                            registration.registration_id
+                        )
+                    )
+
+                except ValueError as error:
+                    if (
+                        "used by active teaching assignments"
+                        in str(error)
+                    ):
+                        st.error(
+                            "\u004b\u0068\u00f4\u006e\u0067 "
+                            "\u0074\u0068\u1ec3 "
+                            "\u006e\u0067\u1eeb\u006e\u0067 "
+                            "\u0111\u0103\u006e\u0067 "
+                            "\u006b\u00fd "
+                            "\u0076\u00ec "
+                            "\u006d\u00f4\u006e/"
+                            "\u0070\u0068\u00e2\u006e "
+                            "\u006d\u00f4\u006e "
+                            "\u006e\u00e0\u0079 "
+                            "\u0111\u0061\u006e\u0067 "
+                            "\u0111\u01b0\u1ee3\u0063 "
+                            "\u0073\u1eed "
+                            "\u0064\u1ee5\u006e\u0067 "
+                            "\u0074\u0072\u006f\u006e\u0067 "
+                            "\u0070\u0068\u00e2\u006e "
+                            "\u0063\u00f4\u006e\u0067 "
+                            "\u0067\u0069\u1ea3\u006e\u0067 "
+                            "\u0064\u1ea1\u0079. "
+                            "\u0048\u00e3\u0079 "
+                            "\u006e\u0067\u1eeb\u006e\u0067 "
+                            "\u0070\u0068\u00e2\u006e "
+                            "\u0063\u00f4\u006e\u0067 "
+                            "\u006c\u0069\u00ea\u006e "
+                            "\u0071\u0075\u0061\u006e "
+                            "\u0074\u0072\u01b0\u1edb\u0063."
+                        )
+                    else:
+                        st.error(
+                            "\u004b\u0068\u00f4\u006e\u0067 "
+                            "\u0074\u0068\u1ec3 "
+                            "\u006e\u0067\u1eeb\u006e\u0067 "
+                            "\u0111\u0103\u006e\u0067 "
+                            "\u006b\u00fd: "
+                            f"{error}"
+                        )
+
+                except Exception as error:
+                    st.error(
+                        "\u004b\u0068\u00f4\u006e\u0067 "
+                        "\u0074\u0068\u1ec3 "
+                        "\u006e\u0067\u1eeb\u006e\u0067 "
+                        "\u0111\u0103\u006e\u0067 "
+                        "\u006b\u00fd: "
+                        f"{error}"
+                    )
+
+                else:
+                    st.success(
+                        "\u0110\u00e3 "
+                        "\u006e\u0067\u1eeb\u006e\u0067 "
+                        "\u0111\u0103\u006e\u0067 "
+                        "\u006b\u00fd "
+                        "\u006d\u00f4\u006e/"
+                        "\u0070\u0068\u00e2\u006e "
+                        "\u006d\u00f4\u006e."
+                    )
+                    st.rerun()

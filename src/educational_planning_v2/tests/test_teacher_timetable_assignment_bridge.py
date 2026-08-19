@@ -3,6 +3,7 @@ from datetime import date
 from educational_planning_v2.models.teaching_assignment import (
     TeachingAssignment,
     TeachingAssignmentRole,
+    TeachingAssignmentStatus,
 )
 from educational_planning_v2.services.teacher_timetable_assignment_bridge import (
     TeacherTimetableAssignmentBridge,
@@ -261,3 +262,93 @@ def test_same_scope_in_different_classes_is_preserved():
         "6A1",
         "6A2",
     }
+
+
+def test_canonical_subject_id_assignment_covers_subject_components():
+    assignment = TeachingAssignment(
+        assignment_id="assign-math",
+        owner_id="teacher-1",
+        academic_year="2026-2027",
+        class_id="7A2",
+        subject_ref="subject-math",
+        component_ref=None,
+        role=TeachingAssignmentRole.TEACHING,
+        effective_from=date(2026, 8, 24),
+        effective_to=date(2027, 5, 31),
+        status=TeachingAssignmentStatus.ACTIVE,
+    )
+
+    scopes = (
+        TeacherTimetableSubjectScope(
+            subject_id="subject-math",
+            subject_name="To?n",
+            component_id="component-algebra",
+            component_name="??i s?",
+        ),
+        TeacherTimetableSubjectScope(
+            subject_id="subject-math",
+            subject_name="To?n",
+            component_id="component-geometry",
+            component_name="H?nh h?c",
+        ),
+    )
+
+    result = (
+        TeacherTimetableAssignmentBridge()
+        .build_options(
+            assignments=(assignment,),
+            subject_scopes=scopes,
+        )
+    )
+
+    assert {
+        item.component_id
+        for item in result
+    } == {
+        "component-algebra",
+        "component-geometry",
+    }
+
+
+def test_canonical_component_id_assignment_only_matches_component():
+    assignment = TeachingAssignment(
+        assignment_id="assign-geometry",
+        owner_id="teacher-1",
+        academic_year="2026-2027",
+        class_id="6A1",
+        subject_ref="subject-math",
+        component_ref="component-geometry",
+        role=TeachingAssignmentRole.TEACHING,
+        effective_from=date(2026, 8, 24),
+        effective_to=date(2027, 5, 31),
+        status=TeachingAssignmentStatus.ACTIVE,
+    )
+
+    scopes = (
+        TeacherTimetableSubjectScope(
+            subject_id="subject-math",
+            subject_name="To?n",
+            component_id="component-algebra",
+            component_name="??i s?",
+        ),
+        TeacherTimetableSubjectScope(
+            subject_id="subject-math",
+            subject_name="To?n",
+            component_id="component-geometry",
+            component_name="H?nh h?c",
+        ),
+    )
+
+    result = (
+        TeacherTimetableAssignmentBridge()
+        .build_options(
+            assignments=(assignment,),
+            subject_scopes=scopes,
+        )
+    )
+
+    assert len(result) == 1
+    assert (
+        result[0].component_id
+        == "component-geometry"
+    )

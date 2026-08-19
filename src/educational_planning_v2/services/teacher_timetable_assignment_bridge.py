@@ -124,6 +124,54 @@ class TeacherTimetableAssignmentBridge:
         )
 
         # ----------------------------------------------------
+        # CANONICAL ID RULE
+        #
+        # New ADMIN assignments store canonical catalog IDs:
+        #
+        #     subject_ref   = subject_id
+        #     component_ref = component_id | None
+        #
+        # Canonical IDs must be matched before any legacy
+        # text/name fallback.
+        # ----------------------------------------------------
+
+        assignment_subject_id = (
+            assignment.subject_ref.strip()
+            if assignment.subject_ref
+            else ""
+        )
+
+        assignment_component_id = (
+            assignment.component_ref.strip()
+            if assignment.component_ref
+            else ""
+        )
+
+        if (
+            assignment_subject_id
+            == scope.subject_id
+        ):
+            # Subject-level assignment covers the canonical
+            # scopes registered under that subject.
+            if not assignment_component_id:
+                return True
+
+            # A canonical component-specific assignment
+            # matches only that component.
+            return (
+                scope.component_id is not None
+                and assignment_component_id
+                == scope.component_id
+            )
+
+        # ----------------------------------------------------
+        # LEGACY NAME RULE
+        #
+        # Older assignments may contain display names instead
+        # of canonical IDs. Preserve compatibility below.
+        # ----------------------------------------------------
+
+        # ----------------------------------------------------
         # CANONICAL RULE
         #
         # TeachingAssignment owns:
