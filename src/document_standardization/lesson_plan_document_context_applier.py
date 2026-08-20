@@ -170,6 +170,104 @@ class LessonPlanDocumentContextApplier:
 
             return True
 
+        if self._apply_table_label_value(
+            document,
+            field_name=field_name,
+            value=value,
+        ):
+            return True
+
+        return False
+
+    @classmethod
+    def _apply_table_label_value(
+        cls,
+        document,
+        *,
+        field_name: str,
+        value: str,
+    ) -> bool:
+        """
+        Support common lesson-plan tables where
+        the metadata label and value occupy
+        separate cells in the same row.
+
+        Example:
+            | Lớp       | 8A1        |
+            | Tiết PPCT | 1          |
+            | Tên bài   | Bài cũ     |
+        """
+        patterns = cls._FIELD_PATTERNS.get(
+            field_name,
+            (),
+        )
+
+        for table in document.tables:
+            for row in table.rows:
+                if len(row.cells) < 2:
+                    continue
+
+                label = row.cells[0].text.strip()
+
+                if not cls._matches_table_label(
+                    label,
+                    patterns,
+                ):
+                    continue
+
+                value_cell = row.cells[1]
+
+                if value_cell.paragraphs:
+                    paragraph = (
+                        value_cell.paragraphs[0]
+                    )
+                    cls._replace_paragraph_text(
+                        paragraph,
+                        value,
+                    )
+
+                    for extra_paragraph in (
+                        value_cell.paragraphs[1:]
+                    ):
+                        cls._replace_paragraph_text(
+                            extra_paragraph,
+                            "",
+                        )
+                else:
+                    value_cell.text = value
+
+                return True
+
+        return False
+
+    @staticmethod
+    def _matches_table_label(
+        label: str,
+        patterns,
+    ) -> bool:
+        normalized = label.strip()
+
+        for pattern in patterns:
+            table_pattern = pattern
+
+            if table_pattern.endswith(
+                r"\s*:"
+            ):
+                table_pattern = (
+                    table_pattern[:-4]
+                )
+            elif table_pattern.endswith(":"):
+                table_pattern = (
+                    table_pattern[:-1]
+                )
+
+            if re.match(
+                table_pattern + r"\s*$",
+                normalized,
+                flags=re.IGNORECASE,
+            ):
+                return True
+
         return False
 
     @classmethod
