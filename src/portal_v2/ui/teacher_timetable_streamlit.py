@@ -43,6 +43,13 @@ from educational_planning_v2.services.teacher_timetable_service import (
 )
 
 
+from portal_v2.ui.portal_flash_feedback import (
+    PortalFlashLevel,
+    render_portal_flash,
+    set_portal_flash,
+)
+
+
 _CATALOG_SNAPSHOT_SESSION_KEY = (
     "teacher_timetable_catalog_snapshot"
 )
@@ -127,6 +134,12 @@ def render_teacher_timetable(
     client: Any,
     user_id: str,
 ) -> None:
+
+    render_portal_flash(
+        st=st,
+        session_state=st.session_state,
+    )
+
     _perf_started = perf_counter()
     _perf: dict[str, float] = {}
 
@@ -1265,15 +1278,23 @@ def render_teacher_timetable(
             return
 
         if changed_count:
-            st.success(
-                "\u0110\u00e3 l\u01b0u "
-                f"{changed_count} thay \u0111\u1ed5i "
-                "th\u1eddi kh\u00f3a bi\u1ec3u."
+            set_portal_flash(
+                st.session_state,
+                message=(
+                    "\u0110\u00e3 c\u1eadp nh\u1eadt "
+                    f"{changed_count} thay \u0111\u1ed5i "
+                    "Th\u1eddi kh\u00f3a bi\u1ec3u."
+                ),
+                level=PortalFlashLevel.SUCCESS,
             )
         else:
-            st.info(
-                "Th\u1eddi kh\u00f3a bi\u1ec3u "
-                "kh\u00f4ng c\u00f3 thay \u0111\u1ed5i."
+            set_portal_flash(
+                st.session_state,
+                message=(
+                    "Th\u1eddi kh\u00f3a bi\u1ec3u "
+                    "kh\u00f4ng c\u00f3 thay \u0111\u1ed5i."
+                ),
+                level=PortalFlashLevel.INFO,
             )
 
         st.rerun()
