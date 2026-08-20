@@ -209,3 +209,62 @@ def test_applier_does_not_overwrite_source(
         raise AssertionError(
             "Expected overwrite protection"
         )
+
+
+def test_replace_period_heading_supports_plus_without_punctuation():
+    result = (
+        LessonPlanDocumentContextApplier
+        ._replace_period_heading(
+            "TI\u1ebeT 10 + 11",
+            curriculum_period=20,
+            period_in_lesson=1,
+        )
+    )
+
+    assert result == "TI\u1ebeT 20 + 21"
+
+
+def test_replace_period_heading_preserves_existing_separator():
+    result = (
+        LessonPlanDocumentContextApplier
+        ._replace_period_heading(
+            "Ti\u1ebft 10,11:",
+            curriculum_period=20,
+            period_in_lesson=1,
+        )
+    )
+
+    assert result == "Ti\u1ebft 20,21:"
+
+
+def test_replace_lesson_heading_supports_standalone_section_heading():
+    result = (
+        LessonPlanDocumentContextApplier
+        ._replace_lesson_heading(
+            "\u00a77: TH\u1ee8 T\u1ef0 TH\u1ef0C HI\u1ec6N C\u00c1C PH\u00c9P T\u00cdNH",
+            lesson_title=(
+                "Th\u1ee9 t\u1ef1 th\u1ef1c hi\u1ec7n "
+                "c\u00e1c ph\u00e9p t\u00ednh"
+            ),
+        )
+    )
+
+    assert result == (
+        "\u00a77: "
+        "Th\u1ee9 t\u1ef1 th\u1ef1c hi\u1ec7n "
+        "c\u00e1c ph\u00e9p t\u00ednh"
+    )
+
+
+def test_replace_lesson_heading_preserves_standalone_section_number():
+    result = (
+        LessonPlanDocumentContextApplier
+        ._replace_lesson_heading(
+            "\u00a712: LUY\u1ec6N T\u1eACP CHUNG",
+            lesson_title="B\u00e0i m\u1edbi",
+        )
+    )
+
+    assert result == (
+        "\u00a712: B\u00e0i m\u1edbi"
+    )

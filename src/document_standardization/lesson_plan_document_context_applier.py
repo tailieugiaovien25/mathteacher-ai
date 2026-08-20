@@ -435,10 +435,10 @@ class LessonPlanDocumentContextApplier:
                 r"(?P<prefix>"
                 r"^\s*ti\u1ebft\s+)"
                 r"(?P<periods>"
-                r"\d+(?:\s*,\s*\d+)*"
+                r"\d+(?:\s*(?:,|\+)\s*\d+)*"
                 r")"
                 r"(?P<separator>"
-                r"\s*[.\-:])"
+                r"\s*[.\-:]?)"
             ),
             text,
             flags=re.IGNORECASE,
@@ -468,11 +468,23 @@ class LessonPlanDocumentContextApplier:
                 curriculum_period
             )
 
-        replacement_periods = ",".join(
-            str(
-                start_period + offset
+        original_periods = (
+            match.group("periods")
+        )
+
+        period_joiner = (
+            " + "
+            if "+" in original_periods
+            else ","
+        )
+
+        replacement_periods = (
+            period_joiner.join(
+                str(
+                    start_period + offset
+                )
+                for offset in range(count)
             )
-            for offset in range(count)
         )
 
         return (
@@ -490,6 +502,19 @@ class LessonPlanDocumentContextApplier:
         lesson_title: str,
     ) -> str | None:
         patterns = (
+            # Standalone section heading:
+            # ?7: Ten bai
+            (
+                r"(?P<prefix>"
+                r"^\s*\u00a7\s*\d+"
+                r"\s*:\s*)"
+                r"(?P<title>.*?)"
+                r"(?P<suffix>"
+                r"\s*\(\s*\d+\s+"
+                r"ti\u1ebft\s*\)\s*"
+                r")?$"
+            ),
+
             # Tiet 1. BAI 1. Ten bai
             (
                 r"(?P<prefix>"
