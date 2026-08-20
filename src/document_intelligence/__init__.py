@@ -15,6 +15,8 @@ __all__ = [
     "DeterministicDocumentAnalyzer",
     "HybridAnalysisResult",
     "HybridDocumentAnalyzer",
+    "DocumentIntelligenceRuntimeConfig",
+    "build_document_analyzer",
 ]
 
 from document_intelligence.validation import (
@@ -32,4 +34,12 @@ from document_intelligence.deterministic_analyzer import (
 from document_intelligence.hybrid_analyzer import (
     HybridAnalysisResult,
     HybridDocumentAnalyzer,
+)
+
+from document_intelligence.runtime_config import (
+    DocumentIntelligenceRuntimeConfig,
+)
+
+from document_intelligence.runtime_factory import (
+    build_document_analyzer,
 )
