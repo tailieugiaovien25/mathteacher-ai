@@ -55,6 +55,16 @@ from lesson_planning_v2.services import (
     LessonPlanDocumentProcessingService,
 )
 
+from document_intelligence.lesson_plan_preview_upload import (
+    LessonPlanPreviewUploadService,
+)
+from document_intelligence.validation import (
+    CanonicalDocumentContext,
+)
+from portal_v2.ui.lesson_plan_preview_streamlit import (
+    render_lesson_plan_preview,
+)
+
 _VIEW_STATE_KEY = "weekly_schedule_portal_view"
 
 _LESSON_PLAN_PROFILE = (
@@ -490,6 +500,47 @@ def _render_lesson_plan_standardization_workspace(
         "\u0110\u00e3 nh\u1eadn gi\u00e1o \u00e1n: "
         + uploaded.name
     )
+
+    try:
+        preview_view = (
+            LessonPlanPreviewUploadService()
+            .prepare(
+                content=uploaded.getvalue(),
+                canonical=CanonicalDocumentContext(
+                    class_name=(
+                        selected_row.class_id
+                    ),
+                    curriculum_period=(
+                        selected_row.curriculum_period
+                    ),
+                    lesson_title=(
+                        selected_row.lesson_title
+                    ),
+                    drafting_date=(
+                        drafting_date.strftime(
+                            "%d/%m/%Y"
+                        )
+                    ),
+                    teaching_date=(
+                        selected_row.teaching_date.strftime(
+                            "%d/%m/%Y"
+                        )
+                    ),
+                ),
+            )
+        )
+
+        render_lesson_plan_preview(
+            st=st,
+            view=preview_view,
+        )
+
+    except Exception as error:
+        st.warning(
+            "Kh\u00f4ng th\u1ec3 xem tr\u01b0\u1edbc "
+            "th\u00f4ng tin gi\u00e1o \u00e1n: "
+            f"{error}"
+        )
 
     process_clicked = st.button(
         "\u2699\ufe0f T\u1ea1o gi\u00e1o \u00e1n "
