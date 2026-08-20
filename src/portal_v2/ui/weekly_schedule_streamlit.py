@@ -76,6 +76,10 @@ from document_intelligence.lesson_plan_teacher_review_resolver import (
 from document_intelligence.lesson_plan_reviewed_schedule_row import (
     LessonPlanReviewedScheduleRow,
 )
+from document_intelligence.lesson_plan_workflow_state import (
+    LessonPlanWorkflowIdentity,
+    LessonPlanWorkflowState,
+)
 from portal_v2.ui.lesson_plan_teacher_review_streamlit import (
     render_lesson_plan_teacher_review,
 )
@@ -480,31 +484,7 @@ def _render_lesson_plan_standardization_workspace(
         ),
     )
 
-    result_key = (
-        "lbg_lesson_plan_result_"
-        + str(view.week_number)
-        + "_"
-        + str(selected_index)
-    )
-
-    source_key = (
-        "lbg_lesson_plan_source_"
-        + str(view.week_number)
-        + "_"
-        + str(selected_index)
-    )
-
     if uploaded is None:
-        st.session_state.pop(
-            result_key,
-            None,
-        )
-
-        st.session_state.pop(
-            source_key,
-            None,
-        )
-
         st.caption(
             "File g\u1ed1c s\u1ebd "
             "\u0111\u01b0\u1ee3c gi\u1eef nguy\u00ean."
@@ -516,12 +496,48 @@ def _render_lesson_plan_standardization_workspace(
         + uploaded.name
     )
 
+    uploaded_content = uploaded.getvalue()
+
+    workflow_identity = (
+        LessonPlanWorkflowIdentity
+        .from_upload(
+            week_number=view.week_number,
+            row_index=selected_index,
+            source_name=uploaded.name,
+            content=uploaded_content,
+        )
+    )
+
+    workflow_state = st.session_state.get(
+        workflow_identity.state_key
+    )
+
+    if (
+        not isinstance(
+            workflow_state,
+            LessonPlanWorkflowState,
+        )
+        or not workflow_state.matches(
+            workflow_identity
+        )
+    ):
+        workflow_state = LessonPlanWorkflowState(
+            identity=workflow_identity
+        )
+
+        st.session_state[
+            workflow_identity.state_key
+        ] = workflow_state
+
     try:
-        preview_view = (
-            LessonPlanPreviewUploadService()
-            .prepare(
-                content=uploaded.getvalue(),
-                canonical=CanonicalDocumentContext(
+        preview_view = workflow_state.preview
+
+        if preview_view is None:
+            preview_view = (
+                LessonPlanPreviewUploadService()
+                .prepare(
+                    content=uploaded_content,
+                    canonical=CanonicalDocumentContext(
                     class_name=(
                         selected_row.class_id
                     ),
@@ -536,14 +552,24 @@ def _render_lesson_plan_standardization_workspace(
                             "%d/%m/%Y"
                         )
                     ),
-                    teaching_date=(
-                        selected_row.teaching_date.strftime(
-                            "%d/%m/%Y"
-                        )
+                        teaching_date=(
+                            selected_row.teaching_date.strftime(
+                                "%d/%m/%Y"
+                            )
+                        ),
                     ),
-                ),
+                )
             )
-        )
+
+            workflow_state = (
+                workflow_state.with_preview(
+                    preview_view
+                )
+            )
+
+            st.session_state[
+                workflow_identity.state_key
+            ] = workflow_state
 
         render_lesson_plan_preview(
             st=st,
@@ -589,10 +615,8 @@ def _render_lesson_plan_standardization_workspace(
                 st=st,
                 view=teacher_review_view,
                 key_prefix=(
-                    "lbg_lesson_plan_review_"
-                    + str(view.week_number)
-                    + "_"
-                    + str(selected_index)
+                    workflow_identity
+                    .widget_key_prefix
                 ),
             )
         )
@@ -604,6 +628,17 @@ def _render_lesson_plan_standardization_workspace(
                 review=teacher_review,
             )
         )
+
+        workflow_state = (
+            workflow_state.with_review(
+                review=teacher_review,
+                resolution=review_resolution,
+            )
+        )
+
+        st.session_state[
+            workflow_identity.state_key
+        ] = workflow_state
 
         review_accepted = (
             review_resolution.accepted
@@ -690,7 +725,7 @@ def _render_lesson_plan_standardization_workspace(
                             drafting_date
                         ),
                         content=(
-                            uploaded.getvalue()
+                            uploaded_content
                         ),
                         original_name=(
                             uploaded.name
@@ -698,13 +733,15 @@ def _render_lesson_plan_standardization_workspace(
                     )
                 )
 
-                st.session_state[
-                    result_key
-                ] = result
+                workflow_state = (
+                    workflow_state.with_result(
+                        result
+                    )
+                )
 
                 st.session_state[
-                    source_key
-                ] = uploaded.name
+                    workflow_identity.state_key
+                ] = workflow_state
 
         except Exception as error:
             st.error(
@@ -713,18 +750,23 @@ def _render_lesson_plan_standardization_workspace(
                 f"gi\u00e1o \u00e1n: {error}"
             )
 
-    result = st.session_state.get(
-        result_key
+    workflow_state = st.session_state.get(
+        workflow_identity.state_key
     )
 
     if (
-        not result
-        or st.session_state.get(
-            source_key
+        not isinstance(
+            workflow_state,
+            LessonPlanWorkflowState,
         )
-        != uploaded.name
+        or not workflow_state.matches(
+            workflow_identity
+        )
+        or workflow_state.result is None
     ):
         return
+
+    result = workflow_state.result
 
     (
         output_name,
