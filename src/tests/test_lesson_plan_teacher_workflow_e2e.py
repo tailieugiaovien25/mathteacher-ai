@@ -243,6 +243,7 @@ def test_teacher_workflow_happy_path_reaches_download(
         drafting_date,
         content,
         original_name,
+        modification_plan=None,
     ):
         processed.append(
             {
@@ -293,6 +294,20 @@ def test_teacher_workflow_happy_path_reaches_download(
         module,
         "LessonPlanTeacherReviewResolver",
         FakeResolver,
+    )
+
+    class FakeModificationPlanner:
+        def build(
+            self,
+            *,
+            resolution,
+        ):
+            return object()
+
+    monkeypatch.setattr(
+        module,
+        "LessonPlanModificationPlanner",
+        FakeModificationPlanner,
     )
 
     monkeypatch.setattr(
@@ -461,6 +476,7 @@ def test_teacher_override_reaches_processing_row(
         drafting_date,
         content,
         original_name,
+        modification_plan=None,
     ):
         processed.append(row)
 
@@ -504,6 +520,20 @@ def test_teacher_override_reaches_processing_row(
         module,
         "LessonPlanTeacherReviewResolver",
         FakeResolver,
+    )
+
+    class FakeModificationPlanner:
+        def build(
+            self,
+            *,
+            resolution,
+        ):
+            return object()
+
+    monkeypatch.setattr(
+        module,
+        "LessonPlanModificationPlanner",
+        FakeModificationPlanner,
     )
 
     monkeypatch.setattr(
@@ -610,6 +640,7 @@ def test_rejected_review_blocks_processing_and_download(
         drafting_date,
         content,
         original_name,
+        modification_plan=None,
     ):
         process_calls.append(
             {
@@ -659,6 +690,20 @@ def test_rejected_review_blocks_processing_and_download(
         module,
         "LessonPlanTeacherReviewResolver",
         FakeResolver,
+    )
+
+    class FakeModificationPlanner:
+        def build(
+            self,
+            *,
+            resolution,
+        ):
+            return object()
+
+    monkeypatch.setattr(
+        module,
+        "LessonPlanModificationPlanner",
+        FakeModificationPlanner,
     )
 
     monkeypatch.setattr(
@@ -780,6 +825,7 @@ def test_rerun_preserves_result_without_reprocessing(
         drafting_date,
         content,
         original_name,
+        modification_plan=None,
     ):
         process_calls.append(
             {
@@ -829,6 +875,20 @@ def test_rerun_preserves_result_without_reprocessing(
         module,
         "LessonPlanTeacherReviewResolver",
         FakeResolver,
+    )
+
+    class FakeModificationPlanner:
+        def build(
+            self,
+            *,
+            resolution,
+        ):
+            return object()
+
+    monkeypatch.setattr(
+        module,
+        "LessonPlanModificationPlanner",
+        FakeModificationPlanner,
     )
 
     monkeypatch.setattr(

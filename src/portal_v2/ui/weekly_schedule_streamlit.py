@@ -73,6 +73,9 @@ from document_intelligence.lesson_plan_teacher_review_presenter import (
 from document_intelligence.lesson_plan_teacher_review_resolver import (
     LessonPlanTeacherReviewResolver,
 )
+from document_intelligence.lesson_plan_modification_plan import (
+    LessonPlanModificationPlanner,
+)
 from document_intelligence.lesson_plan_reviewed_schedule_row import (
     LessonPlanReviewedScheduleRow,
 )
@@ -361,6 +364,7 @@ def _process_lesson_plan_upload(
     drafting_date,
     content: bytes,
     original_name: str,
+    modification_plan=None,
 ) -> tuple[
     str,
     bytes,
@@ -379,6 +383,7 @@ def _process_lesson_plan_upload(
         drafting_date=drafting_date,
         content=content,
         original_name=original_name,
+        modification_plan=modification_plan,
     )
 
     return (
@@ -644,6 +649,16 @@ def _render_lesson_plan_standardization_workspace(
             review_resolution.accepted
         )
 
+        modification_plan = None
+
+        if review_accepted:
+            modification_plan = (
+                LessonPlanModificationPlanner()
+                .build(
+                    resolution=review_resolution
+                )
+            )
+
         reviewed_row = None
 
         if review_accepted:
@@ -680,6 +695,7 @@ def _render_lesson_plan_standardization_workspace(
 
     except Exception as error:
         review_accepted = False
+        modification_plan = None
         reviewed_row = None
 
         st.warning(
@@ -729,6 +745,9 @@ def _render_lesson_plan_standardization_workspace(
                         ),
                         original_name=(
                             uploaded.name
+                        ),
+                        modification_plan=(
+                            modification_plan
                         ),
                     )
                 )

@@ -3,6 +3,15 @@
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from dataclasses import replace
+from datetime import datetime
+
+from document_intelligence.contracts import (
+    DocumentField,
+)
+from document_intelligence.lesson_plan_modification_plan import (
+    LessonPlanModificationPlan,
+)
 import tempfile
 
 from document_standardization import (
@@ -40,6 +49,115 @@ class LessonPlanDocumentProcessingService:
             profile_path
         )
 
+    @staticmethod
+    def apply_modification_plan(
+        *,
+        context,
+        modification_plan,
+    ):
+        from lesson_planning_v2.contexts import (
+            ScheduledLessonContext,
+        )
+
+        if not isinstance(
+            context,
+            ScheduledLessonContext,
+        ):
+            raise TypeError(
+                "context must be ScheduledLessonContext"
+            )
+
+        if not isinstance(
+            modification_plan,
+            LessonPlanModificationPlan,
+        ):
+            raise TypeError(
+                "modification_plan must be "
+                "LessonPlanModificationPlan"
+            )
+
+        if modification_plan.is_empty:
+            return context
+
+        changes = {}
+
+        class_name = modification_plan.value_for(
+            DocumentField.CLASS_NAME
+        )
+        if class_name is not None:
+            changes["class_id"] = class_name
+
+        curriculum_period = (
+            modification_plan.value_for(
+                DocumentField.CURRICULUM_PERIOD
+            )
+        )
+        if curriculum_period is not None:
+            try:
+                parsed_period = int(
+                    curriculum_period
+                )
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    "curriculum_period must be "
+                    "a positive integer"
+                ) from error
+
+            if parsed_period <= 0:
+                raise ValueError(
+                    "curriculum_period must be "
+                    "a positive integer"
+                )
+
+            changes[
+                "curriculum_period"
+            ] = parsed_period
+
+        lesson_title = modification_plan.value_for(
+            DocumentField.LESSON_TITLE
+        )
+        if lesson_title is not None:
+            changes["lesson_title"] = lesson_title
+
+        drafting_date = modification_plan.value_for(
+            DocumentField.DRAFTING_DATE
+        )
+        if drafting_date is not None:
+            changes["drafting_date"] = (
+                LessonPlanDocumentProcessingService
+                ._parse_review_date(
+                    drafting_date
+                )
+            )
+
+        teaching_date = modification_plan.value_for(
+            DocumentField.TEACHING_DATE
+        )
+        if teaching_date is not None:
+            changes["teaching_date"] = (
+                LessonPlanDocumentProcessingService
+                ._parse_review_date(
+                    teaching_date
+                )
+            )
+
+        return replace(
+            context,
+            **changes,
+        )
+
+    @staticmethod
+    def _parse_review_date(value):
+        try:
+            return datetime.strptime(
+                value,
+                "%d/%m/%Y",
+            ).date()
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "date must use DD/MM/YYYY format"
+            ) from error
+
     def process(
         self,
         *,
@@ -47,6 +165,7 @@ class LessonPlanDocumentProcessingService:
         drafting_date: date | None,
         content: bytes,
         original_name: str,
+        modification_plan: LessonPlanModificationPlan | None = None,
     ) -> LessonPlanDocumentProcessingResult:
         safe_name = Path(
             original_name
@@ -72,6 +191,12 @@ class LessonPlanDocumentProcessingService:
                 drafting_date=drafting_date,
             )
         )
+
+        if modification_plan is not None:
+            context = self.apply_modification_plan(
+                context=context,
+                modification_plan=modification_plan,
+            )
 
         output_name = (
             f"{Path(safe_name).stem}"
