@@ -12,6 +12,7 @@ __all__ = [
     "DocumentAnalyzer",
     "DocumentField",
     "DocumentFieldProposal",
+    "DeterministicDocumentAnalyzer",
 ]
 
 from document_intelligence.validation import (
@@ -20,4 +21,8 @@ from document_intelligence.validation import (
     ValidatedDocumentAnalysis,
     ValidatedDocumentProposal,
     ValidationStatus,
+)
+
+from document_intelligence.deterministic_analyzer import (
+    DeterministicDocumentAnalyzer,
 )
