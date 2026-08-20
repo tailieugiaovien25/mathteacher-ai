@@ -84,6 +84,7 @@ class LessonPlanDocumentContextApplier:
                 document,
                 field_name,
                 value,
+                context=context,
             ):
                 applied.append(
                     field_name
@@ -138,41 +139,312 @@ class LessonPlanDocumentContextApplier:
         document,
         field_name: str,
         value: str,
+        *,
+        context: ScheduledLessonContext,
     ) -> bool:
         if not value:
             return False
 
-        patterns = self._FIELD_PATTERNS[
-            field_name
-        ]
-
         for paragraph in self._all_paragraphs(
             document
         ):
-            text = paragraph.text
+            original_text = paragraph.text
 
-            for pattern in patterns:
-                match = re.match(
-                    pattern,
-                    text,
-                    flags=re.IGNORECASE,
+            updated_text = (
+                self._replace_field_in_text(
+                    original_text,
+                    field_name=field_name,
+                    value=value,
+                    context=context,
                 )
+            )
 
-                if match is None:
-                    continue
+            if updated_text is None:
+                continue
 
-                prefix = text[
-                    : match.end()
-                ]
-
+            if updated_text != original_text:
                 self._replace_paragraph_text(
                     paragraph,
-                    f"{prefix} {value}",
+                    updated_text,
                 )
 
-                return True
+            return True
 
         return False
+
+    @classmethod
+    def _replace_field_in_text(
+        cls,
+        text: str,
+        *,
+        field_name: str,
+        value: str,
+        context: ScheduledLessonContext,
+    ) -> str | None:
+        if field_name == "drafting_date":
+            return cls._replace_simple_value(
+                text,
+                pattern=(
+                    r"(?P<prefix>"
+                    r"ng\u00e0y\s+so\u1ea1n"
+                    r"\s*:\s*)"
+                    r"\d{1,2}/\d{1,2}/\d{2,4}"
+                ),
+                value=value,
+            )
+
+        if field_name == "teaching_date":
+            return cls._replace_simple_value(
+                text,
+                pattern=(
+                    r"(?P<prefix>"
+                    r"ng\u00e0y\s+"
+                    r"(?:d\u1ea1y|gi\u1ea3ng)"
+                    r"\s*:\s*)"
+                    r"\d{1,2}/\d{1,2}/\d{2,4}"
+                ),
+                value=value,
+            )
+
+        if field_name == "class_id":
+            return cls._replace_simple_value(
+                text,
+                pattern=(
+                    r"(?P<prefix>"
+                    r"l\u1edbp\s*:?\s*)"
+                    r"[A-Za-z0-9._-]+"
+                ),
+                value=value,
+            )
+
+        if field_name == "curriculum_period":
+            explicit = (
+                cls._replace_simple_value(
+                    text,
+                    pattern=(
+                        r"(?P<prefix>"
+                        r"ti\u1ebft\s+ppct"
+                        r"\s*:\s*)"
+                        r"\d+"
+                    ),
+                    value=value,
+                )
+            )
+
+            if explicit is not None:
+                return explicit
+
+            explicit = (
+                cls._replace_simple_value(
+                    text,
+                    pattern=(
+                        r"(?P<prefix>"
+                        r"ppct\s*:\s*)"
+                        r"\d+"
+                    ),
+                    value=value,
+                )
+            )
+
+            if explicit is not None:
+                return explicit
+
+            explicit = (
+                cls._replace_simple_value(
+                    text,
+                    pattern=(
+                        r"(?P<prefix>"
+                        r"^\s*ti\u1ebft"
+                        r"\s*:\s*)"
+                        r"\d+"
+                    ),
+                    value=value,
+                )
+            )
+
+            if explicit is not None:
+                return explicit
+
+            return cls._replace_period_heading(
+                text,
+                curriculum_period=(
+                    context.curriculum_period
+                ),
+                period_in_lesson=(
+                    context.period_in_lesson
+                ),
+            )
+
+        if field_name == "lesson_title":
+            explicit = re.match(
+                (
+                    r"(?P<prefix>"
+                    r"^\s*(?:"
+                    r"t\u00ean\s+b\u00e0i"
+                    r"|b\u00e0i"
+                    r")\s*:\s*)"
+                    r"(?P<old>.*)$"
+                ),
+                text,
+                flags=re.IGNORECASE,
+            )
+
+            if explicit is not None:
+                return (
+                    explicit.group("prefix")
+                    + value
+                )
+
+            return cls._replace_lesson_heading(
+                text,
+                lesson_title=value,
+            )
+
+        return None
+
+    @staticmethod
+    def _replace_simple_value(
+        text: str,
+        *,
+        pattern: str,
+        value: str,
+    ) -> str | None:
+        match = re.search(
+            pattern,
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        if match is None:
+            return None
+
+        return (
+            text[:match.start()]
+            + match.group("prefix")
+            + value
+            + text[match.end():]
+        )
+
+    @staticmethod
+    def _replace_period_heading(
+        text: str,
+        *,
+        curriculum_period: int,
+        period_in_lesson: int,
+    ) -> str | None:
+        match = re.match(
+            (
+                r"(?P<prefix>"
+                r"^\s*ti\u1ebft\s+)"
+                r"(?P<periods>"
+                r"\d+(?:\s*,\s*\d+)*"
+                r")"
+                r"(?P<separator>"
+                r"\s*[.\-:])"
+            ),
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        if match is None:
+            return None
+
+        existing_periods = re.findall(
+            r"\d+",
+            match.group("periods"),
+        )
+
+        count = max(
+            1,
+            len(existing_periods),
+        )
+
+        start_period = (
+            curriculum_period
+            - period_in_lesson
+            + 1
+        )
+
+        if start_period <= 0:
+            start_period = (
+                curriculum_period
+            )
+
+        replacement_periods = ",".join(
+            str(
+                start_period + offset
+            )
+            for offset in range(count)
+        )
+
+        return (
+            text[:match.start()]
+            + match.group("prefix")
+            + replacement_periods
+            + match.group("separator")
+            + text[match.end():]
+        )
+
+    @staticmethod
+    def _replace_lesson_heading(
+        text: str,
+        *,
+        lesson_title: str,
+    ) -> str | None:
+        patterns = (
+            # Tiet 1. BAI 1. Ten bai
+            (
+                r"(?P<prefix>"
+                r"^\s*ti\u1ebft\s+"
+                r"\d+(?:\s*,\s*\d+)*"
+                r"\s*[.\-:]\s*"
+                r"b\u00e0i\s+\d+"
+                r"\s*[.\-:]\s*)"
+                r"(?P<title>.*?)"
+                r"(?P<suffix>"
+                r"\s*\(\s*\d+\s+"
+                r"ti\u1ebft\s*\)\s*"
+                r")?$"
+            ),
+
+            # TIET 4 - ?4: Ten bai
+            (
+                r"(?P<prefix>"
+                r"^\s*ti\u1ebft\s+"
+                r"\d+(?:\s*,\s*\d+)*"
+                r"\s*[.\-:]\s*"
+                r"\u00a7\s*\d+"
+                r"\s*:\s*)"
+                r"(?P<title>.*?)"
+                r"(?P<suffix>"
+                r"\s*\(\s*\d+\s+"
+                r"ti\u1ebft\s*\)\s*"
+                r")?$"
+            ),
+        )
+
+        for pattern in patterns:
+            match = re.match(
+                pattern,
+                text,
+                flags=re.IGNORECASE,
+            )
+
+            if match is None:
+                continue
+
+            suffix = (
+                match.group("suffix")
+                or ""
+            )
+
+            return (
+                match.group("prefix")
+                + lesson_title
+                + suffix
+            )
+
+        return None
 
     @staticmethod
     def _all_paragraphs(document):
