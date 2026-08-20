@@ -64,6 +64,21 @@ from document_intelligence.validation import (
 from portal_v2.ui.lesson_plan_preview_streamlit import (
     render_lesson_plan_preview,
 )
+from document_intelligence.contracts import (
+    DocumentField,
+)
+from document_intelligence.lesson_plan_teacher_review_presenter import (
+    LessonPlanTeacherReviewPresenter,
+)
+from document_intelligence.lesson_plan_teacher_review_resolver import (
+    LessonPlanTeacherReviewResolver,
+)
+from document_intelligence.lesson_plan_reviewed_schedule_row import (
+    LessonPlanReviewedScheduleRow,
+)
+from portal_v2.ui.lesson_plan_teacher_review_streamlit import (
+    render_lesson_plan_teacher_review,
+)
 
 _VIEW_STATE_KEY = "weekly_schedule_portal_view"
 
@@ -535,9 +550,106 @@ def _render_lesson_plan_standardization_workspace(
             view=preview_view,
         )
 
+        canonical_values = {
+            DocumentField.CLASS_NAME: (
+                selected_row.class_id
+            ),
+            DocumentField.CURRICULUM_PERIOD: (
+                str(
+                    selected_row.curriculum_period
+                )
+            ),
+            DocumentField.LESSON_TITLE: (
+                selected_row.lesson_title
+            ),
+            DocumentField.DRAFTING_DATE: (
+                drafting_date.strftime(
+                    "%d/%m/%Y"
+                )
+            ),
+            DocumentField.TEACHING_DATE: (
+                selected_row.teaching_date.strftime(
+                    "%d/%m/%Y"
+                )
+            ),
+        }
+
+        teacher_review_view = (
+            LessonPlanTeacherReviewPresenter()
+            .present(
+                preview=preview_view,
+                canonical_values=(
+                    canonical_values
+                ),
+            )
+        )
+
+        teacher_review = (
+            render_lesson_plan_teacher_review(
+                st=st,
+                view=teacher_review_view,
+                key_prefix=(
+                    "lbg_lesson_plan_review_"
+                    + str(view.week_number)
+                    + "_"
+                    + str(selected_index)
+                ),
+            )
+        )
+
+        review_resolution = (
+            LessonPlanTeacherReviewResolver()
+            .resolve(
+                preview=preview_view,
+                review=teacher_review,
+            )
+        )
+
+        review_accepted = (
+            review_resolution.accepted
+        )
+
+        reviewed_row = None
+
+        if review_accepted:
+            resolved_metadata = {
+                field: value
+                for field, value
+                in review_resolution.metadata.values
+            }
+
+            reviewed_row = (
+                LessonPlanReviewedScheduleRow
+                .from_schedule_row(
+                    row=selected_row,
+                    resolved_metadata=(
+                        resolved_metadata
+                    ),
+                )
+            )
+
+        if review_accepted:
+            st.success(
+                "Gi\u00e1o vi\u00ean \u0111\u00e3 "
+                "x\u00e1c nh\u1eadn "
+                "th\u00f4ng tin gi\u00e1o \u00e1n."
+            )
+        else:
+            st.warning(
+                "C\u1ea7n ho\u00e0n t\u1ea5t "
+                "x\u00e1c nh\u1eadn "
+                "th\u00f4ng tin tr\u01b0\u1edbc "
+                "khi t\u1ea1o gi\u00e1o \u00e1n "
+                "chu\u1ea9n h\u00f3a."
+            )
+
     except Exception as error:
+        review_accepted = False
+        reviewed_row = None
+
         st.warning(
             "Kh\u00f4ng th\u1ec3 xem tr\u01b0\u1edbc "
+            "ho\u1eb7c x\u00e1c nh\u1eadn "
             "th\u00f4ng tin gi\u00e1o \u00e1n: "
             f"{error}"
         )
@@ -555,7 +667,16 @@ def _render_lesson_plan_standardization_workspace(
         ),
     )
 
-    if process_clicked:
+    if process_clicked and not review_accepted:
+        st.warning(
+            "Ch\u01b0a th\u1ec3 t\u1ea1o "
+            "gi\u00e1o \u00e1n chu\u1ea9n h\u00f3a "
+            "khi th\u00f4ng tin ch\u01b0a "
+            "\u0111\u01b0\u1ee3c gi\u00e1o vi\u00ean "
+            "x\u00e1c nh\u1eadn."
+        )
+
+    if process_clicked and review_accepted:
         try:
             with st.spinner(
                 "\u0110ang b\u1ed5 sung "
@@ -564,7 +685,7 @@ def _render_lesson_plan_standardization_workspace(
             ):
                 result = (
                     _process_lesson_plan_upload(
-                        row=selected_row,
+                        row=reviewed_row,
                         drafting_date=(
                             drafting_date
                         ),
