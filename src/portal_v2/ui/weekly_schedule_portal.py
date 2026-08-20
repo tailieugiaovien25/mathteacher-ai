@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from datetime import date
 from enum import Enum
 
+from educational_planning_v2.models import (
+    TeachingSession,
+)
 from educational_planning_v2.services.weekly_schedule_output_service import (
     WeeklyScheduleOutputResult,
 )
@@ -19,6 +22,7 @@ class WeeklySchedulePortalPreviewRow:
     teaching_date: date
     weekday: int
     timetable_period: int
+    session: TeachingSession
     class_id: str
     subject_ref: str
     component_ref: str | None
@@ -31,6 +35,14 @@ class WeeklySchedulePortalPreviewRow:
     def __post_init__(self) -> None:
         if not isinstance(self.teaching_date, date):
             raise TypeError("teaching_date must be date")
+
+        if not isinstance(
+            self.session,
+            TeachingSession,
+        ):
+            raise TypeError(
+                "session must be TeachingSession"
+            )
 
         for name in (
             "weekday",
@@ -245,6 +257,7 @@ class WeeklySchedulePortalPresenter:
                 teaching_date=entry.teaching_date,
                 weekday=entry.weekday,
                 timetable_period=entry.timetable_period,
+                session=entry.session,
                 class_id=entry.class_id,
                 subject_ref=entry.subject_ref,
                 component_ref=entry.component_ref,

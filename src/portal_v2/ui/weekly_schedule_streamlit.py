@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
 from educational_planning_v2.adapters.operational_weekly_schedule_workbook_intake import (
@@ -49,8 +51,18 @@ from portal_v2.runtime.system_weekly_schedule_runtime import (
     SystemWeeklyScheduleRuntime,
     SystemWeeklyScheduleRuntimeRequest,
 )
+from lesson_planning_v2.services import (
+    LessonPlanDocumentProcessingService,
+)
 
 _VIEW_STATE_KEY = "weekly_schedule_portal_view"
+
+_LESSON_PLAN_PROFILE = (
+    Path(__file__).resolve().parents[3]
+    / "scripts"
+    / "word_standardizer"
+    / "lesson_plan_profile.json"
+)
 
 
 def _local_selection() -> OperationalInputSelection:
@@ -305,6 +317,281 @@ def _render_lbg_table(
         key=(
             "lbg_user_editor_"
             + str(view.week_number)
+        ),
+    )
+
+    _render_lesson_plan_standardization_workspace(
+        view
+    )
+
+
+
+def _process_lesson_plan_upload(
+    *,
+    row,
+    drafting_date,
+    content: bytes,
+    original_name: str,
+) -> tuple[
+    str,
+    bytes,
+    tuple[str, ...],
+]:
+    service = (
+        LessonPlanDocumentProcessingService(
+            profile_path=(
+                _LESSON_PLAN_PROFILE
+            )
+        )
+    )
+
+    result = service.process(
+        row=row,
+        drafting_date=drafting_date,
+        content=content,
+        original_name=original_name,
+    )
+
+    return (
+        result.output_name,
+        result.output_bytes,
+        result.unresolved_fields,
+    )
+
+
+def _lesson_plan_row_label(
+    row,
+) -> str:
+    return (
+        f"{row.teaching_date.strftime('%d/%m/%Y')}"
+        f" | Ti\u1ebft TKB {row.timetable_period}"
+        f" | {row.class_id}"
+        f" | PPCT {row.curriculum_period}"
+        f" | {row.lesson_title}"
+    )
+
+
+def _render_lesson_plan_standardization_workspace(
+    view,
+) -> None:
+    if (
+        view is None
+        or not getattr(
+            view,
+            "rows",
+            None,
+        )
+    ):
+        return
+
+    st.divider()
+
+    st.subheader(
+        "\U0001f4dd Chu\u1ea9n h\u00f3a "
+        "gi\u00e1o \u00e1n theo "
+        "L\u1ecbch b\u00e1o gi\u1ea3ng"
+    )
+
+    st.caption(
+        "Ch\u1ecdn ti\u1ebft d\u1ea1y, "
+        "ng\u00e0y so\u1ea1n v\u00e0 "
+        "t\u1ea3i gi\u00e1o \u00e1n Word."
+    )
+
+    schedule_rows = tuple(
+        view.rows
+    )
+
+    selected_index = st.selectbox(
+        "Ti\u1ebft d\u1ea1y",
+        options=tuple(
+            range(
+                len(schedule_rows)
+            )
+        ),
+        format_func=lambda index: (
+            _lesson_plan_row_label(
+                schedule_rows[index]
+            )
+        ),
+        key=(
+            "lbg_lesson_plan_row_"
+            + str(view.week_number)
+        ),
+    )
+
+    selected_row = schedule_rows[
+        selected_index
+    ]
+
+    st.info(
+        "\u0110\u00e3 ch\u1ecdn: "
+        + _lesson_plan_row_label(
+            selected_row
+        )
+    )
+
+    drafting_date = st.date_input(
+        "Ng\u00e0y so\u1ea1n",
+        value=selected_row.teaching_date,
+        max_value=selected_row.teaching_date,
+        key=(
+            "lbg_lesson_plan_drafting_date_"
+            + str(view.week_number)
+            + "_"
+            + str(selected_index)
+        ),
+    )
+
+    uploaded = st.file_uploader(
+        "T\u1ea3i gi\u00e1o \u00e1n Word (.docx)",
+        type=("docx",),
+        accept_multiple_files=False,
+        key=(
+            "lbg_lesson_plan_upload_"
+            + str(view.week_number)
+            + "_"
+            + str(selected_index)
+        ),
+    )
+
+    result_key = (
+        "lbg_lesson_plan_result_"
+        + str(view.week_number)
+        + "_"
+        + str(selected_index)
+    )
+
+    source_key = (
+        "lbg_lesson_plan_source_"
+        + str(view.week_number)
+        + "_"
+        + str(selected_index)
+    )
+
+    if uploaded is None:
+        st.session_state.pop(
+            result_key,
+            None,
+        )
+
+        st.session_state.pop(
+            source_key,
+            None,
+        )
+
+        st.caption(
+            "File g\u1ed1c s\u1ebd "
+            "\u0111\u01b0\u1ee3c gi\u1eef nguy\u00ean."
+        )
+        return
+
+    st.success(
+        "\u0110\u00e3 nh\u1eadn gi\u00e1o \u00e1n: "
+        + uploaded.name
+    )
+
+    process_clicked = st.button(
+        "\u2699\ufe0f T\u1ea1o gi\u00e1o \u00e1n "
+        "chu\u1ea9n h\u00f3a",
+        type="primary",
+        width="stretch",
+        key=(
+            "lbg_lesson_plan_process_"
+            + str(view.week_number)
+            + "_"
+            + str(selected_index)
+        ),
+    )
+
+    if process_clicked:
+        try:
+            with st.spinner(
+                "\u0110ang b\u1ed5 sung "
+                "th\u00f4ng tin v\u00e0 "
+                "chu\u1ea9n h\u00f3a gi\u00e1o \u00e1n..."
+            ):
+                result = (
+                    _process_lesson_plan_upload(
+                        row=selected_row,
+                        drafting_date=(
+                            drafting_date
+                        ),
+                        content=(
+                            uploaded.getvalue()
+                        ),
+                        original_name=(
+                            uploaded.name
+                        ),
+                    )
+                )
+
+                st.session_state[
+                    result_key
+                ] = result
+
+                st.session_state[
+                    source_key
+                ] = uploaded.name
+
+        except Exception as error:
+            st.error(
+                "Kh\u00f4ng th\u1ec3 "
+                "chu\u1ea9n h\u00f3a "
+                f"gi\u00e1o \u00e1n: {error}"
+            )
+
+    result = st.session_state.get(
+        result_key
+    )
+
+    if (
+        not result
+        or st.session_state.get(
+            source_key
+        )
+        != uploaded.name
+    ):
+        return
+
+    (
+        output_name,
+        output_bytes,
+        unresolved_fields,
+    ) = result
+
+    if unresolved_fields:
+        st.warning(
+            "Ch\u01b0a t\u1ef1 \u0111\u1ed9ng "
+            "c\u1eadp nh\u1eadt \u0111\u01b0\u1ee3c: "
+            + ", ".join(
+                unresolved_fields
+            )
+        )
+    else:
+        st.success(
+            "\u0110\u00e3 b\u1ed5 sung "
+            "c\u00e1c th\u00f4ng tin "
+            "L\u1ecbch b\u00e1o gi\u1ea3ng "
+            "v\u00e0 chu\u1ea9n h\u00f3a "
+            "gi\u00e1o \u00e1n."
+        )
+
+    st.download_button(
+        "\U0001f4e5 T\u1ea3i gi\u00e1o \u00e1n "
+        "chu\u1ea9n h\u00f3a",
+        data=output_bytes,
+        file_name=output_name,
+        mime=(
+            "application/vnd.openxmlformats-"
+            "officedocument.wordprocessingml.document"
+        ),
+        width="stretch",
+        key=(
+            "lbg_lesson_plan_download_"
+            + str(view.week_number)
+            + "_"
+            + str(selected_index)
         ),
     )
 

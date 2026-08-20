@@ -4,6 +4,9 @@ from dataclasses import FrozenInstanceError
 from datetime import date
 import inspect
 
+from educational_planning_v2.models import (
+    TeachingSession,
+)
 from portal_v2.ui.weekly_schedule_portal import (
     WeeklySchedulePortalDownload,
     WeeklySchedulePortalPreviewRow,
@@ -29,6 +32,7 @@ def sample_row():
         teaching_date=date(2026, 9, 28),
         weekday=1,
         timetable_period=1,
+        session=TeachingSession.MORNING,
         class_id=" 6A1 ",
         subject_ref=" MATHEMATICS ",
         component_ref=None,
@@ -79,6 +83,8 @@ def run_contract():
             row.subject_ref == "MATHEMATICS"
             and
             row.lesson_id == "LESSON-009"
+            and
+            row.session is TeachingSession.MORNING
         ),
     ))
 
