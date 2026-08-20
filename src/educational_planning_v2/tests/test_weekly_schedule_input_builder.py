@@ -83,6 +83,7 @@ def test_builds_canonical_timetable_slot():
     assert slot.component_ref is None
     assert slot.weekday == 2
     assert slot.timetable_period == 1
+    assert slot.session is TeachingSession.MORNING
 
 
 def test_inactive_timetable_slot_is_ignored():

@@ -7,6 +7,9 @@ from typing import BinaryIO, Mapping
 
 from openpyxl import load_workbook
 
+from educational_planning_v2.models.teacher_timetable import (
+    TeachingSession,
+)
 from educational_planning_v2.models.weekly_teaching_schedule import (
     AcademicWeek,
     CurriculumPeriod,
@@ -251,6 +254,7 @@ class WeeklyScheduleExcelAdapter:
             component_ref=self._optional_text(row["component_ref"]),
             weekday=self._weekday(row["weekday"]),
             timetable_period=self._positive_int(row["timetable_period"], "tiet_hoc"),
+            session=TeachingSession.MORNING,
             effective_from=self._date(row["effective_from"], "hieu_luc_tu"),
             effective_to=self._date(row["effective_to"], "hieu_luc_den"),
         )

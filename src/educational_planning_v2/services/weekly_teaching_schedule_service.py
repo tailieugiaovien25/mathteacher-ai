@@ -72,6 +72,12 @@ class WeeklyTeachingScheduleService:
             ),
             key=lambda item: (
                 item[0],
+                (
+                    0
+                    if item[1].session.value
+                    == "MORNING"
+                    else 1
+                ),
                 item[1].timetable_period,
                 item[1].class_id,
                 item[1].subject_ref,
@@ -102,6 +108,7 @@ class WeeklyTeachingScheduleService:
                     teaching_date=teaching_date,
                     weekday=slot.weekday,
                     timetable_period=slot.timetable_period,
+                    session=slot.session,
                     teacher_id=normalized_teacher_id,
                     class_id=slot.class_id,
                     subject_ref=slot.subject_ref,
@@ -214,4 +221,3 @@ class WeeklyTeachingScheduleService:
             raise ValueError(f"{field_name} must not be empty")
 
         return normalized
-

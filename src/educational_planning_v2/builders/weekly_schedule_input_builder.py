@@ -120,6 +120,7 @@ class WeeklyScheduleInputBuilder:
                     ),
                     weekday=slot.weekday,
                     timetable_period=slot.period,
+                    session=slot.session,
                     effective_from=(
                         slot.effective_from
                     ),

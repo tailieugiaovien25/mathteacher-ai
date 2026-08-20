@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from educational_planning_v2.models import AcademicWeek, WeeklyTeachingSchedule, WeeklyTeachingScheduleEntry
+from educational_planning_v2.models import AcademicWeek, TeachingSession, WeeklyTeachingSchedule, WeeklyTeachingScheduleEntry
 
 
 def schedule_to_dict(schedule: WeeklyTeachingSchedule) -> dict[str, Any]:
@@ -22,7 +22,7 @@ def schedule_to_dict(schedule: WeeklyTeachingSchedule) -> dict[str, Any]:
         },
         "entries": [{
             "teaching_date": item.teaching_date.isoformat(), "weekday": item.weekday,
-            "timetable_period": item.timetable_period, "teacher_id": item.teacher_id,
+            "timetable_period": item.timetable_period, "session": item.session.value, "teacher_id": item.teacher_id,
             "class_id": item.class_id, "subject_ref": item.subject_ref,
             "component_ref": item.component_ref, "curriculum_period": item.curriculum_period,
             "lesson_id": item.lesson_id, "lesson_title": item.lesson_title,
@@ -45,7 +45,7 @@ def schedule_from_dict(data: dict[str, Any]) -> WeeklyTeachingSchedule:
         ),
         entries=tuple(WeeklyTeachingScheduleEntry(
             teaching_date=date.fromisoformat(item["teaching_date"]), weekday=item["weekday"],
-            timetable_period=item["timetable_period"], teacher_id=item["teacher_id"],
+            timetable_period=item["timetable_period"], session=TeachingSession(item.get("session", "MORNING")), teacher_id=item["teacher_id"],
             class_id=item["class_id"], subject_ref=item["subject_ref"], component_ref=item.get("component_ref"),
             curriculum_period=item["curriculum_period"], lesson_id=item["lesson_id"], lesson_title=item["lesson_title"],
             period_in_lesson=item["period_in_lesson"], total_lesson_periods=item["total_lesson_periods"],
