@@ -1,4 +1,4 @@
-﻿"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
+"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ PORTAL_PAGES = (
     "D\u1eef li\u1ec7u c\u1ee7a t\u00f4i",
     "Kho t\u00e0i li\u1ec7u",
     "Chu\u1ea9n h\u00f3a Word",
+    "M\u1eabu gi\u00e1o \u00e1n",
     "H\u1ed3 s\u01a1 gi\u00e1o vi\u00ean",
 )
 PORTAL_SESSION_KEYS = (
@@ -90,8 +91,20 @@ def connect_feature_repositories(session_state: Any, client: Any, user_id: str) 
     session_state["portal_supabase_client"] = client
     session_state["portal_user_id"] = user_id
 
+    from lesson_planning_v2.adapters.supabase_lesson_plan_workspace_draft_repository import (
+        SupabaseLessonPlanWorkspaceDraftRepository,
+    )
+
     from notification_v2.adapters.supabase_notification_repository import (
         SupabaseNotificationRepository,
+    )
+
+    session_state[
+        "lesson_plan_workspace_draft_repository"
+    ] = (
+        SupabaseLessonPlanWorkspaceDraftRepository(
+            client=client,
+        )
     )
 
     session_state["notification_repository"] = (
@@ -251,6 +264,10 @@ def render_dashboard(st) -> None:
         ),
         ("Kho tài liệu", "Tìm kiếm và tải tài liệu lên Google Drive."),
         ("Chuẩn hóa Word", "Chuẩn hóa giáo án Word mà không ghi đè bản gốc."),
+        (
+            "Mẫu giáo án",
+            "Thiết lập cấu trúc, bố cục, ngày soạn, ngày dạy và phê duyệt giáo án.",
+        ),
         ("Hồ sơ giáo viên", "Quản lý thông tin dùng chung khi lập và xuất lịch."),
     )
     columns = st.columns(2)
@@ -1058,6 +1075,17 @@ def main() -> None:
         from scripts.word_standardizer.app import main as render_word_standardizer
         st.title("Chuẩn hóa Word")
         render_word_standardizer(embedded=True)
+
+    elif selected == 'Mẫu giáo án':
+        from portal_v2.ui.lesson_plan_template_setup_streamlit import (
+            render_lesson_plan_template_setup,
+        )
+
+        render_lesson_plan_template_setup(
+            client=client,
+            teacher_id=str(user_id),
+        )
+
     else:
         render_profile(st, client, str(user_id))
 

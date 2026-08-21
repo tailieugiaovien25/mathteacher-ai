@@ -179,3 +179,156 @@ def test_presenter_rejects_invalid_canonical_values():
                 canonical_values=object(),
             )
         )
+
+
+def test_presenter_emits_at_most_one_review_item_per_field():
+    preview = LessonPlanPreviewViewModel(
+        items=(
+            make_item(
+                field=DocumentField.CLASS_NAME,
+                field_label="Lớp",
+                value="6A2",
+                validation_status=(
+                    ValidationStatus.CONFLICT
+                ),
+                review_state=(
+                    PreviewReviewState.CONFLICT
+                ),
+                requires_review=True,
+            ),
+            make_item(
+                field=DocumentField.CLASS_NAME,
+                field_label="Lớp",
+                value="-",
+                validation_status=(
+                    ValidationStatus.CONFLICT
+                ),
+                review_state=(
+                    PreviewReviewState.CONFLICT
+                ),
+                requires_review=True,
+            ),
+            make_item(
+                field=DocumentField.CLASS_NAME,
+                field_label="Lớp",
+                value="ho",
+                validation_status=(
+                    ValidationStatus.CONFLICT
+                ),
+                review_state=(
+                    PreviewReviewState.CONFLICT
+                ),
+                requires_review=True,
+            ),
+            make_item(
+                field=DocumentField.LESSON_TITLE,
+                field_label="Tên bài",
+                value="Bài 7",
+                validation_status=(
+                    ValidationStatus.ACCEPTED
+                ),
+                review_state=(
+                    PreviewReviewState.ACCEPTED
+                ),
+                requires_review=False,
+            ),
+        ),
+        ai_used=False,
+        ai_failed=False,
+        requires_review=True,
+        conflict_count=3,
+    )
+
+    view = (
+        LessonPlanTeacherReviewPresenter()
+        .present(
+            preview=preview,
+            canonical_values={
+                DocumentField.CLASS_NAME: "6A1",
+                DocumentField.LESSON_TITLE: (
+                    "Bài 7"
+                ),
+            },
+        )
+    )
+
+    fields = tuple(
+        item.field
+        for item in view.items
+    )
+
+    assert (
+        len(fields)
+        == len(set(fields))
+    )
+
+    assert (
+        fields.count(
+            DocumentField.CLASS_NAME
+        )
+        == 1
+    )
+
+
+def test_presenter_prefers_candidate_matching_canonical_value():
+    preview = LessonPlanPreviewViewModel(
+        items=(
+            make_item(
+                field=DocumentField.CLASS_NAME,
+                field_label="Lớp",
+                value="6A2",
+                validation_status=(
+                    ValidationStatus.CONFLICT
+                ),
+                review_state=(
+                    PreviewReviewState.CONFLICT
+                ),
+                requires_review=True,
+            ),
+            make_item(
+                field=DocumentField.CLASS_NAME,
+                field_label="Lớp",
+                value="6A1",
+                validation_status=(
+                    ValidationStatus.ACCEPTED
+                ),
+                review_state=(
+                    PreviewReviewState.ACCEPTED
+                ),
+                requires_review=False,
+            ),
+        ),
+        ai_used=False,
+        ai_failed=False,
+        requires_review=True,
+        conflict_count=1,
+    )
+
+    view = (
+        LessonPlanTeacherReviewPresenter()
+        .present(
+            preview=preview,
+            canonical_values={
+                DocumentField.CLASS_NAME: "6A1",
+            },
+        )
+    )
+
+    assert len(view.items) == 1
+
+    item = view.items[0]
+
+    assert (
+        item.field
+        is DocumentField.CLASS_NAME
+    )
+
+    assert (
+        item.detected_value
+        == "6A1"
+    )
+
+    assert (
+        item.default_action
+        is TeacherReviewAction.CONFIRM
+    )

@@ -51,6 +51,18 @@ from portal_v2.runtime.system_weekly_schedule_runtime import (
     SystemWeeklyScheduleRuntime,
     SystemWeeklyScheduleRuntimeRequest,
 )
+from lesson_planning_v2.services.lesson_plan_lesson_selector_service import LessonPlanLessonSelectorService
+from lesson_planning_v2.services.lesson_plan_draft_workspace_service import (
+    LessonPlanDraftWorkspaceService,
+)
+from lesson_planning_v2.workspace_draft import (
+    LessonPlanWorkspaceDraft,
+)
+
+from lesson_planning_v2.services.lesson_plan_unit_selector_service import (
+    LessonPlanSelectionMode,
+    LessonPlanUnitSelectorService,
+)
 from lesson_planning_v2.services import (
     LessonPlanDocumentProcessingService,
 )
@@ -85,6 +97,10 @@ from document_intelligence.lesson_plan_workflow_state import (
 )
 from portal_v2.ui.lesson_plan_teacher_review_streamlit import (
     render_lesson_plan_teacher_review,
+)
+
+from scripts.teacher_portal.lesson_plan_visual_viewer import (
+    build_document_html,
 )
 
 _VIEW_STATE_KEY = "weekly_schedule_portal_view"
@@ -310,6 +326,7 @@ def _render_lbg_table(
     view,
     *,
     client=None,
+    teacher_user_id="",
 ) -> None:
     (
         class_names,
@@ -353,7 +370,8 @@ def _render_lbg_table(
     )
 
     _render_lesson_plan_standardization_workspace(
-        view
+        view,
+        teacher_user_id=teacher_user_id,
     )
 
 
@@ -393,6 +411,286 @@ def _process_lesson_plan_upload(
     )
 
 
+
+def _lesson_plan_lesson_options_from_rows(
+    rows,
+):
+    """
+    Build lesson-level choices from the current
+    weekly schedule.
+
+    Transitional adapter:
+    downstream processing still receives one
+    representative schedule row.
+    """
+
+    grouped = {}
+
+    for index, row in enumerate(rows):
+        lesson_title = str(
+            getattr(
+                row,
+                "lesson_title",
+                "",
+            )
+            or ""
+        ).strip()
+
+        curriculum_period = getattr(
+            row,
+            "curriculum_period",
+            None,
+        )
+
+        if (
+            not lesson_title
+            or curriculum_period is None
+        ):
+            continue
+
+        item = grouped.setdefault(
+            lesson_title,
+            {
+                "lesson_title": lesson_title,
+                "periods": set(),
+                "classes": set(),
+                "teaching_dates": [],
+                "row_indices": [],
+            },
+        )
+
+        item["periods"].add(
+            int(curriculum_period)
+        )
+
+        class_id = str(
+            getattr(
+                row,
+                "class_id",
+                "",
+            )
+            or ""
+        ).strip()
+
+        if class_id:
+            item["classes"].add(
+                class_id
+            )
+
+        teaching_date = getattr(
+            row,
+            "teaching_date",
+            None,
+        )
+
+        if teaching_date is not None:
+            item["teaching_dates"].append(
+                (
+                    teaching_date,
+                    class_id,
+                )
+            )
+
+        item["row_indices"].append(
+            index
+        )
+
+    result = []
+
+    for item in grouped.values():
+        periods = tuple(
+            sorted(
+                item["periods"]
+            )
+        )
+
+        classes = tuple(
+            sorted(
+                item["classes"]
+            )
+        )
+
+        teaching_dates = tuple(
+            sorted(
+                set(
+                    item[
+                        "teaching_dates"
+                    ]
+                ),
+                key=lambda value: (
+                    value[0],
+                    value[1],
+                ),
+            )
+        )
+
+        row_indices = tuple(
+            item["row_indices"]
+        )
+
+        if not row_indices:
+            continue
+
+        period_text = " + ".join(
+            str(value)
+            for value in periods
+        )
+
+        result.append(
+            {
+                "lesson_title": (
+                    item["lesson_title"]
+                ),
+                "periods": periods,
+                "classes": classes,
+                "teaching_dates": (
+                    teaching_dates
+                ),
+                "row_indices": (
+                    row_indices
+                ),
+                "representative_index": (
+                    row_indices[0]
+                ),
+                "label": (
+                    f"{item['lesson_title']} "
+                    f"(Ti\u1ebft {period_text})"
+                ),
+            }
+        )
+
+    return tuple(
+        sorted(
+            result,
+            key=lambda item: (
+                (
+                    item["periods"][0]
+                    if item["periods"]
+                    else 10**9
+                ),
+                item["lesson_title"],
+            ),
+        )
+    )
+
+
+def _class_display_name(
+    class_id: str,
+) -> str:
+    """
+    Resolve canonical class_id to the teacher-facing
+    class name.
+
+    class_id remains the internal canonical identifier.
+    Only the UI/document-facing value is converted.
+    """
+    value = str(
+        class_id or ""
+    ).strip()
+
+    if not value:
+        return "-"
+
+    try:
+        runtime = st.session_state.get(
+            "_system_weekly_schedule_runtime"
+        )
+
+        repository = getattr(
+            runtime,
+            "_class_repository",
+            None,
+        )
+
+        if repository is not None:
+            item = repository.get(
+                class_id=value,
+            )
+
+            if item is not None:
+                class_name = str(
+                    getattr(
+                        item,
+                        "class_name",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+                if class_name:
+                    return class_name
+
+                class_code = str(
+                    getattr(
+                        item,
+                        "class_code",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+                if class_code:
+                    return class_code
+
+    except Exception:
+        pass
+
+    return value
+
+
+def _render_selected_lesson_summary(
+    lesson,
+) -> None:
+    periods = " + ".join(
+        str(value)
+        for value in lesson["periods"]
+    )
+
+    classes = ", ".join(
+        _class_display_name(
+            class_id
+        )
+        for class_id in lesson["classes"]
+    )
+
+    columns = st.columns(3)
+
+    columns[0].metric(
+        "Ti\u1ebft PPCT",
+        periods or "-",
+    )
+
+    columns[1].metric(
+        "S\u1ed1 ti\u1ebft",
+        len(
+            lesson["periods"]
+        ),
+    )
+
+    columns[2].metric(
+        "L\u1edbp",
+        classes or "-",
+    )
+
+    st.markdown(
+        "**Ng\u00e0y d\u1ea1y**"
+    )
+
+    for (
+        teaching_date,
+        class_id,
+    ) in lesson["teaching_dates"]:
+        st.write(
+            teaching_date.strftime(
+                "%d/%m/%Y"
+            )
+            + " - L\u1edbp "
+            + _class_display_name(
+                class_id
+            )
+        )
+
+
 def _lesson_plan_row_label(
     row,
 ) -> str:
@@ -405,8 +703,408 @@ def _lesson_plan_row_label(
     )
 
 
+
+def _render_lesson_plan_drafting_workspace(
+    selected_lesson=None,
+    teacher_user_id="",
+    academic_year="",
+    week_number=0,
+    selection_mode="LESSON",
+    selection_unit_id="",
+) -> None:
+    """
+    Render the teacher-facing lesson-plan drafting
+    workspace.
+
+    Draft persistence is routed through the
+    application service and repository boundary.
+    """
+
+    st.subheader(
+        "SO\u1ea0N B\u00c0I"
+    )
+
+    st.caption(
+        "So\u1ea1n v\u00e0 ch\u1ec9nh s\u1eeda "
+        "n\u1ed9i dung gi\u00e1o \u00e1n "
+        "tr\u1ef1c ti\u1ebfp."
+    )
+
+    mode = st.radio(
+        "C\u00e1ch b\u1eaft \u0111\u1ea7u",
+        (
+            "So\u1ea1n m\u1edbi",
+            "D\u00f9ng gi\u00e1o \u00e1n "
+            "\u0111\u00e3 c\u00f3",
+            "T\u1ea3i Word l\u00ean",
+        ),
+        horizontal=True,
+        key="lbg_drafting_mode",
+    )
+
+    if mode == "T\u1ea3i Word l\u00ean":
+        st.info(
+            "Ch\u1ebf \u0111\u1ed9 T\u1ea3i Word "
+            "l\u00ean s\u1ebd ti\u1ebfp t\u1ee5c "
+            "s\u1eed d\u1ee5ng workspace "
+            "chu\u1ea9n h\u00f3a hi\u1ec7n c\u00f3."
+        )
+        return
+
+    if (
+        mode
+        == "D\u00f9ng gi\u00e1o \u00e1n "
+        "\u0111\u00e3 c\u00f3"
+    ):
+        st.info(
+            "Kho gi\u00e1o \u00e1n s\u1ebd "
+            "\u0111\u01b0\u1ee3c n\u1ed1i "
+            "\u1edf b\u01b0\u1edbc ti\u1ebfp theo. "
+            "Hi\u1ec7n t\u1ea1i c\u00f3 th\u1ec3 "
+            "so\u1ea1n v\u00e0 ch\u1ec9nh s\u1eeda "
+            "n\u1ed9i dung tr\u1ef1c ti\u1ebfp."
+        )
+
+    if selected_lesson is not None:
+        lesson_title = str(
+            selected_lesson.get(
+                "lesson_title",
+                "",
+            )
+        ).strip()
+
+        if lesson_title:
+            st.markdown(
+                "### "
+                + lesson_title
+            )
+
+    draft = st.session_state.setdefault(
+        "lbg_lesson_plan_draft",
+        {
+            "objectives": "",
+            "materials": "",
+            "process": "",
+        },
+    )
+
+    st.markdown(
+        "### I. M\u1ee4C TI\u00caU"
+    )
+
+    objectives = st.text_area(
+        "M\u1ee5c ti\u00eau",
+        value=draft.get(
+            "objectives",
+            "",
+        ),
+        height=180,
+        key="lbg_drafting_objectives",
+        label_visibility="collapsed",
+    )
+
+    st.markdown(
+        "### II. THI\u1ebeT B\u1eca "
+        "V\u00c0 H\u1eccC LI\u1ec6U"
+    )
+
+    materials = st.text_area(
+        "Thi\u1ebft b\u1ecb "
+        "v\u00e0 h\u1ecdc li\u1ec7u",
+        value=draft.get(
+            "materials",
+            "",
+        ),
+        height=140,
+        key="lbg_drafting_materials",
+        label_visibility="collapsed",
+    )
+
+    st.markdown(
+        "### III. TI\u1ebeN TR\u00ccNH "
+        "D\u1ea0Y H\u1eccC"
+    )
+
+    process = st.text_area(
+        "Ti\u1ebfn tr\u00ecnh d\u1ea1y h\u1ecdc",
+        value=draft.get(
+            "process",
+            "",
+        ),
+        height=320,
+        key="lbg_drafting_process",
+        label_visibility="collapsed",
+    )
+
+    save_column, preview_column, export_column = (
+        st.columns(3)
+    )
+
+    with save_column:
+        save_clicked = st.button(
+            "L\u01b0u b\u1ea3n nh\u00e1p",
+            key="lbg_drafting_save",
+            use_container_width=True,
+        )
+
+    with preview_column:
+        preview_clicked = st.button(
+            "Xem tr\u01b0\u1edbc",
+            key="lbg_drafting_preview",
+            use_container_width=True,
+        )
+
+    with export_column:
+        st.button(
+            "Xu\u1ea5t Word",
+            key="lbg_drafting_export_word",
+            use_container_width=True,
+            disabled=True,
+            help=(
+                "Xu\u1ea5t Word s\u1ebd "
+                "\u0111\u01b0\u1ee3c n\u1ed1i "
+                "v\u1edbi renderer "
+                "\u1edf b\u01b0\u1edbc ti\u1ebfp theo."
+            ),
+        )
+
+    if save_clicked:
+        repository_key = (
+            "lesson_plan_workspace_draft_repository"
+        )
+
+        repository = st.session_state.get(
+            repository_key
+        )
+
+        if repository is None:
+            st.error(
+                "Kho l?u b?n nh?p ch?a s?n s?ng. "
+                "H?y ??ng nh?p l?i."
+            )
+            return
+
+        service = (
+            LessonPlanDraftWorkspaceService(
+                repository
+            )
+        )
+
+        normalized_teacher_user_id = str(
+            teacher_user_id
+        ).strip()
+
+        normalized_academic_year = str(
+            academic_year
+        ).strip()
+
+        normalized_selection_unit_id = str(
+            selection_unit_id
+        ).strip()
+
+        try:
+            normalized_week_number = int(
+                week_number
+            )
+        except (
+            TypeError,
+            ValueError,
+        ):
+            normalized_week_number = 0
+
+        if (
+            not normalized_teacher_user_id
+            or not normalized_academic_year
+            or normalized_week_number <= 0
+            or not normalized_selection_unit_id
+        ):
+            st.error(
+                "Kh\u00f4ng \u0111\u1ee7 "
+                "th\u00f4ng tin \u0111\u1ec3 "
+                "l\u01b0u b\u1ea3n nh\u00e1p."
+            )
+
+        else:
+            lesson_title = str(
+                selected_lesson.get(
+                    "lesson_title",
+                    "",
+                )
+                if selected_lesson
+                else ""
+            )
+
+            classes = (
+                selected_lesson.get(
+                    "classes",
+                    (),
+                )
+                if selected_lesson
+                else ()
+            )
+
+            class_or_grade_ref = (
+                str(classes[0])
+                if classes
+                else None
+            )
+
+            draft_id = (
+                normalized_teacher_user_id
+                + ":"
+                + normalized_academic_year
+                + ":W"
+                + str(
+                    normalized_week_number
+                )
+                + ":"
+                + str(
+                    selection_mode
+                )
+                + ":"
+                + normalized_selection_unit_id
+            )
+
+            workspace_draft = (
+                LessonPlanWorkspaceDraft(
+                    draft_id=draft_id,
+                    teacher_user_id=(
+                        normalized_teacher_user_id
+                    ),
+                    academic_year=(
+                        normalized_academic_year
+                    ),
+                    week_number=(
+                        normalized_week_number
+                    ),
+                    subject_ref=str(
+                        selected_lesson.get(
+                            "subject_ref",
+                            "",
+                        )
+                        if selected_lesson
+                        else ""
+                    ),
+                    selection_mode=str(
+                        selection_mode
+                    ),
+                    selection_unit_id=(
+                        normalized_selection_unit_id
+                    ),
+                    objectives_text=(
+                        objectives
+                    ),
+                    materials_text=(
+                        materials
+                    ),
+                    teaching_process_text=(
+                        process
+                    ),
+                    class_or_grade_ref=(
+                        class_or_grade_ref
+                    ),
+                    lesson_id=(
+                        normalized_selection_unit_id
+                    ),
+                    title=lesson_title,
+                    metadata={
+                        "source": (
+                            "weekly_schedule_"
+                            "drafting_workspace"
+                        ),
+                    },
+                )
+            )
+
+            service.save_draft(
+                workspace_draft
+            )
+
+            loaded_draft = (
+                service.get_draft(
+                    draft_id=(
+                        workspace_draft.draft_id
+                    ),
+                    teacher_user_id=(
+                        workspace_draft
+                        .teacher_user_id
+                    ),
+                )
+            )
+
+            if (
+                loaded_draft
+                != workspace_draft
+            ):
+                st.error(
+                    "Kh\u00f4ng th\u1ec3 "
+                    "x\u00e1c nh\u1eadn "
+                    "b\u1ea3n nh\u00e1p "
+                    "\u0111\u00e3 l\u01b0u."
+                )
+
+            else:
+                st.session_state[
+                    "lbg_lesson_plan_draft"
+                ] = {
+                    "objectives": (
+                        objectives
+                    ),
+                    "materials": (
+                        materials
+                    ),
+                    "process": (
+                        process
+                    ),
+                }
+
+                st.session_state[
+                    "lbg_drafting_saved_draft_id"
+                ] = (
+                    workspace_draft.draft_id
+                )
+
+                st.success(
+                    "\u0110\u00e3 l\u01b0u "
+                    "b\u1ea3n nh\u00e1p."
+                )
+
+    if preview_clicked:
+        st.markdown("---")
+        st.markdown(
+            "## Xem tr\u01b0\u1edbc"
+        )
+
+        st.markdown(
+            "### I. M\u1ee5c ti\u00eau"
+        )
+        st.write(
+            objectives
+            or "Ch\u01b0a c\u00f3 n\u1ed9i dung."
+        )
+
+        st.markdown(
+            "### II. Thi\u1ebft b\u1ecb "
+            "v\u00e0 h\u1ecdc li\u1ec7u"
+        )
+        st.write(
+            materials
+            or "Ch\u01b0a c\u00f3 n\u1ed9i dung."
+        )
+
+        st.markdown(
+            "### III. Ti\u1ebfn tr\u00ecnh "
+            "d\u1ea1y h\u1ecdc"
+        )
+        st.write(
+            process
+            or "Ch\u01b0a c\u00f3 n\u1ed9i dung."
+        )
+
+
 def _render_lesson_plan_standardization_workspace(
     view,
+    teacher_user_id="",
 ) -> None:
     if (
         view is None
@@ -427,42 +1125,207 @@ def _render_lesson_plan_standardization_workspace(
     )
 
     st.caption(
-        "Ch\u1ecdn ti\u1ebft d\u1ea1y, "
-        "ng\u00e0y so\u1ea1n v\u00e0 "
-        "t\u1ea3i gi\u00e1o \u00e1n Word."
+        "Ch\u1ecdn theo b\u00e0i, ti\u1ebft "
+        "ho\u1eb7c ch\u1ee7 \u0111\u1ec1; "
+        "sau \u0111\u00f3 t\u1ea3i "
+        "gi\u00e1o \u00e1n Word."
     )
 
     schedule_rows = tuple(
         view.rows
     )
 
-    selected_index = st.selectbox(
-        "Ti\u1ebft d\u1ea1y",
-        options=tuple(
-            range(
-                len(schedule_rows)
-            )
+    selector = (
+        LessonPlanUnitSelectorService()
+    )
+
+    available_modes = (
+        selector.available_modes(
+            rows=schedule_rows
+        )
+    )
+
+    mode_labels = {
+        LessonPlanSelectionMode.LESSON: (
+            "Theo b\u00e0i"
         ),
-        format_func=lambda index: (
-            _lesson_plan_row_label(
-                schedule_rows[index]
-            )
+        LessonPlanSelectionMode.PERIOD: (
+            "Theo ti\u1ebft"
+        ),
+        LessonPlanSelectionMode.TOPIC: (
+            "Theo ch\u1ee7 \u0111\u1ec1"
+        ),
+        LessonPlanSelectionMode.WEEK_SUBJECT: (
+            "Theo tu\u1ea7n / m\u00f4n h\u1ecdc"
+        ),
+    }
+
+    selection_mode = st.selectbox(
+        "C\u00e1ch ch\u1ecdn n\u1ed9i dung "
+        "gi\u00e1o \u00e1n",
+        options=available_modes,
+        format_func=lambda value: (
+            mode_labels[value]
         ),
         key=(
-            "lbg_lesson_plan_row_"
+            "lbg_lesson_plan_selection_mode_"
             + str(view.week_number)
         ),
     )
 
-    selected_row = schedule_rows[
-        selected_index
-    ]
+    lesson_units = (
+        selector.build_units(
+            rows=schedule_rows,
+            mode=selection_mode,
+        )
+    )
+
+    if not lesson_units:
+        if (
+            selection_mode
+            is LessonPlanSelectionMode.TOPIC
+        ):
+            st.warning(
+                "D\u1eef li\u1ec7u PPCT hi\u1ec7n "
+                "ch\u01b0a c\u00f3 th\u00f4ng tin "
+                "ch\u1ee7 \u0111\u1ec1."
+            )
+        else:
+            st.warning(
+                "Kh\u00f4ng c\u00f3 n\u1ed9i dung "
+                "ph\u00f9 h\u1ee3p \u0111\u1ec3 "
+                "chu\u1ea9n h\u00f3a "
+                "gi\u00e1o \u00e1n."
+            )
+
+        return
+
+    unit_label = {
+        LessonPlanSelectionMode.LESSON: (
+            "B\u00e0i d\u1ea1y"
+        ),
+        LessonPlanSelectionMode.PERIOD: (
+            "Ti\u1ebft d\u1ea1y"
+        ),
+        LessonPlanSelectionMode.TOPIC: (
+            "Ch\u1ee7 \u0111\u1ec1"
+        ),
+        LessonPlanSelectionMode.WEEK_SUBJECT: (
+            "Tu\u1ea7n / m\u00f4n h\u1ecdc"
+        ),
+    }[selection_mode]
+
+    selected_unit_index = st.selectbox(
+        unit_label,
+        options=tuple(
+            range(
+                len(
+                    lesson_units
+                )
+            )
+        ),
+        format_func=lambda index: (
+            lesson_units[
+                index
+            ].selection_label
+        ),
+        key=(
+            "lbg_lesson_plan_unit_"
+            + selection_mode.value
+            + "_"
+            + str(
+                view.week_number
+            )
+        ),
+    )
+
+    selected_unit = (
+        lesson_units[
+            selected_unit_index
+        ]
+    )
+
+    selected_lesson = {
+        "lesson_title": (
+            selected_unit.title
+        ),
+        "periods": (
+            selected_unit.curriculum_periods
+        ),
+        "classes": (
+            selected_unit.class_ids
+        ),
+        "teaching_dates": tuple(
+            (
+                item.teaching_date,
+                item.class_id,
+            )
+            for item
+            in selected_unit.teaching_dates
+        ),
+        "representative_index": (
+            selected_unit
+            .representative_index
+        ),
+    }
+
+    _render_selected_lesson_summary(
+        selected_lesson
+    )
+
+    _render_lesson_plan_drafting_workspace(
+        selected_lesson=selected_lesson,
+        teacher_user_id=teacher_user_id,
+        academic_year=str(
+            getattr(
+                view,
+                "academic_year",
+                "",
+            )
+        ),
+        week_number=int(
+            getattr(
+                view,
+                "week_number",
+                0,
+            )
+        ),
+        selection_mode=str(
+            selection_mode.value
+            if hasattr(
+                selection_mode,
+                "value",
+            )
+            else selection_mode
+        ),
+        selection_unit_id=str(
+            selected_unit.selection_id
+            if hasattr(
+                selected_unit,
+                "selection_id",
+            )
+            else selected_unit.title
+        ),
+    )
+
+    # Transitional compatibility.
+    selected_index = int(
+        selected_lesson[
+            "representative_index"
+        ]
+    )
+
+    selected_row = (
+        schedule_rows[
+            selected_index
+        ]
+    )
 
     st.info(
-        "\u0110\u00e3 ch\u1ecdn: "
-        + _lesson_plan_row_label(
-            selected_row
-        )
+        "\u0110\u00e3 ch\u1ecdn b\u00e0i: "
+        + selected_lesson[
+            "lesson_title"
+        ]
     )
 
     drafting_date = st.date_input(
@@ -502,6 +1365,36 @@ def _render_lesson_plan_standardization_workspace(
     )
 
     uploaded_content = uploaded.getvalue()
+
+    st.divider()
+
+    st.subheader(
+        "Xem to\u00e0n b\u1ed9 gi\u00e1o \u00e1n"
+    )
+
+    st.caption(
+        "Hi\u1ec3n th\u1ecb tr\u1ef1c quan file Word g\u1ed1c tr\u01b0\u1edbc khi "
+        "ki\u1ec3m tra v\u00e0 chu\u1ea9n h\u00f3a."
+    )
+
+    try:
+        viewer_html = build_document_html(
+            uploaded_content
+        )
+
+        st.components.v1.html(
+            viewer_html,
+            height=900,
+            scrolling=True,
+        )
+
+    except Exception as error:
+        st.error(
+            "Kh\u00f4ng th\u1ec3 hi\u1ec3n th\u1ecb tr\u1ef1c quan gi\u00e1o \u00e1n: "
+            + str(error)
+        )
+
+    st.divider()
 
     workflow_identity = (
         LessonPlanWorkflowIdentity
@@ -544,7 +1437,9 @@ def _render_lesson_plan_standardization_workspace(
                     content=uploaded_content,
                     canonical=CanonicalDocumentContext(
                     class_name=(
-                        selected_row.class_id
+                        _class_display_name(
+                            selected_row.class_id
+                        )
                     ),
                     curriculum_period=(
                         selected_row.curriculum_period
@@ -583,7 +1478,9 @@ def _render_lesson_plan_standardization_workspace(
 
         canonical_values = {
             DocumentField.CLASS_NAME: (
-                selected_row.class_id
+                _class_display_name(
+                    selected_row.class_id
+                )
             ),
             DocumentField.CURRICULUM_PERIOD: (
                 str(
@@ -1655,6 +2552,9 @@ def render_weekly_schedule_workspace(
         _render_lbg_table(
             view,
             client=client,
+            teacher_user_id=str(
+                user_id
+            ),
         )
 
     # -----------------------------------------------------

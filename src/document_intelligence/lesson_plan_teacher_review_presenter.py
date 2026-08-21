@@ -60,6 +60,13 @@ class LessonPlanTeacherReviewPresenter:
                 "canonical_values must be dict"
             )
 
+        selected_items = (
+            self._select_review_items(
+                preview=preview,
+                canonical_values=canonical_values,
+            )
+        )
+
         items = tuple(
             self._present_item(
                 item=item,
@@ -69,7 +76,7 @@ class LessonPlanTeacherReviewPresenter:
                     )
                 ),
             )
-            for item in preview.items
+            for item in selected_items
         )
 
         return LessonPlanTeacherReviewViewModel(
@@ -79,6 +86,61 @@ class LessonPlanTeacherReviewPresenter:
                 for item in items
             ),
         )
+
+    @staticmethod
+    def _select_review_items(
+        *,
+        preview: LessonPlanPreviewViewModel,
+        canonical_values: dict[
+            DocumentField,
+            str | None,
+        ],
+    ):
+        grouped = {}
+
+        for item in preview.items:
+            grouped.setdefault(
+                item.field,
+                [],
+            ).append(item)
+
+        selected = []
+
+        for field, candidates in grouped.items():
+            canonical_value = (
+                canonical_values.get(
+                    field
+                )
+            )
+
+            chosen = None
+
+            if canonical_value is not None:
+                for candidate in candidates:
+                    if (
+                        candidate.value
+                        == canonical_value
+                    ):
+                        chosen = candidate
+                        break
+
+            if chosen is None:
+                for candidate in candidates:
+                    if (
+                        candidate.review_state
+                        is PreviewReviewState.ACCEPTED
+                    ):
+                        chosen = candidate
+                        break
+
+            if chosen is None:
+                chosen = candidates[0]
+
+            selected.append(
+                chosen
+            )
+
+        return tuple(selected)
 
     @staticmethod
     def _present_item(
