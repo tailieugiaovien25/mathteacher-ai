@@ -1,10 +1,11 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Mapping
 
 from document_intelligence.contracts import DocumentField
+from educational_planning_v2.models.teacher_timetable import TeachingSession
 
 
 @dataclass(frozen=True)
@@ -142,7 +143,16 @@ class LessonPlanReviewedScheduleRow:
             timetable_period=(
                 row.timetable_period
             ),
-            session=row.session,
+            session=(
+                row.session
+                if isinstance(
+                    row.session,
+                    TeachingSession,
+                )
+                else TeachingSession(
+                    str(row.session).strip()
+                )
+            ),
             class_id=class_id,
             subject_ref=row.subject_ref,
             component_ref=row.component_ref,

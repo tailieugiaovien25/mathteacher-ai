@@ -20,8 +20,8 @@ def run_contract():
     )
 
     tests.append((
-        "TPW1 Weekly schedule remains a Teacher Portal page",
-        "L\u1ecbch b\u00e1o gi\u1ea3ng"
+        "TPW1 Drafting tool remains a Teacher Portal page",
+        "C\u00f4ng c\u1ee5 so\u1ea1n b\u00e0i"
         in teacher_portal_app.PORTAL_PAGES,
     ))
 
@@ -58,8 +58,8 @@ def run_contract():
     ))
 
     tests.append((
-        "TPW5 Weekly schedule remains in portal navigation",
-        "L\u1ecbch b\u00e1o gi\u1ea3ng"
+        "TPW5 Drafting tool remains in portal navigation",
+        "C\u00f4ng c\u1ee5 so\u1ea1n b\u00e0i"
         in teacher_portal_app.PORTAL_PAGES,
     ))
 

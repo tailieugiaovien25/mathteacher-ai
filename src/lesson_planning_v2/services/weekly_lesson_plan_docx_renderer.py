@@ -80,6 +80,10 @@ class WeeklyLessonPlanDocxRenderer:
                 effective_layout,
             )
 
+        self._apply_pagination_rules(
+            docx
+        )
+
         docx.save(path)
 
         return path
@@ -338,6 +342,8 @@ class WeeklyLessonPlanDocxRenderer:
 
             heading = docx.add_paragraph()
 
+            heading.paragraph_format.keep_with_next = True
+
             run = heading.add_run(label)
             run.bold = True
             if layout_profile is not None:
@@ -390,3 +396,52 @@ class WeeklyLessonPlanDocxRenderer:
         return value.strftime(
             "%d/%m/%Y"
         )
+
+
+    @staticmethod
+    def _apply_pagination_rules(
+        docx: DocumentObject,
+    ) -> None:
+        """
+        Keep structural Word blocks together across page breaks.
+
+        Metadata rows form one continuous header chain and
+        I/II/III content headings must remain with the
+        paragraph that follows them.
+        """
+
+        # Period/header metadata is rendered in tables.
+        # Every populated metadata paragraph continues the
+        # structural chain into the following paragraph/block.
+        for table in docx.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        if paragraph.text.strip():
+                            (
+                                paragraph
+                                .paragraph_format
+                                .keep_with_next
+                            ) = True
+
+        content_heading_prefixes = (
+            "I. M?c ti?u",
+            "II. Thi?t b? v? h?c li?u",
+            "III. Ti?n tr?nh d?y h?c",
+        )
+
+        for paragraph in docx.paragraphs:
+            normalized = (
+                paragraph.text.strip()
+            )
+
+            if any(
+                normalized.startswith(prefix)
+                for prefix
+                in content_heading_prefixes
+            ):
+                (
+                    paragraph
+                    .paragraph_format
+                    .keep_with_next
+                ) = True

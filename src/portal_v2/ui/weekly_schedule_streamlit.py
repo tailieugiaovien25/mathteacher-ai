@@ -372,7 +372,10 @@ def _render_lbg_table(
     _render_lesson_plan_standardization_workspace(
         view,
         teacher_user_id=teacher_user_id,
-    )
+
+        client=client,
+)
+
 
 
 
@@ -576,6 +579,8 @@ def _lesson_plan_lesson_options_from_rows(
 
 def _class_display_name(
     class_id: str,
+    *,
+    client=None,
 ) -> str:
     """
     Resolve canonical class_id to the teacher-facing
@@ -590,6 +595,45 @@ def _class_display_name(
 
     if not value:
         return "-"
+
+    if client is not None:
+        try:
+            item = (
+                SupabaseClassCatalogRepository(
+                    client=client
+                )
+                .get(
+                    class_id=value
+                )
+            )
+
+            if item is not None:
+                class_name = str(
+                    getattr(
+                        item,
+                        "class_name",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+                if class_name:
+                    return class_name
+
+                class_code = str(
+                    getattr(
+                        item,
+                        "class_code",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+                if class_code:
+                    return class_code
+
+        except Exception:
+            pass
 
     try:
         runtime = st.session_state.get(
@@ -640,55 +684,81 @@ def _class_display_name(
 
 def _render_selected_lesson_summary(
     lesson,
+    *,
+    drafting_date=None,
+    client=None,
 ) -> None:
-    periods = " + ".join(
-        str(value)
-        for value in lesson["periods"]
-    )
-
-    classes = ", ".join(
-        _class_display_name(
-            class_id
+    lesson_title = str(
+        lesson.get(
+            "lesson_title",
+            "",
         )
-        for class_id in lesson["classes"]
+        or ""
+    ).strip()
+
+    periods = tuple(
+        lesson.get(
+            "periods",
+            (),
+        )
+        or ()
     )
 
-    columns = st.columns(3)
-
-    columns[0].metric(
-        "Ti\u1ebft PPCT",
-        periods or "-",
-    )
-
-    columns[1].metric(
-        "S\u1ed1 ti\u1ebft",
-        len(
-            lesson["periods"]
-        ),
-    )
-
-    columns[2].metric(
-        "L\u1edbp",
-        classes or "-",
+    teaching_dates = tuple(
+        lesson.get(
+            "teaching_dates",
+            (),
+        )
+        or ()
     )
 
     st.markdown(
-        "**Ng\u00e0y d\u1ea1y**"
+        "**B\u00e0i:** "
+        + (
+            lesson_title
+            or "-"
+        )
     )
+
+    st.markdown(
+        "**S\u1ed1 ti\u1ebft:** "
+        + str(
+            len(periods)
+        )
+    )
+
+    st.markdown(
+        "**Ng\u00e0y d\u1ea1y - L\u1edbp**"
+    )
+
+    if not teaching_dates:
+        st.write("-")
+        return
 
     for (
         teaching_date,
         class_id,
-    ) in lesson["teaching_dates"]:
-        st.write(
-            teaching_date.strftime(
-                "%d/%m/%Y"
+    ) in teaching_dates:
+        try:
+            date_text = (
+                teaching_date.strftime(
+                    "%d/%m/%Y"
+                )
             )
-            + " - L\u1edbp "
+        except Exception:
+            date_text = str(
+                teaching_date
+            )
+
+        st.write(
+            date_text
+            + " - "
             + _class_display_name(
-                class_id
+                class_id,
+                client=client,
             )
         )
+
 
 
 def _lesson_plan_row_label(
@@ -711,400 +781,760 @@ def _render_lesson_plan_drafting_workspace(
     week_number=0,
     selection_mode="LESSON",
     selection_unit_id="",
+    client=None,
 ) -> None:
     """
-    Render the teacher-facing lesson-plan drafting
-    workspace.
+    Complete V1 teacher-facing lesson-plan editor.
 
-    Draft persistence is routed through the
-    application service and repository boundary.
+    Draft identity is scoped by teacher, academic year,
+    week, subject, selection mode and selection unit.
     """
-
-    st.subheader(
-        "SO\u1ea0N B\u00c0I"
+    from lesson_planning_v2.services.lesson_plan_draft_workspace_service import (
+        LessonPlanDraftWorkspaceService,
+    )
+    from lesson_planning_v2.services.lesson_plan_workspace_v1_service import (
+        LessonPlanDocxTextImporter,
+        LessonPlanDocxWholeDocumentImporter,
+        LessonPlanFullDocumentDocxAdapter,
+        LessonPlanLibrarySourceService,
+        LessonPlanSimpleDocxExporter,
+        LessonPlanWorkspaceContent,
+        LessonPlanWorkspaceContext,
+        LessonPlanWorkspaceV1Service,
     )
 
-    st.caption(
-        "So\u1ea1n v\u00e0 ch\u1ec9nh s\u1eeda "
-        "n\u1ed9i dung gi\u00e1o \u00e1n "
-        "tr\u1ef1c ti\u1ebfp."
+    st.subheader("✨ SOẠN BÀI CÙNG AI")
+
+    selected = (
+        selected_lesson
+        if isinstance(
+            selected_lesson,
+            dict,
+        )
+        else {}
     )
 
-    mode = st.radio(
-        "C\u00e1ch b\u1eaft \u0111\u1ea7u",
-        (
-            "So\u1ea1n m\u1edbi",
-            "D\u00f9ng gi\u00e1o \u00e1n "
-            "\u0111\u00e3 c\u00f3",
-            "T\u1ea3i Word l\u00ean",
-        ),
-        horizontal=True,
-        key="lbg_drafting_mode",
+    normalized_teacher = str(
+        teacher_user_id
+    ).strip()
+
+    normalized_year = str(
+        academic_year
+    ).strip()
+
+    try:
+        normalized_week = int(
+            week_number
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
+        normalized_week = 0
+
+    normalized_unit = str(
+        selection_unit_id
+    ).strip()
+
+    normalized_mode = (
+        getattr(
+            selection_mode,
+            "value",
+            selection_mode,
+        )
     )
 
-    if mode == "T\u1ea3i Word l\u00ean":
+    normalized_mode = str(
+        normalized_mode
+    ).strip() or "LESSON"
+
+    subject_ref = str(
+        selected.get(
+            "subject_ref",
+            selected.get(
+                "subject_id",
+                selected.get(
+                    "subject",
+                    "general",
+                ),
+            ),
+        )
+    ).strip() or "general"
+
+    class_id = str(
+        selected.get(
+            "class_id",
+            "",
+        )
+    ).strip()
+
+    grade_level = str(
+        selected.get(
+            "grade_level",
+            "",
+        )
+    ).strip()
+
+    class_ref = str(
+        selected.get(
+            "class_name",
+            "",
+        )
+    ).strip()
+
+    if (
+        not class_ref
+        and class_id
+        and client is not None
+    ):
+        try:
+            class_item = (
+                SupabaseClassCatalogRepository(
+                    client=client
+                )
+                .get(
+                    class_id=class_id
+                )
+            )
+
+            if class_item is not None:
+                class_ref = str(
+                    class_item.class_name
+                ).strip()
+
+                if not grade_level:
+                    grade_level = str(
+                        class_item.grade_level
+                    ).strip()
+
+        except Exception:
+            # Display-name resolution must never
+            # destroy the lesson-plan workspace.
+            pass
+
+    if not class_ref:
+        class_ref = (
+            grade_level
+            or class_id
+            or "N/A"
+        )
+
+    lesson_title = str(
+        selected.get(
+            "lesson_title",
+            selected.get(
+                "title",
+                "",
+            ),
+        )
+    ).strip()
+
+    curriculum_period = (
+        selected.get(
+            "curriculum_period"
+        )
+    )
+
+    teaching_date = (
+        selected.get(
+            "teaching_date"
+        )
+    )
+
+    if (
+        not normalized_teacher
+        or not normalized_year
+        or normalized_week <= 0
+        or not normalized_unit
+    ):
         st.info(
-            "Ch\u1ebf \u0111\u1ed9 T\u1ea3i Word "
-            "l\u00ean s\u1ebd ti\u1ebfp t\u1ee5c "
-            "s\u1eed d\u1ee5ng workspace "
-            "chu\u1ea9n h\u00f3a hi\u1ec7n c\u00f3."
+            "Ch\u1ecdn \u0111\u1ea7y \u0111\u1ee7 b\u00e0i/ti\u1ebft v\u00e0 tu\u1ea7n "
+            "\u0111\u1ec3 b\u1eaft \u0111\u1ea7u so\u1ea1n b\u00e0i."
         )
         return
 
-    if (
-        mode
-        == "D\u00f9ng gi\u00e1o \u00e1n "
-        "\u0111\u00e3 c\u00f3"
-    ):
-        st.info(
-            "Kho gi\u00e1o \u00e1n s\u1ebd "
-            "\u0111\u01b0\u1ee3c n\u1ed1i "
-            "\u1edf b\u01b0\u1edbc ti\u1ebfp theo. "
-            "Hi\u1ec7n t\u1ea1i c\u00f3 th\u1ec3 "
-            "so\u1ea1n v\u00e0 ch\u1ec9nh s\u1eeda "
-            "n\u1ed9i dung tr\u1ef1c ti\u1ebfp."
-        )
-
-    if selected_lesson is not None:
-        lesson_title = str(
-            selected_lesson.get(
-                "lesson_title",
-                "",
+    try:
+        context = (
+            LessonPlanWorkspaceContext(
+                teacher_user_id=(
+                    normalized_teacher
+                ),
+                academic_year=(
+                    normalized_year
+                ),
+                week_number=(
+                    normalized_week
+                ),
+                subject_ref=subject_ref,
+                selection_mode=(
+                    normalized_mode
+                ),
+                selection_unit_id=(
+                    normalized_unit
+                ),
+                class_or_grade_ref=(
+                    class_ref
+                ),
+                lesson_id=(
+                    normalized_unit
+                ),
+                title=lesson_title,
             )
-        ).strip()
+        )
+    except ValueError as error:
+        st.error(str(error))
+        return
 
-        if lesson_title:
-            st.markdown(
-                "### "
-                + lesson_title
+    repository = st.session_state.get(
+        "lesson_plan_workspace_draft_repository"
+    )
+
+    if repository is None:
+        st.error(
+            "Kho l\u01b0u b\u1ea3n nh\u00e1p ch\u01b0a s\u1eb5n s\u00e0ng. "
+            "H\u00e3y \u0111\u0103ng nh\u1eadp l\u1ea1i."
+        )
+        return
+
+    draft_service = (
+        LessonPlanDraftWorkspaceService(
+            repository
+        )
+    )
+
+    workspace_service = (
+        LessonPlanWorkspaceV1Service(
+            draft_service=draft_service
+        )
+    )
+
+    try:
+        persisted = (
+            workspace_service.load(
+                context=context
+            )
+        )
+    except Exception as error:
+        st.warning(
+            "Chưa thể đọc bản nháp đã lưu: "
+            + str(error)
+        )
+        persisted = None
+
+    prefix = context.widget_prefix
+
+    objectives_key = (
+        prefix + "_objectives"
+    )
+    materials_key = (
+        prefix + "_materials"
+    )
+    process_key = (
+        prefix + "_process"
+    )
+
+    full_document_key = (
+        prefix + "_full_document"
+    )
+
+    source_key = (
+        prefix + "_source_mode"
+    )
+
+    standardization_transfer_key = (
+        prefix
+        + "_standardization_transfer"
+    )
+
+    standardization_transfer_ready_key = (
+        prefix
+        + "_standardization_transfer_ready"
+    )
+
+    # Initialize each lesson independently.
+    if objectives_key not in st.session_state:
+        st.session_state[
+            objectives_key
+        ] = (
+            persisted.objectives_text
+            if persisted is not None
+            else ""
+        )
+
+    if materials_key not in st.session_state:
+        st.session_state[
+            materials_key
+        ] = (
+            persisted.materials_text
+            if persisted is not None
+            else ""
+        )
+
+    if process_key not in st.session_state:
+        st.session_state[
+            process_key
+        ] = (
+            persisted.teaching_process_text
+            if persisted is not None
+            else ""
+        )
+
+    if full_document_key not in st.session_state:
+        persisted_full_document = ""
+
+        if persisted is not None:
+            persisted_full_document = str(
+                getattr(
+                    persisted,
+                    "full_document_text",
+                    "",
+                )
+                or ""
+            ).strip()
+
+        if persisted_full_document:
+            st.session_state[
+                full_document_key
+            ] = persisted_full_document
+
+        else:
+            legacy_parts = []
+
+            if st.session_state[
+                objectives_key
+            ].strip():
+                legacy_parts.extend(
+                    (
+                        "I. M\u1ee4C TI\u00caU",
+                        st.session_state[
+                            objectives_key
+                        ].strip(),
+                    )
+                )
+
+            if st.session_state[
+                materials_key
+            ].strip():
+                legacy_parts.extend(
+                    (
+                        (
+                            "II. THI\u1ebeT B\u1eca "
+                            "V\u00c0 H\u1eccC LI\u1ec6U"
+                        ),
+                        st.session_state[
+                            materials_key
+                        ].strip(),
+                    )
+                )
+
+            if st.session_state[
+                process_key
+            ].strip():
+                legacy_parts.extend(
+                    (
+                        (
+                            "III. TI\u1ebeN TR\u00ccNH "
+                            "D\u1ea0Y H\u1eccC"
+                        ),
+                        st.session_state[
+                            process_key
+                        ].strip(),
+                    )
+                )
+
+            st.session_state[
+                full_document_key
+            ] = "\n\n".join(
+                legacy_parts
+            ).strip()
+
+
+    st.caption(
+        "Bản nháp được lưu riêng theo "
+        "giáo viên và bài/tiết đang chọn."
+    )
+
+    mode = st.radio(
+        "Cách bắt đầu",
+        (
+            "Soạn mới cùng AI",
+            "Tải & chỉnh sửa giáo án cũ",
+        ),
+        horizontal=True,
+        key=source_key,
+    )
+
+    uploaded = None
+
+    if mode == "Tải & chỉnh sửa giáo án cũ":
+        uploaded = st.file_uploader(
+            "Tải giáo án cũ để chỉnh sửa",
+            type=("docx",),
+            key=prefix + "_upload",
+        )
+
+        if uploaded is not None:
+            import_clicked = st.button(
+                "Đưa giáo án vào trình chỉnh sửa",
+                key=prefix + "_import_word",
             )
 
-    draft = st.session_state.setdefault(
-        "lbg_lesson_plan_draft",
-        {
-            "objectives": "",
-            "materials": "",
-            "process": "",
-        },
-    )
+            if import_clicked:
+                try:
+                    imported = (
+                        LessonPlanDocxWholeDocumentImporter()
+                        .import_bytes(
+                            uploaded.getvalue()
+                        )
+                    )
+
+                    st.session_state[
+                        full_document_key
+                    ] = imported
+
+                    st.session_state[
+                        objectives_key
+                    ] = ""
+
+                    st.session_state[
+                        materials_key
+                    ] = ""
+
+                    st.session_state[
+                        process_key
+                    ] = ""
+
+                    st.session_state[
+                        prefix
+                        + "_source_docx"
+                    ] = uploaded.getvalue()
+
+                    st.session_state[
+                        prefix
+                        + "_source_name"
+                    ] = uploaded.name
+
+                    st.success(
+                        "Đã đưa nội dung Word "
+                        "vào trình soạn."
+                    )
+
+                    st.rerun()
+
+                except Exception as error:
+                    st.error(
+                        "Không thể đọc file Word: "
+                        + str(error)
+                    )
+
+    st.markdown("---")
 
     st.markdown(
-        "### I. M\u1ee4C TI\u00caU"
+        "### Không gian làm việc"
     )
 
-    objectives = st.text_area(
-        "M\u1ee5c ti\u00eau",
-        value=draft.get(
-            "objectives",
-            "",
-        ),
-        height=180,
-        key="lbg_drafting_objectives",
-        label_visibility="collapsed",
+    st.caption(
+        "Giáo án được "
+        "chỉnh sửa ở khung bên trái. "
+        "Khung bên phải dành cho AI "
+        "phân tích, đề xuất "
+        "và tiếp nhận yêu cầu "
+        "của giáo viên."
     )
 
-    st.markdown(
-        "### II. THI\u1ebeT B\u1eca "
-        "V\u00c0 H\u1eccC LI\u1ec6U"
+    editor_col, ai_col = st.columns(
+        [7, 3],
+        gap="large",
     )
 
-    materials = st.text_area(
-        "Thi\u1ebft b\u1ecb "
-        "v\u00e0 h\u1ecdc li\u1ec7u",
-        value=draft.get(
-            "materials",
-            "",
-        ),
-        height=140,
-        key="lbg_drafting_materials",
-        label_visibility="collapsed",
-    )
-
-    st.markdown(
-        "### III. TI\u1ebeN TR\u00ccNH "
-        "D\u1ea0Y H\u1eccC"
-    )
-
-    process = st.text_area(
-        "Ti\u1ebfn tr\u00ecnh d\u1ea1y h\u1ecdc",
-        value=draft.get(
-            "process",
-            "",
-        ),
-        height=320,
-        key="lbg_drafting_process",
-        label_visibility="collapsed",
-    )
-
-    save_column, preview_column, export_column = (
-        st.columns(3)
-    )
-
-    with save_column:
-        save_clicked = st.button(
-            "L\u01b0u b\u1ea3n nh\u00e1p",
-            key="lbg_drafting_save",
-            use_container_width=True,
+    with editor_col:
+        st.markdown(
+            '#### \U0001f4c4 Gi\xe1o \xe1n \u0111ang l\xe0m vi\u1ec7c'
         )
 
-    with preview_column:
-        preview_clicked = st.button(
-            "Xem tr\u01b0\u1edbc",
-            key="lbg_drafting_preview",
-            use_container_width=True,
+        st.caption(
+            'To\xe0n b\u1ed9 gi\xe1o \xe1n \u0111\u01b0\u1ee3c hi\u1ec3n th\u1ecb v\xe0 ch\u1ec9nh s\u1eeda li\xean t\u1ee5c trong m\u1ed9t v\xf9ng.'
         )
 
-    with export_column:
-        st.button(
-            "Xu\u1ea5t Word",
-            key="lbg_drafting_export_word",
-            use_container_width=True,
-            disabled=True,
-            help=(
-                "Xu\u1ea5t Word s\u1ebd "
-                "\u0111\u01b0\u1ee3c n\u1ed1i "
-                "v\u1edbi renderer "
-                "\u1edf b\u01b0\u1edbc ti\u1ebfp theo."
+        full_document = st.text_area(
+            'N\u1ed9i dung gi\xe1o \xe1n',
+            key=full_document_key,
+            height=1000,
+            label_visibility="collapsed",
+            placeholder=(
+                'N\u1ed9i dung gi\xe1o \xe1n s\u1ebd xu\u1ea5t hi\u1ec7n t\u1ea1i \u0111\xe2y. B\u1ea1n c\xf3 th\u1ec3 so\u1ea1n m\u1edbi ho\u1eb7c t\u1ea3i gi\xe1o \xe1n c\u0169 \u0111\u1ec3 ti\u1ebfp t\u1ee5c ch\u1ec9nh s\u1eeda.'
             ),
         )
 
-    if save_clicked:
-        repository_key = (
-            "lesson_plan_workspace_draft_repository"
+    with ai_col:
+        st.markdown(
+            "#### ✨ Trợ lý AI"
         )
 
-        repository = st.session_state.get(
-            repository_key
+        st.caption(
+            "AI đọc giáo án "
+            "và chủ động "
+            "đề xuất trước. "
+            "Giáo viên quyết định "
+            "nội dung nào được "
+            "áp dụng."
         )
 
-        if repository is None:
-            st.error(
-                "Kho l?u b?n nh?p ch?a s?n s?ng. "
-                "H?y ??ng nh?p l?i."
+        st.info(
+            "AI sẽ phân tích "
+            "giáo án đang làm việc "
+            "và đưa ra các "
+            "đề xuất về "
+            "mục tiêu, học liệu "
+            "và tiến trình dạy học."
+        )
+
+        st.markdown(
+            "##### Đề xuất của AI"
+        )
+
+        ai_suggestion_box = st.container(
+            border=True
+        )
+
+        with ai_suggestion_box:
+            st.markdown(
+                "**Chưa có "
+                "đề xuất.**"
             )
-            return
 
-        service = (
-            LessonPlanDraftWorkspaceService(
-                repository
+            st.write(
+                "Ở bước tiếp theo, "
+                "AI sẽ chủ động "
+                "phân tích nội dung "
+                "giáo án và hiển thị "
+                "đề xuất tại đây."
             )
+
+        st.markdown(
+            "##### Yêu cầu AI "
+            "chỉnh sửa"
         )
 
-        normalized_teacher_user_id = str(
-            teacher_user_id
-        ).strip()
+        ai_request = st.text_area(
+            "Yêu cầu AI",
+            key=prefix + "_ai_request",
+            height=220,
+            placeholder=(
+                "Ví dụ: Bổ sung "
+                "hoạt động khởi "
+                "động; điều chỉnh "
+                "mục tiêu theo yêu cầu "
+                "cần đạt; làm rõ "
+                "sản phẩm học tập..."
+            ),
+            label_visibility="collapsed",
+        )
 
-        normalized_academic_year = str(
-            academic_year
-        ).strip()
+        ai_request_clicked = st.button(
+            "Gửi yêu cầu cho AI",
+            key=prefix + "_ai_request_submit",
+            use_container_width=True,
+            disabled=True,
+        )
 
-        normalized_selection_unit_id = str(
-            selection_unit_id
-        ).strip()
+        st.caption(
+            "Chức năng AI sẽ "
+            "được kết nối "
+            "ở bước tiếp theo. "
+            "Hiện tại AI chưa "
+            "tự động thay đổi "
+            "nội dung giáo án."
+        )
 
+
+    content = (
+        LessonPlanWorkspaceContent(
+            objectives_text="",
+            materials_text="",
+            teaching_process_text="",
+            full_document_text=(
+                full_document
+            ),
+        )
+    )
+
+    st.markdown("---")
+
+    st.markdown(
+        '### B\u01b0\u1edbc ti\u1ebfp theo'
+    )
+
+    st.caption(
+        'Khi n\u1ed9i dung gi\xe1o \xe1n \u0111\xe3 ph\xf9 h\u1ee3p, chuy\u1ec3n tr\u1ef1c ti\u1ebfp sang c\xf4ng c\u1ee5 Chu\u1ea9n h\xf3a gi\xe1o \xe1n theo L\u1ecbch b\xe1o gi\u1ea3ng. Kh\xf4ng c\u1ea7n xu\u1ea5t Word trung gian.'
+    )
+
+    transfer_clicked = st.button(
+        '\u27a1\ufe0f Chuy\u1ec3n sang Chu\u1ea9n h\xf3a gi\xe1o \xe1n theo L\u1ecbch b\xe1o gi\u1ea3ng',
+        key=(
+            prefix
+            + "_transfer_to_standardization"
+        ),
+        type="primary",
+        use_container_width=True,
+        disabled=(
+            not str(
+                full_document
+            ).strip()
+        ),
+    )
+
+    if transfer_clicked:
         try:
-            normalized_week_number = int(
-                week_number
-            )
-        except (
-            TypeError,
-            ValueError,
-        ):
-            normalized_week_number = 0
-
-        if (
-            not normalized_teacher_user_id
-            or not normalized_academic_year
-            or normalized_week_number <= 0
-            or not normalized_selection_unit_id
-        ):
-            st.error(
-                "Kh\u00f4ng \u0111\u1ee7 "
-                "th\u00f4ng tin \u0111\u1ec3 "
-                "l\u01b0u b\u1ea3n nh\u00e1p."
-            )
-
-        else:
-            lesson_title = str(
-                selected_lesson.get(
-                    "lesson_title",
-                    "",
-                )
-                if selected_lesson
-                else ""
-            )
-
-            classes = (
-                selected_lesson.get(
-                    "classes",
-                    (),
-                )
-                if selected_lesson
-                else ()
-            )
-
-            class_or_grade_ref = (
-                str(classes[0])
-                if classes
-                else None
-            )
-
-            draft_id = (
-                normalized_teacher_user_id
-                + ":"
-                + normalized_academic_year
-                + ":W"
-                + str(
-                    normalized_week_number
-                )
-                + ":"
-                + str(
-                    selection_mode
-                )
-                + ":"
-                + normalized_selection_unit_id
-            )
-
-            workspace_draft = (
-                LessonPlanWorkspaceDraft(
-                    draft_id=draft_id,
-                    teacher_user_id=(
-                        normalized_teacher_user_id
-                    ),
-                    academic_year=(
-                        normalized_academic_year
-                    ),
-                    week_number=(
-                        normalized_week_number
-                    ),
-                    subject_ref=str(
-                        selected_lesson.get(
-                            "subject_ref",
-                            "",
-                        )
-                        if selected_lesson
-                        else ""
-                    ),
-                    selection_mode=str(
-                        selection_mode
-                    ),
-                    selection_unit_id=(
-                        normalized_selection_unit_id
-                    ),
-                    objectives_text=(
-                        objectives
-                    ),
-                    materials_text=(
-                        materials
-                    ),
-                    teaching_process_text=(
-                        process
-                    ),
-                    class_or_grade_ref=(
-                        class_or_grade_ref
-                    ),
-                    lesson_id=(
-                        normalized_selection_unit_id
-                    ),
-                    title=lesson_title,
-                    metadata={
-                        "source": (
-                            "weekly_schedule_"
-                            "drafting_workspace"
-                        ),
-                    },
-                )
-            )
-
-            service.save_draft(
-                workspace_draft
-            )
-
-            loaded_draft = (
-                service.get_draft(
-                    draft_id=(
-                        workspace_draft.draft_id
-                    ),
-                    teacher_user_id=(
-                        workspace_draft
-                        .teacher_user_id
-                    ),
+            source_docx_bytes = (
+                st.session_state.get(
+                    prefix + "_source_docx"
                 )
             )
 
             if (
-                loaded_draft
-                != workspace_draft
+                isinstance(
+                    source_docx_bytes,
+                    bytes,
+                )
+                and source_docx_bytes
             ):
-                st.error(
-                    "Kh\u00f4ng th\u1ec3 "
-                    "x\u00e1c nh\u1eadn "
-                    "b\u1ea3n nh\u00e1p "
-                    "\u0111\u00e3 l\u01b0u."
+                # Preservation-first:
+                # preserve the uploaded DOCX package.
+                internal_docx_bytes = (
+                    source_docx_bytes
                 )
 
             else:
-                st.session_state[
-                    "lbg_lesson_plan_draft"
-                ] = {
-                    "objectives": (
-                        objectives
-                    ),
-                    "materials": (
-                        materials
-                    ),
-                    "process": (
-                        process
-                    ),
-                }
-
-                st.session_state[
-                    "lbg_drafting_saved_draft_id"
-                ] = (
-                    workspace_draft.draft_id
+                # Fallback for lesson plans created
+                # without an uploaded DOCX source.
+                internal_docx_bytes = (
+                    LessonPlanFullDocumentDocxAdapter()
+                    .build_bytes(
+                        full_document
+                    )
                 )
 
+        except Exception as error:
+            st.error(
+                "Không thể chuẩn bị "
+                "giáo án để "
+                "chuyển sang bước "
+                "chuẩn hóa: "
+                + str(error)
+            )
+
+            internal_docx_bytes = None
+
+        if internal_docx_bytes is not None:
+            transfer_source_name = (
+                (
+                    str(
+                        lesson_title
+                    ).strip()
+                    or "giao-an-ai"
+                )
+                + ".docx"
+            )
+
+            st.session_state[
+                standardization_transfer_key
+            ] = {
+                "source": "AI_DRAFT",
+                "docx_bytes": (
+                    internal_docx_bytes
+                ),
+                "source_name": (
+                    transfer_source_name
+                ),
+                "teacher_user_id": (
+                    normalized_teacher
+                ),
+                "academic_year": (
+                    normalized_year
+                ),
+                "week_number": (
+                    normalized_week
+                ),
+                "subject_ref": (
+                    subject_ref
+                ),
+                "selection_mode": (
+                    normalized_mode
+                ),
+                "selection_unit_id": (
+                    normalized_unit
+                ),
+                "lesson_title": (
+                    lesson_title
+                ),
+                "class_ref": (
+                    class_ref
+                ),
+                "full_document_text": str(
+                    full_document
+                ),
+            }
+
+            st.session_state[
+                standardization_transfer_ready_key
+            ] = True
+
+            st.success(
+                "Đã chuyển giáo án "
+                "đang làm việc sang "
+                "bước Chuẩn hóa "
+                "giáo án theo "
+                "Lịch báo giảng."
+            )
+
+    save_clicked = st.button(
+        "Lưu bản nháp",
+        key=prefix + "_save",
+        use_container_width=True,
+    )
+
+    if save_clicked:
+        try:
+            saved = workspace_service.save(
+                context=context,
+                content=content,
+                source=mode,
+            )
+
+            verified = (
+                workspace_service.load(
+                    context=context
+                )
+            )
+
+            if verified != saved:
+                st.error(
+                    "Không thể xác nhận "
+                    "bản nháp để lưu."
+                )
+            else:
                 st.success(
-                    "\u0110\u00e3 l\u01b0u "
-                    "b\u1ea3n nh\u00e1p."
+                    "Đã lưu bản nháp."
                 )
 
-    if preview_clicked:
-        st.markdown("---")
-        st.markdown(
-            "## Xem tr\u01b0\u1edbc"
-        )
+        except Exception as error:
+            st.error(
+                "Không thể lưu bản nháp: "
+                + str(error)
+            )
 
-        st.markdown(
-            "### I. M\u1ee5c ti\u00eau"
-        )
-        st.write(
-            objectives
-            or "Ch\u01b0a c\u00f3 n\u1ed9i dung."
-        )
 
-        st.markdown(
-            "### II. Thi\u1ebft b\u1ecb "
-            "v\u00e0 h\u1ecdc li\u1ec7u"
-        )
-        st.write(
-            materials
-            or "Ch\u01b0a c\u00f3 n\u1ed9i dung."
-        )
 
-        st.markdown(
-            "### III. Ti\u1ebfn tr\u00ecnh "
-            "d\u1ea1y h\u1ecdc"
-        )
-        st.write(
-            process
-            or "Ch\u01b0a c\u00f3 n\u1ed9i dung."
-        )
+
+
+
 
 
 def _render_lesson_plan_standardization_workspace(
     view,
     teacher_user_id="",
+    client=None,
 ) -> None:
     if (
         view is None
@@ -1116,19 +1546,18 @@ def _render_lesson_plan_standardization_workspace(
     ):
         return
 
-    st.divider()
+    st.markdown(
+        '<div class="mt-workspace-section-separator"></div>',
+        unsafe_allow_html=True,
+    )
 
     st.subheader(
-        "\U0001f4dd Chu\u1ea9n h\u00f3a "
-        "gi\u00e1o \u00e1n theo "
-        "L\u1ecbch b\u00e1o gi\u1ea3ng"
+        "\U0001f4c5 TH\u00d4NG TIN B\u00c0I SO\u1ea0N"
     )
 
     st.caption(
-        "Ch\u1ecdn theo b\u00e0i, ti\u1ebft "
-        "ho\u1eb7c ch\u1ee7 \u0111\u1ec1; "
-        "sau \u0111\u00f3 t\u1ea3i "
-        "gi\u00e1o \u00e1n Word."
+        "Ch\u1ecdn b\u00e0i, ti\u1ebft ho\u1eb7c "
+        "ch\u1ee7 \u0111\u1ec1 c\u1ea7n x\u1eed l\u00fd."
     )
 
     schedule_rows = tuple(
@@ -1269,8 +1698,71 @@ def _render_lesson_plan_standardization_workspace(
         ),
     }
 
+    selected_index = int(
+        selected_lesson[
+            "representative_index"
+        ]
+    )
+
+    selected_row = (
+        schedule_rows[
+            selected_index
+        ]
+    )
+
+    # Preserve the canonical representative schedule-row
+    # context when crossing from weekly scheduling into the
+    # lesson drafting workspace.
+    selected_lesson.update(
+        {
+            "class_id": str(
+                getattr(
+                    selected_row,
+                    "class_id",
+                    "",
+                )
+                or ""
+            ),
+            "curriculum_period": getattr(
+                selected_row,
+                "curriculum_period",
+                None,
+            ),
+            "teaching_date": getattr(
+                selected_row,
+                "teaching_date",
+                None,
+            ),
+            "lesson_title": str(
+                getattr(
+                    selected_row,
+                    "lesson_title",
+                    "",
+                )
+                or selected_lesson.get(
+                    "lesson_title",
+                    ""
+                )
+            ),
+        }
+    )
+
+    drafting_date = st.date_input(
+        "Ng\u00e0y so\u1ea1n",
+        value=selected_row.teaching_date,
+        max_value=selected_row.teaching_date,
+        key=(
+            "lbg_lesson_plan_drafting_date_"
+            + str(view.week_number)
+            + "_"
+            + str(selected_index)
+        ),
+    )
+
     _render_selected_lesson_summary(
-        selected_lesson
+        selected_lesson,
+        drafting_date=drafting_date,
+        client=client,
     )
 
     _render_lesson_plan_drafting_workspace(
@@ -1306,67 +1798,209 @@ def _render_lesson_plan_standardization_workspace(
             )
             else selected_unit.title
         ),
+        client=client,
     )
 
-    # Transitional compatibility.
-    selected_index = int(
-        selected_lesson[
-            "representative_index"
-        ]
+    st.markdown(
+        '<div class="mt-workspace-section-separator"></div>',
+        unsafe_allow_html=True,
     )
 
-    selected_row = (
-        schedule_rows[
-            selected_index
-        ]
+    st.subheader(
+        "\U0001f4dd Chu\u1ea9n h\u00f3a "
+        "gi\u00e1o \u00e1n theo "
+        "L\u1ecbch b\u00e1o gi\u1ea3ng"
+    )
+
+    st.caption(
+        "T\u1ea3i gi\u00e1o \u00e1n Word g\u1ed1c; "
+        "h\u1ec7 th\u1ed1ng s\u1ebd b\u1ed5 sung "
+        "th\u00f4ng tin t\u1eeb L\u1ecbch b\u00e1o gi\u1ea3ng "
+        "v\u00e0 chu\u1ea9n h\u00f3a gi\u00e1o \u00e1n."
     )
 
     st.info(
-        "\u0110\u00e3 ch\u1ecdn b\u00e0i: "
-        + selected_lesson[
-            "lesson_title"
-        ]
+        "\u2139\ufe0f Quy tr\u00ecnh: "
+        "B\u1ed5 sung th\u00f4ng tin t\u1eeb "
+        "L\u1ecbch b\u00e1o gi\u1ea3ng "
+        "\u2192 Chu\u1ea9n h\u00f3a gi\u00e1o \u00e1n "
+        "\u2192 Xem tr\u01b0\u1edbc "
+        "\u2192 L\u01b0u tr\u00ean h\u1ec7 th\u1ed1ng / "
+        "T\u1ea3i xu\u1ed1ng. "
+        "File g\u1ed1c ch\u1ec9 d\u00f9ng l\u00e0m "
+        "\u0111\u1ea7u v\u00e0o, kh\u00f4ng l\u01b0u "
+        "v\u00e0o Kho gi\u00e1o \u00e1n."
     )
 
-    drafting_date = st.date_input(
-        "Ng\u00e0y so\u1ea1n",
-        value=selected_row.teaching_date,
-        max_value=selected_row.teaching_date,
+    input_mode = st.radio(
+        "Nguồn giáo án",
+        (
+            "Tải giáo án lên",
+            "Dùng giáo án "
+            "vừa xử lý cùng AI",
+        ),
+        horizontal=True,
         key=(
-            "lbg_lesson_plan_drafting_date_"
+            "lbg_lesson_plan_input_mode_"
             + str(view.week_number)
             + "_"
             + str(selected_index)
         ),
     )
 
-    uploaded = st.file_uploader(
-        "T\u1ea3i gi\u00e1o \u00e1n Word (.docx)",
-        type=("docx",),
-        accept_multiple_files=False,
-        key=(
-            "lbg_lesson_plan_upload_"
-            + str(view.week_number)
-            + "_"
-            + str(selected_index)
-        ),
-    )
+    uploaded = None
+    uploaded_content = None
+    source_name = ""
+    source_kind = ""
 
-    if uploaded is None:
-        st.caption(
-            "File g\u1ed1c s\u1ebd "
-            "\u0111\u01b0\u1ee3c gi\u1eef nguy\u00ean."
+    if (
+        input_mode
+        == "Tải giáo án lên"
+    ):
+        uploaded = st.file_uploader(
+            "Tải giáo án Word (.docx)",
+            type=("docx",),
+            accept_multiple_files=False,
+            key=(
+                "lbg_lesson_plan_upload_"
+                + str(view.week_number)
+                + "_"
+                + str(selected_index)
+            ),
         )
-        return
 
-    st.success(
-        "\u0110\u00e3 nh\u1eadn gi\u00e1o \u00e1n: "
-        + uploaded.name
+        if uploaded is None:
+            st.caption(
+                "File gốc chỉ được "
+                "dùng làm đầu vào "
+                "và sẽ được "
+                "giữ nguyên."
+            )
+            return
+
+        source_name = str(
+            uploaded.name
+        )
+
+        uploaded_content = (
+            uploaded.getvalue()
+        )
+
+        source_kind = "UPLOAD"
+
+        st.success(
+            "Đã nhận giáo án: "
+            + source_name
+        )
+
+    else:
+        transfer_candidates = []
+
+        for key, value in (
+            st.session_state.items()
+        ):
+            if not str(key).endswith(
+                "_standardization_transfer"
+            ):
+                continue
+
+            if not isinstance(
+                value,
+                dict,
+            ):
+                continue
+
+            if (
+                value.get("source")
+                != "AI_DRAFT"
+            ):
+                continue
+
+            transfer_candidates.append(
+                value
+            )
+
+        transfer_payload = (
+            transfer_candidates[-1]
+            if transfer_candidates
+            else None
+        )
+
+        if transfer_payload is None:
+            st.info(
+                "Chưa có giáo án "
+                "được chuyển từ "
+                "công cụ Soạn bài "
+                "cùng AI."
+            )
+            return
+
+        ai_docx_bytes = (
+            transfer_payload.get(
+                "docx_bytes"
+            )
+        )
+
+        if not isinstance(
+            ai_docx_bytes,
+            (
+                bytes,
+                bytearray,
+            ),
+        ):
+            st.info(
+                "Đã nhận giáo án "
+                "vừa xử lý cùng AI."
+            )
+
+            st.warning(
+                "Giáo án AI chưa có "
+                "tài liệu DOCX làm việc "
+                "nội bộ."
+            )
+
+            st.caption(
+                "Giáo viên không cần "
+                "xuất Word. Hệ thống sẽ "
+                "tự tạo tài liệu "
+                "làm việc ở bước "
+                "tiếp theo."
+            )
+
+            return
+
+        uploaded_content = bytes(
+            ai_docx_bytes
+        )
+
+        source_name = str(
+            transfer_payload.get(
+                "source_name",
+                "",
+            )
+            or (
+                str(
+                    transfer_payload.get(
+                        "lesson_title",
+                        "giao-an-ai",
+                    )
+                )
+                + ".docx"
+            )
+        )
+
+        source_kind = "AI_DRAFT"
+
+        st.success(
+            "Đã nhận giáo án "
+            "vừa xử lý cùng AI."
+        )
+
+
+    st.markdown(
+        '<div class="mt-workspace-section-separator"></div>',
+        unsafe_allow_html=True,
     )
-
-    uploaded_content = uploaded.getvalue()
-
-    st.divider()
 
     st.subheader(
         "Xem to\u00e0n b\u1ed9 gi\u00e1o \u00e1n"
@@ -1394,14 +2028,17 @@ def _render_lesson_plan_standardization_workspace(
             + str(error)
         )
 
-    st.divider()
+    st.markdown(
+        '<div class="mt-workspace-section-separator"></div>',
+        unsafe_allow_html=True,
+    )
 
     workflow_identity = (
         LessonPlanWorkflowIdentity
         .from_upload(
             week_number=view.week_number,
             row_index=selected_index,
-            source_name=uploaded.name,
+            source_name=source_name,
             content=uploaded_content,
         )
     )
@@ -1427,6 +2064,10 @@ def _render_lesson_plan_standardization_workspace(
             workflow_identity.state_key
         ] = workflow_state
 
+    reviewed_row = None
+    modification_plan = None
+    preparation_error = None
+
     try:
         preview_view = workflow_state.preview
 
@@ -1438,7 +2079,8 @@ def _render_lesson_plan_standardization_workspace(
                     canonical=CanonicalDocumentContext(
                     class_name=(
                         _class_display_name(
-                            selected_row.class_id
+                            selected_row.class_id,
+                            client=client,
                         )
                     ),
                     curriculum_period=(
@@ -1471,15 +2113,11 @@ def _render_lesson_plan_standardization_workspace(
                 workflow_identity.state_key
             ] = workflow_state
 
-        render_lesson_plan_preview(
-            st=st,
-            view=preview_view,
-        )
-
         canonical_values = {
             DocumentField.CLASS_NAME: (
                 _class_display_name(
-                    selected_row.class_id
+                    selected_row.class_id,
+                    client=client,
                 )
             ),
             DocumentField.CURRICULUM_PERIOD: (
@@ -1502,98 +2140,30 @@ def _render_lesson_plan_standardization_workspace(
             ),
         }
 
-        teacher_review_view = (
-            LessonPlanTeacherReviewPresenter()
-            .present(
-                preview=preview_view,
-                canonical_values=(
+        modification_plan = (
+            LessonPlanModificationPlanner()
+            .build_from_values(
+                values=canonical_values
+            )
+        )
+
+        reviewed_row = (
+            LessonPlanReviewedScheduleRow
+            .from_schedule_row(
+                row=selected_row,
+                resolved_metadata=(
                     canonical_values
                 ),
             )
         )
 
-        teacher_review = (
-            render_lesson_plan_teacher_review(
-                st=st,
-                view=teacher_review_view,
-                key_prefix=(
-                    workflow_identity
-                    .widget_key_prefix
-                ),
-            )
-        )
 
-        review_resolution = (
-            LessonPlanTeacherReviewResolver()
-            .resolve(
-                preview=preview_view,
-                review=teacher_review,
-            )
-        )
-
-        workflow_state = (
-            workflow_state.with_review(
-                review=teacher_review,
-                resolution=review_resolution,
-            )
-        )
-
-        st.session_state[
-            workflow_identity.state_key
-        ] = workflow_state
-
-        review_accepted = (
-            review_resolution.accepted
-        )
-
-        modification_plan = None
-
-        if review_accepted:
-            modification_plan = (
-                LessonPlanModificationPlanner()
-                .build(
-                    resolution=review_resolution
-                )
-            )
-
-        reviewed_row = None
-
-        if review_accepted:
-            resolved_metadata = {
-                field: value
-                for field, value
-                in review_resolution.metadata.values
-            }
-
-            reviewed_row = (
-                LessonPlanReviewedScheduleRow
-                .from_schedule_row(
-                    row=selected_row,
-                    resolved_metadata=(
-                        resolved_metadata
-                    ),
-                )
-            )
-
-        if review_accepted:
-            st.success(
-                "Gi\u00e1o vi\u00ean \u0111\u00e3 "
-                "x\u00e1c nh\u1eadn "
-                "th\u00f4ng tin gi\u00e1o \u00e1n."
-            )
-        else:
-            st.warning(
-                "C\u1ea7n ho\u00e0n t\u1ea5t "
-                "x\u00e1c nh\u1eadn "
-                "th\u00f4ng tin tr\u01b0\u1edbc "
-                "khi t\u1ea1o gi\u00e1o \u00e1n "
-                "chu\u1ea9n h\u00f3a."
-            )
 
     except Exception as error:
-        review_accepted = False
-        modification_plan = None
         reviewed_row = None
+        modification_plan = None
+        preparation_error = error
+        modification_plan = None
 
         st.warning(
             "Kh\u00f4ng th\u1ec3 xem tr\u01b0\u1edbc "
@@ -1615,16 +2185,20 @@ def _render_lesson_plan_standardization_workspace(
         ),
     )
 
-    if process_clicked and not review_accepted:
-        st.warning(
-            "Ch\u01b0a th\u1ec3 t\u1ea1o "
-            "gi\u00e1o \u00e1n chu\u1ea9n h\u00f3a "
-            "khi th\u00f4ng tin ch\u01b0a "
-            "\u0111\u01b0\u1ee3c gi\u00e1o vi\u00ean "
-            "x\u00e1c nh\u1eadn."
+
+    processing_ready = (
+        reviewed_row is not None
+        and modification_plan is not None
+        and preparation_error is None
+    )
+
+    if process_clicked and not processing_ready:
+        st.error(
+            "Canonical lesson data preparation failed; "
+            "standardization cannot continue."
         )
 
-    if process_clicked and review_accepted:
+    if process_clicked and processing_ready:
         try:
             with st.spinner(
                 "\u0110ang b\u1ed5 sung "
@@ -1641,7 +2215,7 @@ def _render_lesson_plan_standardization_workspace(
                             uploaded_content
                         ),
                         original_name=(
-                            uploaded.name
+                            source_name
                         ),
                         modification_plan=(
                             modification_plan
@@ -1690,6 +2264,41 @@ def _render_lesson_plan_standardization_workspace(
         unresolved_fields,
     ) = result
 
+
+    st.markdown(
+        '<div class="mt-workspace-section-separator"></div>',
+        unsafe_allow_html=True,
+    )
+
+    st.subheader(
+        "Xem tr\u01b0\u1edbc gi\u00e1o \u00e1n \u0111\u00e3 chu\u1ea9n h\u00f3a"
+    )
+
+    st.caption(
+        "\u0110\u00e2y l\u00e0 b\u1ea3n gi\u00e1o \u00e1n sau khi \u0111\u00e3 b\u1ed5 sung "
+        "th\u00f4ng tin t\u1eeb L\u1ecbch b\u00e1o gi\u1ea3ng v\u00e0 chu\u1ea9n h\u00f3a."
+    )
+
+    try:
+        standardized_viewer_html = (
+            build_document_html(
+                output_bytes
+            )
+        )
+
+        st.components.v1.html(
+            standardized_viewer_html,
+            height=900,
+            scrolling=True,
+        )
+
+    except Exception as error:
+        st.warning(
+            "Kh\u00f4ng th\u1ec3 hi\u1ec3n th\u1ecb tr\u1ef1c quan "
+            "b\u1ea3n gi\u00e1o \u00e1n \u0111\u00e3 chu\u1ea9n h\u00f3a: "
+            + str(error)
+        )
+
     if unresolved_fields:
         st.warning(
             "Ch\u01b0a t\u1ef1 \u0111\u1ed9ng "
@@ -1706,6 +2315,179 @@ def _render_lesson_plan_standardization_workspace(
             "v\u00e0 chu\u1ea9n h\u00f3a "
             "gi\u00e1o \u00e1n."
         )
+
+
+    st.markdown("---")
+
+    st.markdown(
+        "### Gi\u00e1o \u00e1n \u0111\u00e3 chu\u1ea9n h\u00f3a"
+    )
+
+    st.caption(
+        "B\u1ea1n c\u00f3 th\u1ec3 l\u01b0u b\u1ea3n \u0111\u00e3 chu\u1ea9n h\u00f3a "
+        "tr\u00ean h\u1ec7 th\u1ed1ng ho\u1eb7c t\u1ea3i xu\u1ed1ng m\u00e1y."
+    )
+
+    save_standardized_clicked = st.button(
+        "L\u01b0u v\u00e0o Kho gi\u00e1o \u00e1n",
+        type="secondary",
+        key=(
+            "lbg_lesson_plan_save_standardized_"
+            + str(view.week_number)
+            + "_"
+            + str(selected_index)
+        ),
+        width="stretch",
+    )
+
+    if save_standardized_clicked:
+        upload_service = (
+            st.session_state.get(
+                "document_library_upload_service"
+            )
+        )
+
+        if upload_service is None:
+            st.warning(
+                "Kho gi\u00e1o \u00e1n ch\u01b0a s\u1eb5n s\u00e0ng. "
+                "B\u1ea1n v\u1eabn c\u00f3 th\u1ec3 t\u1ea3i file v\u1ec1 m\u00e1y."
+            )
+
+        else:
+            try:
+                from teacher_document_library_v2 import (
+                    DocumentCategory,
+                    DocumentUploadMetadata,
+                )
+
+                categories = tuple(
+                    DocumentCategory
+                )
+
+                category = next(
+                    (
+                        item
+                        for item in categories
+                        if (
+                            "lesson"
+                            in item.value.casefold()
+                            or "giao"
+                            in item.value.casefold()
+                        )
+                    ),
+                    categories[0],
+                )
+
+                class_name = (
+                    _class_display_name(
+                        selected_row.class_id,
+                        client=client,
+                    )
+                )
+
+                academic_year = str(
+                    getattr(
+                        view,
+                        "academic_year",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+                subject = str(
+                    getattr(
+                        selected_row,
+                        "subject",
+                        "",
+                    )
+                    or getattr(
+                        selected_row,
+                        "subject_name",
+                        "",
+                    )
+                    or "N/A"
+                ).strip()
+
+                grade_level = str(
+                    getattr(
+                        selected_row,
+                        "grade_level",
+                        "",
+                    )
+                    or "N/A"
+                ).strip()
+
+                lesson_title = str(
+                    getattr(
+                        selected_row,
+                        "lesson_title",
+                        "",
+                    )
+                    or output_name
+                ).strip()
+
+                metadata = (
+                    DocumentUploadMetadata(
+                        title=lesson_title,
+                        category=category,
+                        academic_year=(
+                            academic_year
+                            or "N/A"
+                        ),
+                        subject=subject,
+                        grade_level=grade_level,
+                        class_name=(
+                            class_name
+                            if class_name != "-"
+                            else None
+                        ),
+                        description=(
+                            "Gi\u00e1o \u00e1n \u0111\u00e3 \u0111\u01b0\u1ee3c b\u1ed5 sung "
+                            "th\u00f4ng tin t\u1eeb L\u1ecbch b\u00e1o gi\u1ea3ng "
+                            "v\u00e0 chu\u1ea9n h\u00f3a tr\u00ean h\u1ec7 th\u1ed1ng."
+                        ),
+                        tags=(
+                            "lesson-plan",
+                            "standardized",
+                        ),
+                    )
+                )
+
+                saved_document = (
+                    upload_service.upload(
+                        content=output_bytes,
+                        file_name=output_name,
+                        mime_type=(
+                            "application/vnd.openxmlformats-"
+                            "officedocument.wordprocessingml.document"
+                        ),
+                        metadata=metadata,
+                    )
+                )
+
+                st.success(
+                    "\u0110\u00e3 l\u01b0u gi\u00e1o \u00e1n chu\u1ea9n h\u00f3a "
+                    "v\u00e0o Kho gi\u00e1o \u00e1n."
+                )
+
+                link = getattr(
+                    saved_document,
+                    "web_view_link",
+                    None,
+                )
+
+                if link:
+                    st.link_button(
+                        "M\u1edf gi\u00e1o \u00e1n \u0111\u00e3 l\u01b0u",
+                        link,
+                    )
+
+            except Exception as error:
+                st.error(
+                    "Kh\u00f4ng th\u1ec3 l\u01b0u gi\u00e1o \u00e1n "
+                    "\u0111\u00e3 chu\u1ea9n h\u00f3a: "
+                    + str(error)
+                )
 
     st.download_button(
         "\U0001f4e5 T\u1ea3i gi\u00e1o \u00e1n "
@@ -2346,13 +3128,12 @@ def render_weekly_schedule_workspace(
         return
 
     st.title(
-        "\U0001f4c5 L\u1ecbch b\u00e1o gi\u1ea3ng"
+        "\u270d\ufe0f C\u00f4ng c\u1ee5 so\u1ea1n b\u00e0i"
     )
 
     st.caption(
-        "L\u1eadp v\u00e0 qu\u1ea3n l\u00fd "
-        "L\u1ecbch b\u00e1o gi\u1ea3ng "
-        "theo t\u1eebng tu\u1ea7n h\u1ecdc."
+        "Ch\u1ecdn b\u00e0i theo tu\u1ea7n, so\u1ea1n c\u00f9ng AI "
+        "v\u00e0 chu\u1ea9n h\u00f3a gi\u00e1o \u00e1n."
     )
 
     try:
@@ -2493,11 +3274,6 @@ def render_weekly_schedule_workspace(
         )
 
     with controls[4]:
-        st.markdown(
-            "<div style='height:28px'></div>",
-            unsafe_allow_html=True,
-        )
-
         reload_data = st.button(
             "\U0001f504 T\u1ea3i l\u1ea1i d\u1eef li\u1ec7u",
             width="stretch",
@@ -2510,15 +3286,6 @@ def render_weekly_schedule_workspace(
             None,
         )
         st.rerun()
-
-    # -----------------------------------------------------
-    # TEACHER INFO
-    # -----------------------------------------------------
-
-    st.info(
-        "Gi\u00e1o vi\u00ean: "
-        + str(user_id)
-    )
 
     # -----------------------------------------------------
     # CURRENT WEEKLY SCHEDULE VIEW
@@ -2540,194 +3307,92 @@ def render_weekly_schedule_workspace(
         view = None
 
     if view is None:
-        st.info(
-            "Ch\u01b0a c\u00f3 L\u1ecbch b\u00e1o gi\u1ea3ng "
-            f"cho Tu\u1ea7n {week_number}. "
-            "H\u1ec7 th\u1ed1ng s\u1ebd t\u1ef1 \u0111\u1ed9ng "
-            "t\u1ea1o t\u1eeb TKB, Ph\u00e2n c\u00f4ng "
-            "v\u00e0 PPCT sau khi ho\u00e0n thi\u1ec7n "
-            "b\u01b0\u1edbc k\u1ebft n\u1ed1i d\u1eef li\u1ec7u."
-        )
-    else:
-        _render_lbg_table(
-            view,
-            client=client,
-            teacher_user_id=str(
-                user_id
-            ),
-        )
-
-    # -----------------------------------------------------
-    # REVIEW / APPROVAL
-    # -----------------------------------------------------
-
-    st.text_area(
-        (
-            "Ki\u1ec3m tra, nh\u1eadn x\u00e9t "
-            "c\u1ee7a t\u1ed5 chuy\u00ean m\u00f4n / "
-            "Ban gi\u00e1m hi\u1ec7u (n\u1ebfu c\u00f3)"
-        ),
-        placeholder=(
-            "Nh\u1eadp nh\u1eadn x\u00e9t, "
-            "\u0111\u00e1nh gi\u00e1..."
-        ),
-        key=(
-            "lbg_user_review_"
-            + str(week_number)
-        ),
-    )
-
-    # -----------------------------------------------------
-    # ACTION BUTTONS
-    # -----------------------------------------------------
-
-    actions = st.columns(
-        [1.25, 1.05, 1.15, 1.25],
-        gap="small",
-    )
-
-    with actions[0]:
-        st.button(
-            "\U0001f4c1 L\u01b0u tr\u00ean Google Drive",
-            width="stretch",
-            key="lbg_user_google_drive",
-            disabled=(
-                view is None
-            ),
-        )
-
-    with actions[1]:
-        if (
-            view is not None
-            and getattr(
-                view,
-                "download",
-                None,
-            )
-        ):
-            st.download_button(
-                "\U0001f4ca Xu\u1ea5t ra file Excel",
-                data=view.download.content,
-                file_name=(
-                    view.download.file_name
-                ),
-                mime=(
-                    view.download.mime_type
-                ),
-                width="stretch",
-                key="lbg_user_excel",
-            )
-        else:
-            st.button(
-                "\U0001f4ca Xu\u1ea5t ra file Excel",
-                width="stretch",
-                disabled=True,
-                key="lbg_user_excel_disabled",
-            )
-
-    with actions[2]:
-        st.button(
-            "\u270d\ufe0f Tr\u00ecnh k\u00ed tr\u00ean VTsmas",
-            width="stretch",
-            key="lbg_user_vtsmas",
-            disabled=(
-                view is None
-            ),
-        )
-
-    with actions[3]:
-        update_clicked = st.button(
-            "\U0001f4be C\u1eadp nh\u1eadt "
-            "L\u1ecbch b\u00e1o gi\u1ea3ng",
-            type="primary",
-            width="stretch",
-            key="lbg_user_update",
-        )
-
-    if update_clicked:
         try:
-            with st.spinner(
-                "\u0110ang t\u1ea1o L\u1ecbch b\u00e1o gi\u1ea3ng "
-                f"Tu\u1ea7n {week_number}..."
-            ):
-                runtime = (
-                    SystemWeeklyScheduleRuntime(
-                        client=client,
-                        user_id=str(user_id),
-                    )
-                )
-
-                schedule = runtime.generate(
-                    request=(
-                        SystemWeeklyScheduleRuntimeRequest(
-                            schedule_id=(
-                                f"lbg-{user_id}-"
-                                f"{academic_year}-"
-                                f"{week_number}"
-                            ),
-                            academic_year=academic_year,
-                            week_number=int(
-                                week_number
-                            ),
-                            ppct_scope_rules=(),
-                        )
-                    )
-                )
-
-                generation_result = (
-                    WeeklyScheduleGenerationResult(
-                        request=(
-                            WeeklyScheduleGenerationRequest(
-                                schedule_id=(
-                                    f"lbg-{user_id}-"
-                                    f"{academic_year}-"
-                                    f"{week_number}"
-                                ),
-                                teacher_id=str(
-                                    user_id
-                                ),
-                                academic_year=academic_year,
-                                week_number=int(
-                                    week_number
-                                ),
-                            )
-                        ),
-                        schedule=schedule,
-                    )
-                )
-
-                output = (
-                    WeeklyScheduleOutputService()
-                    .export_excel(
-                        generation=(
-                            generation_result
-                        )
-                    )
-                )
-
-                presenter = (
-                    WeeklySchedulePortalPresenter()
-                )
-
-                generated_view = (
-                    presenter.present(
-                        output=output,
-                    )
-                )
-
-                st.session_state[
-                    _VIEW_STATE_KEY
-                ] = generated_view
-
-            st.success(
-                "\u0110\u00e3 c\u1eadp nh\u1eadt L\u1ecbch b\u00e1o gi\u1ea3ng "
-                f"Tu\u1ea7n {week_number}."
+            schedule_id = (
+                "SYSTEM-"
+                + str(user_id)
+                + "-"
+                + academic_year
+                + "-W"
+                + str(week_number)
             )
 
-            st.rerun()
+            runtime = (
+                SystemWeeklyScheduleRuntime(
+                    client=client,
+                    user_id=str(user_id),
+                )
+            )
+
+            schedule = runtime.generate(
+                request=(
+                    SystemWeeklyScheduleRuntimeRequest(
+                        schedule_id=schedule_id,
+                        academic_year=academic_year,
+                        week_number=week_number,
+
+                        # Empty by design:
+                        # SystemWeeklyScheduleRuntime
+                        # automatically resolves PPCT scope
+                        # rules from active assignments and
+                        # active PPCT data.
+                        ppct_scope_rules=(),
+                    )
+                )
+            )
+
+            generation = (
+                WeeklyScheduleGenerationResult(
+                    request=(
+                        WeeklyScheduleGenerationRequest(
+                            schedule_id=schedule_id,
+                            teacher_id=str(user_id),
+                            academic_year=academic_year,
+                            week_number=week_number,
+                        )
+                    ),
+                    schedule=schedule,
+                )
+            )
+
+            output = (
+                WeeklyScheduleOutputService()
+                .export_excel(
+                    generation=generation
+                )
+            )
+
+            view = (
+                WeeklySchedulePortalPresenter()
+                .present(
+                    output=output
+                )
+            )
+
+            st.session_state[
+                _VIEW_STATE_KEY
+            ] = view
 
         except Exception as error:
             st.error(
-                "Kh\u00f4ng th\u1ec3 t\u1ea1o L\u1ecbch b\u00e1o gi\u1ea3ng "
-                f"Tu\u1ea7n {week_number}: {error}"
+                "Kh\u00f4ng th\u1ec3 t\u1ef1 \u0111\u1ed9ng "
+                "t\u1ea1o d\u1eef li\u1ec7u b\u00e0i d\u1ea1y "
+                f"cho Tu\u1ea7n {week_number}: "
+                + str(error)
             )
+            return
+
+    if view is None:
+        st.info(
+            "Ch\u01b0a c\u00f3 d\u1eef li\u1ec7u b\u00e0i d\u1ea1y "
+            f"cho Tu\u1ea7n {week_number}."
+        )
+        return
+
+    _render_lbg_table(
+        view,
+        client=client,
+        teacher_user_id=str(
+            user_id
+        ),
+    )

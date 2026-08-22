@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -90,6 +90,50 @@ class LessonPlanModificationPlanner:
             )
             for field, value
             in resolution.metadata.values
+        )
+
+        return LessonPlanModificationPlan(
+            modifications=modifications
+        )
+
+    def build_from_values(
+        self,
+        *,
+        values,
+    ) -> LessonPlanModificationPlan:
+        """
+        Build a modification plan directly from canonical
+        document metadata.
+
+        This is the preferred path when authoritative
+        metadata already comes from THONG TIN BAI SOAN /
+        the weekly teaching schedule.
+
+        Teacher review is intentionally not required here.
+        """
+
+        if values is None:
+            raise TypeError(
+                "values must not be None"
+            )
+
+        try:
+            items = tuple(
+                values.items()
+            )
+        except AttributeError as error:
+            raise TypeError(
+                "values must be a mapping"
+            ) from error
+
+        modifications = tuple(
+            LessonPlanFieldModification(
+                field=field,
+                value=value,
+            )
+            for field, value in items
+            if value is not None
+            and str(value).strip()
         )
 
         return LessonPlanModificationPlan(

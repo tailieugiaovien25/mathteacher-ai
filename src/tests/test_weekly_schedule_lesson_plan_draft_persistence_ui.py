@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import ast
 
 
@@ -141,14 +141,20 @@ def test_drafting_workspace_uses_draft_service():
     )
 
     assert (
-        "LessonPlanWorkspaceDraft"
+        "LessonPlanWorkspaceV1Service"
         in source
     )
 
     assert (
-        "save_draft"
+        "workspace_service.save("
         in source
     )
+
+    assert (
+        "workspace_service.load("
+        in source
+    )
+
 
 
 def test_drafting_workspace_no_longer_claims_session_only_persistence():

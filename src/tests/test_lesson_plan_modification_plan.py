@@ -149,3 +149,98 @@ def test_planner_rejects_wrong_resolution_type():
                 resolution=object()
             )
         )
+
+
+def test_planner_builds_directly_from_canonical_values():
+    values = {
+        DocumentField.CLASS_NAME: "6A1",
+        DocumentField.CURRICULUM_PERIOD: "4",
+        DocumentField.LESSON_TITLE: "B?i 7",
+        DocumentField.DRAFTING_DATE: "09/09/2026",
+        DocumentField.TEACHING_DATE: "10/09/2026",
+    }
+
+    plan = (
+        LessonPlanModificationPlanner()
+        .build_from_values(
+            values=values
+        )
+    )
+
+    assert (
+        plan.value_for(
+            DocumentField.CLASS_NAME
+        )
+        == "6A1"
+    )
+
+    assert (
+        plan.value_for(
+            DocumentField.CURRICULUM_PERIOD
+        )
+        == "4"
+    )
+
+    assert (
+        plan.value_for(
+            DocumentField.LESSON_TITLE
+        )
+        == "B?i 7"
+    )
+
+    assert (
+        plan.value_for(
+            DocumentField.DRAFTING_DATE
+        )
+        == "09/09/2026"
+    )
+
+    assert (
+        plan.value_for(
+            DocumentField.TEACHING_DATE
+        )
+        == "10/09/2026"
+    )
+
+
+def test_direct_plan_does_not_require_teacher_review():
+    values = {
+        DocumentField.CLASS_NAME: "6A1",
+    }
+
+    plan = (
+        LessonPlanModificationPlanner()
+        .build_from_values(
+            values=values
+        )
+    )
+
+    assert not plan.is_empty
+
+
+def test_direct_plan_ignores_empty_optional_values():
+    values = {
+        DocumentField.CLASS_NAME: "6A1",
+        DocumentField.LESSON_TITLE: "",
+    }
+
+    plan = (
+        LessonPlanModificationPlanner()
+        .build_from_values(
+            values=values
+        )
+    )
+
+    assert (
+        plan.value_for(
+            DocumentField.CLASS_NAME
+        )
+        == "6A1"
+    )
+
+    assert (
+        plan.value_for(
+            DocumentField.LESSON_TITLE
+        )
+        is None
+    )

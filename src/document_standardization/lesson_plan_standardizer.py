@@ -36,6 +36,11 @@ class DocumentInventory:
     drawings: int
     images: int
     fonts: dict[str, int] = field(default_factory=dict)
+    body_text_sha256: str = ""
+    header_footer_text_sha256: str = ""
+    media_fingerprints: tuple[str, ...] = ()
+    embedded_fingerprints: tuple[str, ...] = ()
+    external_relationships: tuple[str, ...] = ()
 
 
 def _sha256(path: Path) -> str:
@@ -61,28 +66,313 @@ def _package_counts(path: Path) -> dict[str, int]:
     return dict(counts)
 
 
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _text_sha256(values) -> str:
+    payload = json.dumps(
+        list(values),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    return _sha256_bytes(payload)
+
+
+def _body_text_fingerprint(document) -> str:
+    values = []
+
+    for index, paragraph in enumerate(
+        document.paragraphs
+    ):
+        values.append(
+            (
+                "paragraph",
+                index,
+                paragraph.text,
+            )
+        )
+
+    for table_index, table in enumerate(
+        document.tables
+    ):
+        for row_index, row in enumerate(
+            table.rows
+        ):
+            for cell_index, cell in enumerate(
+                row.cells
+            ):
+                values.append(
+                    (
+                        "cell",
+                        table_index,
+                        row_index,
+                        cell_index,
+                        cell.text,
+                    )
+                )
+
+    return _text_sha256(values)
+
+
+def _header_footer_text_fingerprint(
+    document,
+) -> str:
+    values = []
+
+    for section_index, section in enumerate(
+        document.sections
+    ):
+        containers = (
+            (
+                "header",
+                section.header,
+            ),
+            (
+                "first_page_header",
+                section.first_page_header,
+            ),
+            (
+                "even_page_header",
+                section.even_page_header,
+            ),
+            (
+                "footer",
+                section.footer,
+            ),
+            (
+                "first_page_footer",
+                section.first_page_footer,
+            ),
+            (
+                "even_page_footer",
+                section.even_page_footer,
+            ),
+        )
+
+        for kind, container in containers:
+            values.append(
+                (
+                    section_index,
+                    kind,
+                    tuple(
+                        paragraph.text
+                        for paragraph
+                        in container.paragraphs
+                    ),
+                )
+            )
+
+    return _text_sha256(values)
+
+
+def _package_fingerprints(
+    path: Path,
+) -> dict[str, tuple[str, ...]]:
+    media = []
+    embedded = []
+    external_relationships = []
+
+    with zipfile.ZipFile(path) as archive:
+        names = set(
+            archive.namelist()
+        )
+
+        for name in sorted(names):
+            if name.startswith(
+                "word/media/"
+            ):
+                media.append(
+                    (
+                        name
+                        + ":"
+                        + _sha256_bytes(
+                            archive.read(name)
+                        )
+                    )
+                )
+
+            elif name.startswith(
+                "word/embeddings/"
+            ):
+                embedded.append(
+                    (
+                        name
+                        + ":"
+                        + _sha256_bytes(
+                            archive.read(name)
+                        )
+                    )
+                )
+
+        relationship_names = sorted(
+            name
+            for name in names
+            if (
+                name.endswith(".rels")
+                and (
+                    name.startswith(
+                        "word/"
+                    )
+                    or name.startswith(
+                        "_rels/"
+                    )
+                )
+            )
+        )
+
+        rel_ns = (
+            "http://schemas.openxmlformats.org/"
+            "package/2006/relationships"
+        )
+
+        for name in relationship_names:
+            root = etree.fromstring(
+                archive.read(name)
+            )
+
+            for relationship in root:
+                if (
+                    relationship.tag
+                    != f"{{{rel_ns}}}Relationship"
+                ):
+                    continue
+
+                if (
+                    relationship.get(
+                        "TargetMode"
+                    )
+                    != "External"
+                ):
+                    continue
+
+                external_relationships.append(
+                    "|".join(
+                        (
+                            name,
+                            relationship.get(
+                                "Type",
+                                "",
+                            ),
+                            relationship.get(
+                                "Target",
+                                "",
+                            ),
+                        )
+                    )
+                )
+
+    return {
+        "media": tuple(media),
+        "embedded": tuple(embedded),
+        "external_relationships": tuple(
+            sorted(
+                external_relationships
+            )
+        ),
+    }
+
+
 def inventory(path: Path) -> DocumentInventory:
     document = Document(path)
+
     fonts = Counter()
     table_cells = 0
-    paragraphs = list(document.paragraphs)
+
+    paragraphs = list(
+        document.paragraphs
+    )
+
     for table in document.tables:
         for row in table.rows:
             for cell in row.cells:
                 table_cells += 1
-                paragraphs.extend(cell.paragraphs)
+                paragraphs.extend(
+                    cell.paragraphs
+                )
+
     for paragraph in paragraphs:
         for run in paragraph.runs:
             if run.font.name:
-                fonts[run.font.name] += 1
-    package = _package_counts(path)
+                fonts[
+                    run.font.name
+                ] += 1
+
+    package = _package_counts(
+        path
+    )
+
+    fingerprints = (
+        _package_fingerprints(
+            path
+        )
+    )
+
     return DocumentInventory(
-        paragraphs=len(paragraphs), tables=len(document.tables), table_cells=table_cells,
-        inline_shapes=len(document.inline_shapes), sections=len(document.sections),
-        omml_equations=package.get("omml_equations", 0),
-        equation_paragraphs=package.get("equation_paragraphs", 0),
-        ole_objects=package.get("ole_objects", 0), drawings=package.get("drawings", 0),
-        images=package.get("images", 0), fonts=dict(sorted(fonts.items())),
+        paragraphs=len(
+            paragraphs
+        ),
+        tables=len(
+            document.tables
+        ),
+        table_cells=table_cells,
+        inline_shapes=len(
+            document.inline_shapes
+        ),
+        sections=len(
+            document.sections
+        ),
+        omml_equations=package.get(
+            "omml_equations",
+            0,
+        ),
+        equation_paragraphs=package.get(
+            "equation_paragraphs",
+            0,
+        ),
+        ole_objects=package.get(
+            "ole_objects",
+            0,
+        ),
+        drawings=package.get(
+            "drawings",
+            0,
+        ),
+        images=package.get(
+            "images",
+            0,
+        ),
+        fonts=dict(
+            sorted(
+                fonts.items()
+            )
+        ),
+        body_text_sha256=(
+            _body_text_fingerprint(
+                document
+            )
+        ),
+        header_footer_text_sha256=(
+            _header_footer_text_fingerprint(
+                document
+            )
+        ),
+        media_fingerprints=(
+            fingerprints[
+                "media"
+            ]
+        ),
+        embedded_fingerprints=(
+            fingerprints[
+                "embedded"
+            ]
+        ),
+        external_relationships=(
+            fingerprints[
+                "external_relationships"
+            ]
+        ),
     )
 
 
@@ -169,50 +459,154 @@ class LessonPlanWordStandardizer:
             element.remove(child)
         element.append(OxmlElement("w:p"))
 
-    def _normalize_headers_and_footers(self, document, changes):
-        profile = self.profile.get("header_footer", {})
-        if not profile.get("remove_existing", False):
+    def _normalize_headers_and_footers(
+        self,
+        document,
+        changes,
+    ):
+        profile = self.profile.get(
+            "header_footer",
+            {},
+        )
+
+        # Preservation-first contract:
+        # existing headers and footers belong to
+        # the teacher's source document and must
+        # remain untouched unless destructive
+        # replacement is explicitly requested.
+        if not profile.get(
+            "remove_existing",
+            False,
+        ):
+            changes[
+                "headers_footers_preserved"
+            ] += 1
             return
 
         body = self.profile["body"]
+
         for section in document.sections:
-            headers = (section.header, section.first_page_header, section.even_page_header)
-            footers = (section.footer, section.first_page_footer, section.even_page_footer)
+            headers = (
+                section.header,
+                section.first_page_header,
+                section.even_page_header,
+            )
+
+            footers = (
+                section.footer,
+                section.first_page_footer,
+                section.even_page_footer,
+            )
+
             for header in headers:
                 header.is_linked_to_previous = False
-                self._clear_header_or_footer(header)
-                changes["headers_cleared"] += 1
+                self._clear_header_or_footer(
+                    header
+                )
+                changes[
+                    "headers_cleared"
+                ] += 1
+
             for footer in footers:
                 footer.is_linked_to_previous = False
-                self._clear_header_or_footer(footer)
-                changes["footers_cleared"] += 1
+                self._clear_header_or_footer(
+                    footer
+                )
+                changes[
+                    "footers_cleared"
+                ] += 1
 
-            if profile.get("page_number", True):
+
+            if profile.get(
+                "page_number",
+                True,
+            ):
                 for footer in footers:
-                    paragraph = footer.paragraphs[0]
-                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    paragraph = (
+                        footer.paragraphs[0]
+                    )
+
+                    paragraph.alignment = (
+                        WD_ALIGN_PARAGRAPH.CENTER
+                    )
+
                     run = paragraph.add_run()
                     run.font.name = body["font"]
-                    run.font.size = Pt(body["size_pt"])
-                    fonts = run._element.get_or_add_rPr().rFonts
-                    for key in ("ascii", "hAnsi", "eastAsia", "cs"):
-                        fonts.set(qn(f"w:{key}"), body["font"])
-                    field_begin = OxmlElement("w:fldChar")
-                    field_begin.set(qn("w:fldCharType"), "begin")
-                    instruction = OxmlElement("w:instrText")
-                    instruction.set(qn("xml:space"), "preserve")
+                    run.font.size = Pt(
+                        body["size_pt"]
+                    )
+
+                    fonts = (
+                        run._element
+                        .get_or_add_rPr()
+                        .rFonts
+                    )
+
+                    for key in (
+                        "ascii",
+                        "hAnsi",
+                        "eastAsia",
+                        "cs",
+                    ):
+                        fonts.set(
+                            qn(f"w:{key}"),
+                            body["font"],
+                        )
+
+                    field_begin = OxmlElement(
+                        "w:fldChar"
+                    )
+                    field_begin.set(
+                        qn("w:fldCharType"),
+                        "begin",
+                    )
+
+                    instruction = OxmlElement(
+                        "w:instrText"
+                    )
+                    instruction.set(
+                        qn("xml:space"),
+                        "preserve",
+                    )
                     instruction.text = " PAGE "
-                    field_end = OxmlElement("w:fldChar")
-                    field_end.set(qn("w:fldCharType"), "end")
-                    run._r.extend((field_begin, instruction, field_end))
-                    changes["automatic_page_numbers_added"] += 1
+
+                    field_end = OxmlElement(
+                        "w:fldChar"
+                    )
+                    field_end.set(
+                        qn("w:fldCharType"),
+                        "end",
+                    )
+
+                    run._r.extend(
+                        (
+                            field_begin,
+                            instruction,
+                            field_end,
+                        )
+                    )
+
+                    changes[
+                        "automatic_page_numbers_added"
+                    ] += 1
 
         settings = document.settings._element
-        update_fields = settings.find(qn("w:updateFields"))
+
+        update_fields = settings.find(
+            qn("w:updateFields")
+        )
+
         if update_fields is None:
-            update_fields = OxmlElement("w:updateFields")
+            update_fields = OxmlElement(
+                "w:updateFields"
+            )
             settings.append(update_fields)
-        update_fields.set(qn("w:val"), "true")
+
+        update_fields.set(
+            qn("w:val"),
+            "true",
+        )
+
 
     def _paragraph_kind(self, text: str) -> str:
         stripped = " ".join(text.split())
@@ -348,11 +742,82 @@ class LessonPlanWordStandardizer:
                 os.unlink(temporary_name)
         return forced
 
-    @staticmethod
-    def _validate_integrity(before, after):
-        for name in ("tables", "table_cells", "inline_shapes", "sections", "omml_equations", "ole_objects", "images"):
-            if getattr(before, name) != getattr(after, name):
-                raise ValueError(f"Kiểm tra toàn vẹn thất bại: số lượng {name} đã thay đổi.")
+    def _validate_integrity(
+        self,
+        before,
+        after,
+    ):
+        count_fields = (
+            "paragraphs",
+            "tables",
+            "table_cells",
+            "inline_shapes",
+            "sections",
+            "omml_equations",
+            "equation_paragraphs",
+            "ole_objects",
+            "drawings",
+            "images",
+        )
+
+        for name in count_fields:
+            if (
+                getattr(before, name)
+                != getattr(after, name)
+            ):
+                raise ValueError(
+                    "Document integrity failure: "
+                    + name
+                    + " count changed."
+                )
+
+        if (
+            before.body_text_sha256
+            != after.body_text_sha256
+        ):
+            raise ValueError(
+                "Document integrity failure: "
+                "body or table text changed."
+            )
+
+        immutable_fields = (
+            "media_fingerprints",
+            "embedded_fingerprints",
+            "external_relationships",
+        )
+
+        for name in immutable_fields:
+            if (
+                getattr(before, name)
+                != getattr(after, name)
+            ):
+                raise ValueError(
+                    "Document integrity failure: "
+                    + name
+                    + " changed."
+                )
+
+        remove_existing = bool(
+            self.profile.get(
+                "header_footer",
+                {},
+            ).get(
+                "remove_existing",
+                False,
+            )
+        )
+
+        if (
+            not remove_existing
+            and (
+                before.header_footer_text_sha256
+                != after.header_footer_text_sha256
+            )
+        ):
+            raise ValueError(
+                "Document integrity failure: "
+                "header/footer content changed."
+            )
 
     @staticmethod
     def _warnings(before):

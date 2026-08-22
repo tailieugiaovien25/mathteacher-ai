@@ -234,3 +234,87 @@ class GoogleDriveFileStorage:
         if not name or name in (".", ".."):
             raise ValueError("file_name must not be empty")
         return name[:255]
+
+    def download(
+        self,
+        file_id: str,
+    ) -> bytes:
+        """Download one file through the authenticated Drive service."""
+        from io import BytesIO
+
+        from googleapiclient.discovery import build
+        from googleapiclient.http import (
+            MediaIoBaseDownload,
+        )
+
+        normalized_id = str(
+            file_id
+        ).strip()
+
+        if not normalized_id:
+            raise ValueError(
+                "file_id must not be empty"
+            )
+
+        service = getattr(
+            self,
+            "_service",
+            None,
+        )
+
+        if service is None:
+            service = getattr(
+                self,
+                "service",
+                None,
+            )
+
+        if service is None:
+            credentials = getattr(
+                self,
+                "_credentials",
+                None,
+            )
+
+            if credentials is None:
+                credentials = getattr(
+                    self,
+                    "credentials",
+                    None,
+                )
+
+            if credentials is None:
+                raise RuntimeError(
+                    "Google Drive credentials "
+                    "are not available."
+                )
+
+            service = build(
+                "drive",
+                "v3",
+                credentials=credentials,
+                cache_discovery=False,
+            )
+
+        request = (
+            service.files()
+            .get_media(
+                fileId=normalized_id
+            )
+        )
+
+        stream = BytesIO()
+
+        downloader = MediaIoBaseDownload(
+            stream,
+            request,
+        )
+
+        done = False
+
+        while not done:
+            _, done = (
+                downloader.next_chunk()
+            )
+
+        return stream.getvalue()

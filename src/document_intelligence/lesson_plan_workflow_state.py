@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from hashlib import sha256
@@ -122,16 +122,11 @@ class LessonPlanWorkflowState:
             result=None,
         )
 
+
     def with_result(
         self,
         result: Any,
     ) -> "LessonPlanWorkflowState":
-        if self.resolution is None:
-            raise ValueError(
-                "review resolution is required "
-                "before processing result"
-            )
-
         return replace(
             self,
             result=result,

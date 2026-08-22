@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -42,71 +42,122 @@ class LessonPlanDocumentContextApplier:
     }
 
     def apply(
-        self,
-        source: Path,
-        output: Path,
-        context: ScheduledLessonContext,
-    ) -> ContextApplicationResult:
-        source = source.resolve()
-        output = output.resolve()
+            self,
+            source: Path,
+            output: Path,
+            context: ScheduledLessonContext,
+        ) -> ContextApplicationResult:
+            """
+            Compatibility entry point.
 
-        if source == output:
-            raise ValueError(
-                "Không được ghi đè tệp Word gốc."
-            )
+            Public API remains unchanged, but canonical
+            metadata mutation is delegated to the
+            preservation-first metadata overlay engine.
+            """
+            source = source.resolve()
+            output = output.resolve()
 
-        if (
-            source.suffix.lower() != ".docx"
-            or output.suffix.lower() != ".docx"
-        ):
-            raise ValueError(
-                "Context applier chỉ xử lý tệp .docx."
-            )
-
-        if not isinstance(
-            context,
-            ScheduledLessonContext,
-        ):
-            raise TypeError(
-                "context must be ScheduledLessonContext"
-            )
-
-        document = Document(source)
-
-        values = self._context_values(
-            context
-        )
-
-        applied: list[str] = []
-
-        for field_name, value in values.items():
-            if self._apply_field(
-                document,
-                field_name,
-                value,
-                context=context,
-            ):
-                applied.append(
-                    field_name
+            if source == output:
+                raise ValueError(
+                    "Kh\u00f4ng \u0111\u01b0\u1ee3c ghi \u0111\u00e8 t\u1ec7p Word g\u1ed1c."
                 )
 
-        unresolved = [
-            field_name
-            for field_name in values
-            if field_name not in applied
-        ]
+            if (
+                source.suffix.lower() != ".docx"
+                or output.suffix.lower() != ".docx"
+            ):
+                raise ValueError(
+                    "Context applier ch\u1ec9 x\u1eed l\u00fd t\u1ec7p .docx."
+                )
 
-        output.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+            if not isinstance(
+                context,
+                ScheduledLessonContext,
+            ):
+                raise TypeError(
+                    "context must be ScheduledLessonContext"
+                )
 
-        document.save(output)
+            from document_standardization.lesson_plan_metadata import (
+                LessonPlanMetadata,
+            )
+            from document_standardization.lesson_plan_metadata_overlay import (
+                LessonPlanMetadataOverlay,
+            )
 
-        return ContextApplicationResult(
-            applied_fields=tuple(applied),
-            unresolved_fields=tuple(unresolved),
-        )
+            document = Document(source)
+
+            metadata = LessonPlanMetadata(
+                drafting_date=context.drafting_date,
+                teaching_date=context.teaching_date,
+                class_name=context.class_id,
+                curriculum_period=(
+                    context.curriculum_period
+                ),
+                lesson_title=context.lesson_title,
+            )
+
+            overlay_result = (
+                LessonPlanMetadataOverlay()
+                .apply(
+                    document=document,
+                    metadata=metadata,
+                )
+            )
+
+            output.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            document.save(output)
+
+            field_name_map = {
+                "drafting_date": "drafting_date",
+                "teaching_date": "teaching_date",
+                "class_name": "class_id",
+                "curriculum_period": (
+                    "curriculum_period"
+                ),
+                "lesson_title": "lesson_title",
+            }
+
+            unresolved_metadata = {
+                field.value
+                for field
+                in overlay_result.unresolved_fields
+            }
+
+            requested = (
+                metadata.overlay_values()
+            )
+
+            applied = []
+
+            unresolved = []
+
+            for metadata_name in requested:
+                public_name = field_name_map.get(
+                    metadata_name,
+                    metadata_name,
+                )
+
+                if (
+                    metadata_name
+                    in unresolved_metadata
+                ):
+                    unresolved.append(
+                        public_name
+                    )
+                else:
+                    applied.append(
+                        public_name
+                    )
+
+            return ContextApplicationResult(
+                applied_fields=tuple(applied),
+                unresolved_fields=tuple(unresolved),
+            )
 
     @staticmethod
     def _context_values(

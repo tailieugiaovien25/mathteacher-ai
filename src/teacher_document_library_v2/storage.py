@@ -19,3 +19,10 @@ class StoredDocumentFile:
 class DocumentFileStorage(Protocol):
     def upload(self, content: bytes, file_name: str, mime_type: str) -> StoredDocumentFile: ...
     def delete(self, file_id: str) -> bool: ...
+
+    def download(
+        self,
+        file_id: str,
+    ) -> bytes:
+        """Return stored file bytes for one owned file."""
+        ...

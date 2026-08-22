@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from document_intelligence.lesson_plan_teacher_review import (
     LessonPlanTeacherReview,
@@ -44,37 +44,36 @@ def render_lesson_plan_teacher_review(
         )
 
     st.subheader(
-        "Xác nhận thông tin kế hoạch bài dạy"
+        "Th?ng tin ??i chi?u"
     )
 
     if view.requires_review:
-        st.warning(
-            "Có thông tin cần giáo viên kiểm tra "
-            "trước khi tiếp tục."
+        st.info(
+            "H? th?ng ?? ??i chi?u th?ng tin trong gi?o ?n "
+            "v?i d? li?u b?i d?y hi?n t?i. "
+            "Ki?m tra c?c m?c c?n thi?t tr??c khi ti?p t?c."
         )
     else:
-        st.info(
-            "Thông tin đã phù hợp. "
-            "Giáo viên có thể xác nhận hoặc chỉnh sửa."
+        st.success(
+            "Th?ng tin gi?o ?n ph? h?p v?i d? li?u b?i d?y."
         )
 
     decisions = []
 
-    for index, item in enumerate(view.items):
-        st.markdown(
-            f"**{item.field_label}**"
+    for index, item in enumerate(
+        view.items
+    ):
+        detected_value = (
+            item.detected_value
+            if item.detected_value is not None
+            else ""
         )
 
-        st.write(
-            "Giá trị nhận diện: "
-            f"{item.detected_value}"
+        canonical_value = (
+            item.canonical_value
+            if item.canonical_value is not None
+            else ""
         )
-
-        if item.canonical_value is not None:
-            st.write(
-                "Giá trị chuẩn: "
-                f"{item.canonical_value}"
-            )
 
         default_index = (
             _ACTION_OPTIONS.index(
@@ -82,28 +81,58 @@ def render_lesson_plan_teacher_review(
             )
         )
 
-        action = st.radio(
-            "Quyết định",
-            options=_ACTION_OPTIONS,
-            index=default_index,
-            format_func=lambda value: (
-                _ACTION_LABELS[value]
-            ),
-            key=(
-                f"{key_prefix}_"
-                f"{index}_"
-                f"{item.field.value}_action"
-            ),
+        columns = st.columns(
+            [1.2, 2.0, 2.0, 1.8],
+            gap="small",
         )
+
+        with columns[0]:
+            st.markdown(
+                f"**{item.field_label}**"
+            )
+
+        with columns[1]:
+            st.write(
+                detected_value
+                or "?"
+            )
+
+        with columns[2]:
+            st.write(
+                canonical_value
+                or "?"
+            )
+
+        with columns[3]:
+            action = st.selectbox(
+                "X? l?",
+                options=_ACTION_OPTIONS,
+                index=default_index,
+                format_func=lambda value: (
+                    _ACTION_LABELS[value]
+                ),
+                key=(
+                    f"{key_prefix}_"
+                    f"{index}_"
+                    f"{item.field.value}_action"
+                ),
+                label_visibility="collapsed",
+            )
 
         override_value = None
 
-        if action is TeacherReviewAction.OVERRIDE:
+        if (
+            action
+            is TeacherReviewAction.OVERRIDE
+        ):
             override_value = st.text_input(
-                "Giá trị thay thế",
+                (
+                    "Gi? tr? thay th? ? "
+                    + item.field_label
+                ),
                 value=(
-                    item.canonical_value
-                    or item.detected_value
+                    canonical_value
+                    or detected_value
                 ),
                 key=(
                     f"{key_prefix}_"

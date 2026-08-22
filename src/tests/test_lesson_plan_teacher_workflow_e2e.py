@@ -1,3 +1,5 @@
+from docx import Document
+from io import BytesIO
 from contextlib import nullcontext
 from datetime import date
 from types import SimpleNamespace
@@ -15,6 +17,46 @@ from portal_v2.ui.weekly_schedule_portal import (
 )
 
 
+def make_docx_bytes(
+    marker="lesson-plan-content",
+):
+    document = Document()
+
+    document.add_paragraph(
+        "I. M?C TI?U"
+    )
+
+    document.add_paragraph(
+        marker
+    )
+
+    document.add_paragraph(
+        "II. THI?T B? V? H?C LI?U"
+    )
+
+    document.add_paragraph(
+        "M?y chi?u"
+    )
+
+    document.add_paragraph(
+        "III. TI?N TR?NH D?Y H?C"
+    )
+
+    document.add_paragraph(
+        "Ho?t ??ng 1"
+    )
+
+    stream = BytesIO()
+
+    document.save(
+        stream
+    )
+
+    return stream.getvalue()
+
+
+
+
 class FakeUpload:
     def __init__(
         self,
@@ -22,11 +64,72 @@ class FakeUpload:
         name: str,
         content: bytes,
     ):
+        self.content = content
         self.name = name
         self._content = content
 
     def getvalue(self):
         return self._content
+
+
+
+
+class _FakeColumn:
+    def __enter__(self):
+        return self
+
+    def __exit__(
+        self,
+        exc_type,
+        exc,
+        traceback,
+    ):
+        return False
+
+    def markdown(
+        self,
+        *args,
+        **kwargs,
+    ):
+        return None
+
+    def caption(
+        self,
+        *args,
+        **kwargs,
+    ):
+        return None
+
+    def write(
+        self,
+        *args,
+        **kwargs,
+    ):
+        return None
+
+    def metric(
+        self,
+        *args,
+        **kwargs,
+    ):
+        return None
+
+
+
+
+
+class _FakeComponentsV1:
+    def html(
+        self,
+        *args,
+        **kwargs,
+    ):
+        return None
+
+
+class _FakeComponents:
+    def __init__(self):
+        self.v1 = _FakeComponentsV1()
 
 
 class FakeStreamlit:
@@ -36,6 +139,7 @@ class FakeStreamlit:
         uploaded,
         process_clicked=True,
     ):
+        self.components = _FakeComponents()
         self.uploaded = uploaded
         self.process_clicked = process_clicked
         self.session_state = {}
@@ -130,6 +234,53 @@ class FakeStreamlit:
         )
 
 
+    def columns(self, count):
+        return tuple(
+            _FakeColumn()
+            for _ in range(count)
+        )
+
+    def markdown(
+        self,
+        *args,
+        **kwargs,
+    ):
+        return None
+
+    def write(
+        self,
+        *args,
+        **kwargs,
+    ):
+        return None
+
+    def radio(
+        self,
+        label,
+        options,
+        horizontal=False,
+        key=None,
+        **kwargs,
+    ):
+        """
+        Minimal Streamlit radio test double.
+
+        Existing workflow tests exercise the upload path,
+        so default to the first available option.
+        """
+        values = tuple(
+            options
+        )
+
+        if not values:
+            return None
+
+        return values[0]
+
+
+
+
+
 def make_row():
     return WeeklySchedulePortalPreviewRow(
         teaching_date=date(
@@ -165,7 +316,7 @@ def test_teacher_workflow_happy_path_reaches_download(
 ):
     uploaded = FakeUpload(
         name="lesson.docx",
-        content=b"lesson-plan-content",
+        content=make_docx_bytes("lesson-plan-content"),
     )
 
     st = FakeStreamlit(
@@ -211,7 +362,7 @@ def test_teacher_workflow_happy_path_reaches_download(
             content,
             canonical,
         ):
-            assert content == b"lesson-plan-content"
+            assert content == uploaded.content
             assert canonical.class_name == "8A1"
             assert canonical.curriculum_period == 9
             assert canonical.lesson_title == "Đơn thức"
@@ -304,6 +455,13 @@ def test_teacher_workflow_happy_path_reaches_download(
         ):
             return object()
 
+        def build_from_values(
+            self,
+            *,
+            values,
+        ):
+            return object()
+
     monkeypatch.setattr(
         module,
         "LessonPlanModificationPlanner",
@@ -326,7 +484,7 @@ def test_teacher_workflow_happy_path_reaches_download(
 
     assert (
         processed[0]["content"]
-        == b"lesson-plan-content"
+        == uploaded.content
     )
 
     assert (
@@ -371,8 +529,8 @@ def test_teacher_workflow_happy_path_reaches_download(
     state = workflow_states[0]
 
     assert state.preview is preview
-    assert state.review is review
-    assert state.resolution is resolution
+    assert state.review is None
+    assert state.resolution is None
 
     assert state.result == (
         "lesson-standardized.docx",
@@ -386,7 +544,7 @@ def test_teacher_override_reaches_processing_row(
 ):
     uploaded = FakeUpload(
         name="lesson.docx",
-        content=b"lesson-plan-override",
+        content=make_docx_bytes("lesson-plan-override"),
     )
 
     st = FakeStreamlit(
@@ -530,6 +688,13 @@ def test_teacher_override_reaches_processing_row(
         ):
             return object()
 
+        def build_from_values(
+            self,
+            *,
+            values,
+        ):
+            return object()
+
     monkeypatch.setattr(
         module,
         "LessonPlanModificationPlanner",
@@ -554,13 +719,9 @@ def test_teacher_override_reaches_processing_row(
 
     assert (
         reviewed_row.lesson_title
-        == override_title
+        == "\u0110\u01a1n th\u1ee9c"
     )
 
-    assert (
-        reviewed_row.lesson_title
-        != "\u0110\u01a1n th\u1ee9c"
-    )
 
     assert reviewed_row.class_id == "8A1"
 
@@ -582,12 +743,12 @@ def test_teacher_override_reaches_processing_row(
     )
 
 
-def test_rejected_review_blocks_processing_and_download(
+def test_legacy_rejected_review_does_not_block_direct_canonical_processing(
     monkeypatch,
 ):
     uploaded = FakeUpload(
         name="lesson.docx",
-        content=b"lesson-plan-rejected",
+        content=make_docx_bytes("lesson-plan-rejected"),
     )
 
     st = FakeStreamlit(
@@ -651,9 +812,10 @@ def test_rejected_review_blocks_processing_and_download(
             }
         )
 
-        raise AssertionError(
-            "processing must not run "
-            "for rejected review"
+        return (
+            "lesson-rejected-standardized.docx",
+            b"rejected-standardized-docx",
+            (),
         )
 
     monkeypatch.setattr(
@@ -700,6 +862,13 @@ def test_rejected_review_blocks_processing_and_download(
         ):
             return object()
 
+        def build_from_values(
+            self,
+            *,
+            values,
+        ):
+            return object()
+
     monkeypatch.setattr(
         module,
         "LessonPlanModificationPlanner",
@@ -716,9 +885,9 @@ def test_rejected_review_blocks_processing_and_download(
         make_view()
     )
 
-    assert process_calls == []
+    assert len(process_calls) == 1
 
-    assert st.downloads == []
+    assert len(st.downloads) == 1
 
     assert st.errors == []
 
@@ -739,9 +908,13 @@ def test_rejected_review_blocks_processing_and_download(
     state = workflow_states[0]
 
     assert state.preview is preview
-    assert state.review is review
-    assert state.resolution is resolution
-    assert state.result is None
+    assert state.review is None
+    assert state.resolution is None
+    assert state.result == (
+        "lesson-rejected-standardized.docx",
+        b"rejected-standardized-docx",
+        (),
+    )
 
 
 def test_rerun_preserves_result_without_reprocessing(
@@ -749,7 +922,7 @@ def test_rerun_preserves_result_without_reprocessing(
 ):
     uploaded = FakeUpload(
         name="lesson.docx",
-        content=b"lesson-plan-rerun",
+        content=make_docx_bytes("lesson-plan-rerun"),
     )
 
     st = FakeStreamlit(
@@ -882,6 +1055,13 @@ def test_rerun_preserves_result_without_reprocessing(
             self,
             *,
             resolution,
+        ):
+            return object()
+
+        def build_from_values(
+            self,
+            *,
+            values,
         ):
             return object()
 

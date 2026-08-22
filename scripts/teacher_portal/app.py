@@ -17,17 +17,17 @@ from portal_v2.authorization import (
     build_portal_authorization_context,
 )
 from portal_v2.ui import render_admin_shell
+from portal_v2.ui.teacher_workspace_styles import apply_teacher_workspace_styles
 
 
 PORTAL_PAGES = (
-    "T\u1ed5ng quan",
-    "L\u1ecbch b\u00e1o gi\u1ea3ng",
-    "Th\u1eddi kh\u00f3a bi\u1ec3u",
-    "D\u1eef li\u1ec7u c\u1ee7a t\u00f4i",
-    "Kho t\u00e0i li\u1ec7u",
-    "Chu\u1ea9n h\u00f3a Word",
-    "M\u1eabu gi\u00e1o \u00e1n",
-    "H\u1ed3 s\u01a1 gi\u00e1o vi\u00ean",
+    'T\u1ed5ng quan',
+    'C\xf4ng c\u1ee5 so\u1ea1n b\xe0i',
+    'Th\u1eddi kh\xf3a bi\u1ec3u',
+    'D\u1eef li\u1ec7u c\u1ee7a t\xf4i',
+    'Kho t\xe0i li\u1ec7u',
+    'M\u1eabu gi\xe1o \xe1n',
+    'H\u1ed3 s\u01a1 gi\xe1o vi\xean',
 )
 PORTAL_SESSION_KEYS = (
     "portal_supabase_client",
@@ -86,6 +86,80 @@ def authenticate_portal(client: Any, email: str, password: str) -> tuple[str, st
     return str(user_id), returned_email
 
 
+
+def connect_document_library_runtime(
+    session_state,
+):
+    """Build document-library services from the authenticated portal state."""
+
+    repository = session_state.get(
+        "document_library_repository"
+    )
+
+    if repository is None:
+        return None
+
+    from teacher_document_library_v2.services import (
+        TeacherDocumentCatalog,
+        TeacherDocumentUploadService,
+    )
+
+    catalog = TeacherDocumentCatalog(
+        repository
+    )
+
+    session_state[
+        "document_library_catalog"
+    ] = catalog
+
+    credential_payload = (
+        session_state.get(
+            "google_drive_credentials"
+        )
+    )
+
+    if not credential_payload:
+        session_state.pop(
+            "document_library_storage",
+            None,
+        )
+        session_state.pop(
+            "document_library_upload_service",
+            None,
+        )
+        return catalog
+
+    from teacher_document_library_v2.adapters import (
+        GoogleDriveFileStorage,
+        credentials_from_dict,
+    )
+
+    credentials = credentials_from_dict(
+        credential_payload
+    )
+
+    storage = GoogleDriveFileStorage(
+        credentials
+    )
+
+    upload_service = (
+        TeacherDocumentUploadService(
+            catalog,
+            storage,
+        )
+    )
+
+    session_state[
+        "document_library_storage"
+    ] = storage
+
+    session_state[
+        "document_library_upload_service"
+    ] = upload_service
+
+    return catalog
+
+
 def connect_feature_repositories(session_state: Any, client: Any, user_id: str) -> None:
     """Share one authenticated client across feature-specific adapters."""
     session_state["portal_supabase_client"] = client
@@ -142,6 +216,10 @@ def connect_feature_repositories(session_state: Any, client: Any, user_id: str) 
     session_state["document_library_client"] = client
     session_state["document_library_repository"] = (
         SupabaseTeacherDocumentRepository(client, user_id)
+    )
+
+    connect_document_library_runtime(
+        session_state
     )
 
 
@@ -257,18 +335,26 @@ def render_dashboard(st) -> None:
     st.title("Tổng quan")
     st.caption("Chọn một công cụ để bắt đầu công việc.")
     cards = (
-        ("Lịch báo giảng", "Tạo, lưu và xuất lịch dạy theo tuần."),
         (
-            "Dữ liệu của tôi",
-            "Quản lý PPCT, thời khóa biểu và tuần học theo năm học.",
+            'C\xf4ng c\u1ee5 so\u1ea1n b\xe0i',
+            'Ch\u1ecdn b\xe0i, so\u1ea1n c\xf9ng AI v\xe0 chu\u1ea9n h\xf3a gi\xe1o \xe1n.',
         ),
-        ("Kho tài liệu", "Tìm kiếm và tải tài liệu lên Google Drive."),
-        ("Chuẩn hóa Word", "Chuẩn hóa giáo án Word mà không ghi đè bản gốc."),
         (
-            "Mẫu giáo án",
-            "Thiết lập cấu trúc, bố cục, ngày soạn, ngày dạy và phê duyệt giáo án.",
+            'D\u1eef li\u1ec7u c\u1ee7a t\xf4i',
+            'Qu\u1ea3n l\xfd PPCT, th\u1eddi kh\xf3a bi\u1ec3u v\xe0 tu\u1ea7n h\u1ecdc theo n\u0103m h\u1ecdc.',
         ),
-        ("Hồ sơ giáo viên", "Quản lý thông tin dùng chung khi lập và xuất lịch."),
+        (
+            'Kho t\xe0i li\u1ec7u',
+            'T\xecm ki\u1ebfm v\xe0 t\u1ea3i t\xe0i li\u1ec7u l\xean Google Drive.',
+        ),
+        (
+            'M\u1eabu gi\xe1o \xe1n',
+            'Thi\u1ebft l\u1eadp c\u1ea5u tr\xfac, b\u1ed1 c\u1ee5c, ng\xe0y so\u1ea1n, ng\xe0y d\u1ea1y v\xe0 ph\xea duy\u1ec7t gi\xe1o \xe1n.',
+        ),
+        (
+            'H\u1ed3 s\u01a1 gi\xe1o vi\xean',
+            'Qu\u1ea3n l\xfd th\xf4ng tin d\xf9ng chung khi l\u1eadp v\xe0 xu\u1ea5t l\u1ecbch.',
+        ),
     )
     columns = st.columns(2)
     for index, (page, description) in enumerate(cards):
@@ -450,12 +536,7 @@ def main() -> None:
     import streamlit as st
 
     st.set_page_config(page_title="MathTeacher-AI", page_icon="🎓", layout="wide")
-    st.markdown("""
-        <style>
-        .block-container {max-width: 1240px; padding-top: 1.5rem;}
-        [data-testid="stSidebar"] {border-right: 1px solid #e5e7eb;}
-        </style>
-    """, unsafe_allow_html=True)
+    apply_teacher_workspace_styles(st)
     settings = supabase_settings()
     client = st.session_state.get("portal_supabase_client")
     user_id = st.session_state.get("portal_user_id")
@@ -610,7 +691,7 @@ def main() -> None:
     if selected == "Tổng quan":
         render_dashboard(st)
 
-    elif selected == "Lịch báo giảng":
+    elif selected == 'C\xf4ng c\u1ee5 so\u1ea1n b\xe0i':
         from portal_v2.ui.weekly_schedule_streamlit import (
             render_weekly_schedule_workspace,
         )
@@ -1071,23 +1152,6 @@ def main() -> None:
         from scripts.document_library.app import main as render_document_library
         st.title("Kho tài liệu")
         render_document_library(embedded=True)
-    elif selected == "Chuẩn hóa Word":
-        from scripts.word_standardizer.app import main as render_word_standardizer
-        st.title("Chuẩn hóa Word")
-        render_word_standardizer(embedded=True)
-
-    elif selected == 'Mẫu giáo án':
-        from portal_v2.ui.lesson_plan_template_setup_streamlit import (
-            render_lesson_plan_template_setup,
-        )
-
-        render_lesson_plan_template_setup(
-            client=client,
-            teacher_id=str(user_id),
-        )
-
-    else:
-        render_profile(st, client, str(user_id))
 
 
 if __name__ == "__main__":

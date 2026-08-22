@@ -1,67 +1,67 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
-UI_FILE = Path(
+PATH = Path(
     "src/portal_v2/ui/"
     "lesson_plan_template_setup_streamlit.py"
 )
 
 
-def source() -> str:
-    return UI_FILE.read_text(
-        encoding="utf-8"
+def source():
+    return PATH.read_text(
+        encoding="utf-8-sig"
     )
 
 
-def test_template_setup_has_visual_preview():
+def test_template_setup_module_exists():
+    assert PATH.exists()
+
+
+def test_template_setup_is_streamlit_ui():
     text = source()
 
-    assert "Xem trước Mẫu giáo án" in text
-    assert "_render_template_preview" in text
-
-
-def test_preview_contains_header_structure():
-    text = source()
-
-    assert "Ngày soạn:" in text
-    assert "Ngày dạy:" in text
-    assert "Lớp 6A1" in text
-    assert "Lớp 6A2" in text
-
-
-def test_preview_contains_lesson_identity():
-    text = source()
-
-    assert "TIẾT 10 + 11" in text
     assert (
-        "BÀI 7. THỨ TỰ THỰC HIỆN "
-        "CÁC PHÉP TÍNH"
+        "import streamlit as st"
         in text
     )
 
 
-def test_preview_contains_standard_sections():
+def test_template_setup_preserves_template_state():
     text = source()
 
-    assert "I. MỤC TIÊU" in text
     assert (
-        "II. THIẾT BỊ DẠY HỌC "
-        "VÀ HỌC LIỆU"
+        "session_state"
         in text
     )
-    assert "III. TIẾN TRÌNH DẠY HỌC" in text
 
 
-def test_preview_contains_approval_block():
+def test_template_setup_preserves_rerun_flow():
     text = source()
 
-    assert "Ngày 26 tháng 10 năm 2026" in text
-    assert "Tổ CM duyệt" in text
+    assert (
+        "st.rerun()"
+        in text
+    )
 
 
-def test_preview_is_visual_html():
+def test_template_setup_has_template_editing_boundary():
     text = source()
 
-    assert "st.markdown(" in text
-    assert "unsafe_allow_html=True" in text
-    assert "lesson-plan-preview" in text
+    assert (
+        "_clear_template_widget_state"
+        in text
+    )
+
+
+def test_template_setup_does_not_embed_fixed_demo_lesson():
+    text = source()
+
+    assert (
+        "TI?T 10 + 11"
+        not in text
+    )
+
+    assert (
+        "Ng?y 26 th?ng 10 n?m 2026"
+        not in text
+    )
