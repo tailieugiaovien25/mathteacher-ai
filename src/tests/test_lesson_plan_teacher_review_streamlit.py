@@ -20,11 +20,11 @@ class FakeStreamlit:
     def __init__(
         self,
         *,
-        radio_values=None,
+        selectbox_values=None,
         text_values=None,
     ):
-        self.radio_values = list(
-            radio_values or ()
+        self.selectbox_values = list(
+            selectbox_values or ()
         )
         self.text_values = list(
             text_values or ()
@@ -32,10 +32,18 @@ class FakeStreamlit:
         self.subheaders = []
         self.warnings = []
         self.infos = []
+        self.successes = []
         self.markdowns = []
         self.writes = []
-        self.radios = []
+        self.selectboxes = []
         self.text_inputs = []
+        self.column_specs = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
 
     def subheader(self, value):
         self.subheaders.append(value)
@@ -46,13 +54,25 @@ class FakeStreamlit:
     def info(self, value):
         self.infos.append(value)
 
+    def success(self, value):
+        self.successes.append(value)
+
+    def columns(self, spec, *, gap=None):
+        self.column_specs.append(
+            {
+                "spec": tuple(spec),
+                "gap": gap,
+            }
+        )
+        return tuple(self for _ in spec)
+
     def markdown(self, value):
         self.markdowns.append(value)
 
     def write(self, value):
         self.writes.append(value)
 
-    def radio(
+    def selectbox(
         self,
         label,
         *,
@@ -60,19 +80,21 @@ class FakeStreamlit:
         index,
         format_func,
         key,
+        label_visibility="visible",
     ):
-        self.radios.append(
+        self.selectboxes.append(
             {
                 "label": label,
                 "options": options,
                 "index": index,
                 "format_func": format_func,
                 "key": key,
+                "label_visibility": label_visibility,
             }
         )
 
-        if self.radio_values:
-            return self.radio_values.pop(0)
+        if self.selectbox_values:
+            return self.selectbox_values.pop(0)
 
         return options[index]
 
@@ -154,14 +176,14 @@ def test_renderer_uses_safe_defaults():
         is TeacherReviewAction.REJECT
     )
 
-    assert len(st.warnings) == 1
-    assert len(st.infos) == 0
+    assert len(st.warnings) == 0
+    assert len(st.infos) == 1
     assert len(st.text_inputs) == 0
 
 
 def test_renderer_returns_override():
     st = FakeStreamlit(
-        radio_values=(
+        selectbox_values=(
             TeacherReviewAction.CONFIRM,
             TeacherReviewAction.OVERRIDE,
         ),
@@ -206,7 +228,8 @@ def test_renderer_shows_info_when_review_not_required():
     )
 
     assert len(st.warnings) == 0
-    assert len(st.infos) == 1
+    assert len(st.infos) == 0
+    assert len(st.successes) == 1
 
 
 def test_renderer_uses_unique_widget_keys():
@@ -220,7 +243,7 @@ def test_renderer_uses_unique_widget_keys():
 
     keys = [
         item["key"]
-        for item in st.radios
+        for item in st.selectboxes
     ]
 
     assert len(keys) == len(set(keys))

@@ -78,6 +78,10 @@ def test_portal_builds_normalized_teacher_profile():
     assert profile.teacher_code == "GV001"
     assert profile.subjects == ("Toán", "Tin học")
     assert "Kho tài liệu" in PORTAL_PAGES
+    assert "Công cụ soạn bài" not in PORTAL_PAGES
+    assert "Chuẩn hóa giáo án" in PORTAL_PAGES
+    assert "Soạn bài cùng AI" in PORTAL_PAGES
+    assert "Lịch báo giảng & PBSDTB" in PORTAL_PAGES
 
 
 def test_feature_apps_support_embedded_rendering():

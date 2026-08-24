@@ -15,7 +15,9 @@ from document_intelligence.lesson_plan_modification_plan import (
 import tempfile
 
 from document_standardization import (
+    LessonPlanAiRevisionOverlay,
     LessonPlanDocumentPipeline,
+    LessonPlanStandardizationOptions,
     LessonPlanWordStandardizer,
 )
 from lesson_planning_v2.services.scheduled_lesson_context_service import (
@@ -28,6 +30,7 @@ class LessonPlanDocumentProcessingResult:
     output_name: str
     output_bytes: bytes
     unresolved_fields: tuple[str, ...]
+    review_warnings: tuple[str, ...] = ()
 
 
 class LessonPlanDocumentProcessingService:
@@ -166,6 +169,9 @@ class LessonPlanDocumentProcessingService:
         content: bytes,
         original_name: str,
         modification_plan: LessonPlanModificationPlan | None = None,
+        options: LessonPlanStandardizationOptions | None = None,
+        original_content: bytes | None = None,
+        ai_revised_text: str = "",
     ) -> LessonPlanDocumentProcessingResult:
         safe_name = Path(
             original_name
@@ -203,6 +209,16 @@ class LessonPlanDocumentProcessingService:
             ".lbg-standardized.docx"
         )
 
+        resolved_options = (
+            options
+            or LessonPlanStandardizationOptions()
+        )
+
+        if not resolved_options.has_selected_operation:
+            raise ValueError(
+                "At least one standardization operation must be selected."
+            )
+
         with tempfile.TemporaryDirectory(
             prefix="lbg-lesson-plan-"
         ) as workspace_name:
@@ -210,7 +226,8 @@ class LessonPlanDocumentProcessingService:
                 workspace_name
             )
 
-            source = workspace / safe_name
+            working_source = workspace / safe_name
+            source = working_source
             output = workspace / output_name
 
             report_path = (
@@ -221,9 +238,45 @@ class LessonPlanDocumentProcessingService:
                 )
             )
 
-            source.write_bytes(
+            working_source.write_bytes(
                 content
             )
+
+            review_warnings: tuple[str, ...] = ()
+            if resolved_options.preserve_original_maximum:
+                if original_content:
+                    original_source = workspace / (
+                        "original-" + safe_name
+                    )
+                    original_source.write_bytes(
+                        bytes(original_content)
+                    )
+                    source = workspace / (
+                        "preservation-overlay-" + safe_name
+                    )
+                    try:
+                        overlay_result = (
+                            LessonPlanAiRevisionOverlay().apply(
+                                source=original_source,
+                                output=source,
+                                revised_text=ai_revised_text,
+                            )
+                        )
+                        review_warnings = overlay_result.warnings
+                    except Exception as error:
+                        from shutil import copyfile
+
+                        copyfile(original_source, source)
+                        review_warnings = (
+                            "Không thể ánh xạ an toàn thay đổi AI; "
+                            "hệ thống đã dùng nguyên bản Word gốc: "
+                            + str(error),
+                        )
+                else:
+                    review_warnings = (
+                        "Không có Word gốc trong phiên; chế độ giữ nguyên "
+                        "tối đa được áp dụng trên bản làm việc hiện có.",
+                    )
 
             pipeline = (
                 LessonPlanDocumentPipeline(
@@ -236,12 +289,16 @@ class LessonPlanDocumentProcessingService:
                 )
             )
 
-            result = pipeline.process(
-                source=source,
-                output=output,
-                report_path=report_path,
-                context=context,
-            )
+            pipeline_arguments = {
+                "source": source,
+                "output": output,
+                "report_path": report_path,
+                "context": context,
+            }
+            if options is not None:
+                pipeline_arguments["options"] = resolved_options
+
+            result = pipeline.process(**pipeline_arguments)
 
             output_bytes = (
                 output.read_bytes()
@@ -256,6 +313,7 @@ class LessonPlanDocumentProcessingService:
                     .context_result
                     .unresolved_fields
                 ),
+                review_warnings=review_warnings,
             )
         )
 

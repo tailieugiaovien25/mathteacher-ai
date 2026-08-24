@@ -643,3 +643,228 @@ class LessonPlanDocumentContextApplier:
             return
 
         paragraph.add_run(value)
+
+
+# MULTICLASS_TEACHING_DATE_OVERLAY_V1
+#
+# Compatibility layer for teacher lesson plans whose
+# teaching-date field contains several class/date pairs:
+#
+#   Ng?y d?y:
+#   7A1 - 02/10/2025
+#   7A2 - 30/09/2025
+#
+# Only the date belonging to context.class_id is replaced.
+# Other classes, document structure and unrelated content
+# remain unchanged.
+
+def _mt_replace_span_preserving_runs(
+    paragraph,
+    start: int,
+    end: int,
+    replacement: str,
+) -> bool:
+    runs = list(paragraph.runs)
+
+    if not runs:
+        return False
+
+    positions = []
+    cursor = 0
+
+    for run in runs:
+        run_start = cursor
+        cursor += len(run.text)
+        positions.append(
+            (run, run_start, cursor)
+        )
+
+    affected = [
+        item
+        for item in positions
+        if item[2] > start
+        and item[1] < end
+    ]
+
+    if not affected:
+        return False
+
+    first_run, first_start, _ = affected[0]
+    last_run, last_start, _ = affected[-1]
+
+    first_local = max(
+        0,
+        start - first_start,
+    )
+
+    last_local = max(
+        0,
+        end - last_start,
+    )
+
+    prefix = first_run.text[
+        :first_local
+    ]
+
+    suffix = last_run.text[
+        last_local:
+    ]
+
+    if first_run is last_run:
+        first_run.text = (
+            prefix
+            + replacement
+            + suffix
+        )
+        return True
+
+    first_run.text = (
+        prefix
+        + replacement
+    )
+
+    for run, _, _ in affected[1:-1]:
+        run.text = ""
+
+    last_run.text = suffix
+
+    return True
+
+
+def _mt_iter_all_paragraphs(document):
+    for paragraph in document.paragraphs:
+        yield paragraph
+
+    for table in document.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    yield paragraph
+
+
+def _mt_overlay_multiclass_teaching_date(
+    output,
+    context,
+) -> bool:
+    import re
+    from docx import Document
+
+    class_id = str(
+        getattr(
+            context,
+            "class_id",
+            "",
+        )
+        or ""
+    ).strip()
+
+    teaching_date = getattr(
+        context,
+        "teaching_date",
+        None,
+    )
+
+    if (
+        not class_id
+        or teaching_date is None
+    ):
+        return False
+
+    formatted_date = (
+        teaching_date.strftime(
+            "%d/%m/%Y"
+        )
+        if hasattr(
+            teaching_date,
+            "strftime",
+        )
+        else str(teaching_date)
+    )
+
+    document = Document(output)
+
+    # Accept "-", en dash, em dash and ":".
+    # Only replace the date attached to the selected class.
+    pattern = re.compile(
+        r"(?<![A-Za-z0-9])"
+        + re.escape(class_id)
+        + r"\s*[-\u2013\u2014:]\s*"
+        + r"(?P<date>"
+          r"\d{1,2}[/-]\d{1,2}[/-]\d{4}"
+          r")",
+        flags=re.IGNORECASE,
+    )
+
+    changed = False
+
+    for paragraph in _mt_iter_all_paragraphs(
+        document
+    ):
+        text = paragraph.text
+
+        matches = list(
+            pattern.finditer(text)
+        )
+
+        # Work backwards so earlier character
+        # positions are not shifted.
+        for match in reversed(matches):
+            date_start = match.start(
+                "date"
+            )
+            date_end = match.end(
+                "date"
+            )
+
+            current_date = match.group(
+                "date"
+            )
+
+            if current_date == formatted_date:
+                continue
+
+            if _mt_replace_span_preserving_runs(
+                paragraph,
+                date_start,
+                date_end,
+                formatted_date,
+            ):
+                changed = True
+
+    if changed:
+        document.save(output)
+
+    return changed
+
+
+_mt_original_context_apply = (
+    LessonPlanDocumentContextApplier.apply
+)
+
+
+def _mt_context_apply_with_multiclass_date(
+    self,
+    source,
+    output,
+    context,
+):
+    result = _mt_original_context_apply(
+        self,
+        source,
+        output,
+        context,
+    )
+
+    _mt_overlay_multiclass_teaching_date(
+        output,
+        context,
+    )
+
+    return result
+
+
+LessonPlanDocumentContextApplier.apply = (
+    _mt_context_apply_with_multiclass_date
+)
+
+

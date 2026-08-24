@@ -43,6 +43,34 @@ class DocumentInventory:
     external_relationships: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class LessonPlanStandardizationOptions:
+    """User-confirmed operations for one standardization run."""
+
+    preserve_original_maximum: bool = False
+    sync_context: bool = True
+    normalize_font: bool = True
+    normalize_equations: bool = True
+    normalize_tables: bool = True
+    normalize_page_layout: bool = True
+    normalize_spacing: bool = True
+    normalize_header_footer: bool = True
+
+    @property
+    def has_selected_operation(self) -> bool:
+        return any(
+            (
+                self.sync_context,
+                self.normalize_font,
+                self.normalize_equations,
+                self.normalize_tables,
+                self.normalize_page_layout,
+                self.normalize_spacing,
+                self.normalize_header_footer,
+            )
+        )
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -386,7 +414,14 @@ class LessonPlanWordStandardizer:
     def from_json(cls, path: Path) -> "LessonPlanWordStandardizer":
         return cls(json.loads(path.read_text(encoding="utf-8")))
 
-    def standardize(self, source: Path, output: Path, report_path: Path) -> dict[str, object]:
+    def standardize(
+        self,
+        source: Path,
+        output: Path,
+        report_path: Path,
+        *,
+        options: LessonPlanStandardizationOptions | None = None,
+    ) -> dict[str, object]:
         source = source.resolve()
         output = output.resolve()
         if source == output:
@@ -394,19 +429,33 @@ class LessonPlanWordStandardizer:
         if source.suffix.lower() != ".docx" or output.suffix.lower() != ".docx":
             raise ValueError("Công cụ V1 chỉ xử lý tệp .docx.")
 
+        options = options or LessonPlanStandardizationOptions()
         before = inventory(source)
         source_hash = _sha256(source)
         document = Document(source)
         changes = Counter()
-        self._normalize_sections(document, changes)
-        self._normalize_styles(document)
-        self._normalize_paragraphs(document, changes)
-        self._normalize_tables(document, changes)
-        self._normalize_headers_and_footers(document, changes)
+        if options.normalize_page_layout:
+            self._normalize_sections(document, changes)
+        if options.normalize_font:
+            self._normalize_styles(document)
+        if options.normalize_font or options.normalize_spacing:
+            self._normalize_paragraphs(
+                document,
+                changes,
+                normalize_font=options.normalize_font,
+                normalize_spacing=options.normalize_spacing,
+            )
+        if options.normalize_tables:
+            self._normalize_tables(document, changes)
+        if options.normalize_header_footer:
+            self._normalize_headers_and_footers(document, changes)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         document.save(output)
-        if self.profile.get("equations", {}).get("mode") == "force_times":
+        if (
+            options.normalize_equations
+            and self.profile.get("equations", {}).get("mode") == "force_times"
+        ):
             changes["omml_runs_forced_to_times"] = self._force_omml_font(
                 output,
                 self.profile["equations"].get("text_font", "Times New Roman"),
@@ -420,6 +469,7 @@ class LessonPlanWordStandardizer:
             "source": str(source), "output": str(output), "source_sha256": source_hash,
             "source_preserved": _sha256(source) == source_hash,
             "profile_name": self.profile.get("profile_name", "lesson-plan-default"),
+            "selected_options": asdict(options),
             "before": asdict(before), "after": asdict(after), "changes": dict(changes),
             "equations": {
                 "mode": self.profile.get("equations", {}).get("mode", "safe"),
@@ -623,29 +673,47 @@ class LessonPlanWordStandardizer:
                 for cell in row.cells:
                     yield from cell.paragraphs
 
-    def _normalize_paragraphs(self, document, changes):
+    def _normalize_paragraphs(
+        self,
+        document,
+        changes,
+        *,
+        normalize_font=True,
+        normalize_spacing=True,
+    ):
         body = self.profile["body"]
         for paragraph in self._all_paragraphs(document):
             kind = self._paragraph_kind(paragraph.text)
             in_table = paragraph._p.getparent().tag == qn("w:tc")
             size = self.profile["table"]["size_pt"] if in_table else body["size_pt"]
-            for run in paragraph.runs:
-                run.font.name = body["font"]
-                run.font.size = Pt(size)
-                fonts = run._element.get_or_add_rPr().rFonts
-                for key in ("ascii", "hAnsi", "eastAsia", "cs"):
-                    fonts.set(qn(f"w:{key}"), body["font"])
+            if normalize_font:
+                for run in paragraph.runs:
+                    run.font.name = body["font"]
+                    run.font.size = Pt(size)
+                    fonts = run._element.get_or_add_rPr().rFonts
+                    for key in ("ascii", "hAnsi", "eastAsia", "cs"):
+                        fonts.set(qn(f"w:{key}"), body["font"])
             fmt = paragraph.paragraph_format
-            fmt.line_spacing = body["line_spacing"]
-            fmt.space_before = Pt(0)
-            fmt.space_after = Pt(0)
-            if kind == "body" and paragraph.text.strip():
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            elif kind == "title":
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for run in paragraph.runs: run.bold = True; run.font.size = Pt(self.profile["title"]["size_pt"])
-            elif kind in {"heading_1", "heading_2", "activity"}:
-                for run in paragraph.runs: run.bold = True
+            if normalize_spacing:
+                fmt.line_spacing = body["line_spacing"]
+                fmt.space_before = Pt(0)
+                fmt.space_after = Pt(0)
+                if kind == "body" and paragraph.text.strip():
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                elif kind == "title":
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            if normalize_font and kind in {
+                "title",
+                "heading_1",
+                "heading_2",
+                "activity",
+            }:
+                for run in paragraph.runs:
+                    run.bold = True
+                    if kind == "title":
+                        run.font.size = Pt(
+                            self.profile["title"]["size_pt"]
+                        )
             changes[f"paragraph_{kind}"] += 1
 
     def _normalize_tables(self, document, changes):

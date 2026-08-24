@@ -64,21 +64,120 @@ def select_admin_portal_page(
     session_state[ADMIN_PORTAL_SESSION_KEY] = page.page_id
 
 
-def _render_admin_dashboard(st) -> None:
+def _load_admin_user_directory(*, client) -> tuple[dict[str, str], ...]:
+    """Join trusted portal roles with optional teacher profiles."""
+
+    role_response = (
+        client.table("portal_roles")
+        .select("user_id,role,created_at")
+        .eq("role", "teacher")
+        .execute()
+    )
+    profile_response = (
+        client.table("teacher_profiles")
+        .select(
+            "user_id,teacher_code,full_name,school_name,created_at"
+        )
+        .execute()
+    )
+
+    role_rows = tuple(getattr(role_response, "data", ()) or ())
+    profile_rows = tuple(getattr(profile_response, "data", ()) or ())
+    profiles_by_user = {
+        str(item.get("user_id", "") or ""): item
+        for item in profile_rows
+        if isinstance(item, dict)
+    }
+
+    result = []
+    for role_row in role_rows:
+        if not isinstance(role_row, dict):
+            continue
+        user_id = str(role_row.get("user_id", "") or "").strip()
+        if not user_id:
+            continue
+        profile = profiles_by_user.get(user_id)
+        result.append(
+            {
+                "user_id": user_id,
+                "teacher_code": str((profile or {}).get("teacher_code", "") or ""),
+                "full_name": str((profile or {}).get("full_name", "") or ""),
+                "school_name": str((profile or {}).get("school_name", "") or ""),
+                "registered_at": str(role_row.get("created_at", "") or ""),
+                "status": (
+                    "Đã là người dùng"
+                    if profile is not None
+                    else "Mới đăng ký"
+                ),
+            }
+        )
+
+    return tuple(
+        sorted(
+            result,
+            key=lambda item: (
+                0 if item["status"] == "Mới đăng ký" else 1,
+                item["full_name"].casefold(),
+                item["registered_at"],
+            ),
+        )
+    )
+
+
+def _render_admin_dashboard(st, *, client=None) -> None:
     st.title("ADMIN Dashboard")
     st.caption(
         "Tổng quan vận hành và quản trị dữ liệu tin cậy của MathTeacher-AI."
     )
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Draft", "—")
-    col2.metric("Pending", "—")
-    col3.metric("Verified", "—")
-    col4.metric("Published", "—")
+    if client is None:
+        st.warning("Chưa có kết nối dữ liệu để tải danh sách USER.")
+        return
 
-    st.info(
-        "UI Shell đã sẵn sàng. Dữ liệu thật sẽ được nối qua "
-        "application/service boundary ở các hoạt động tiếp theo."
+    try:
+        user_rows = _load_admin_user_directory(client=client)
+    except Exception as error:
+        st.error(f"Không thể tải danh sách USER: {error}")
+        return
+
+    new_count = sum(
+        item["status"] == "Mới đăng ký"
+        for item in user_rows
+    )
+    active_count = len(user_rows) - new_count
+
+    metric_columns = st.columns(3)
+    metric_columns[0].metric("Tổng USER", len(user_rows))
+    metric_columns[1].metric("Mới đăng ký", new_count)
+    metric_columns[2].metric("Đã là người dùng", active_count)
+
+    status_filter = st.segmented_control(
+        "Trạng thái USER",
+        options=("Tất cả", "Mới đăng ký", "Đã là người dùng"),
+        default="Tất cả",
+        key="admin_dashboard_user_status",
+    )
+    visible_rows = tuple(
+        item
+        for item in user_rows
+        if status_filter in (None, "Tất cả")
+        or item["status"] == status_filter
+    )
+
+    st.dataframe(
+        [
+            {
+                "Trạng thái": item["status"],
+                "Họ và tên": item["full_name"] or "— Chưa khai hồ sơ —",
+                "Mã giáo viên": item["teacher_code"] or "—",
+                "Trường": item["school_name"] or "—",
+                "Ngày đăng ký": item["registered_at"][:10] or "—",
+                "USER ID": item["user_id"],
+            }
+            for item in visible_rows
+        ],
+        hide_index=True,
+        use_container_width=True,
     )
 
 
@@ -136,6 +235,13 @@ def render_admin_page(
         page_id=page_id
     )
 
+    if page.page_id == ADMIN_PAGE_DASHBOARD:
+        _render_admin_dashboard(
+            st,
+            client=client,
+        )
+        return
+
     if (
         page.page_id
         == ADMIN_PAGE_SUBJECT_CATALOG
@@ -177,7 +283,6 @@ def render_admin_page(
         return
 
     renderers = {
-        ADMIN_PAGE_DASHBOARD: _render_admin_dashboard,
         ADMIN_PAGE_TRUSTED_DATA: _render_trusted_data,
         ADMIN_PAGE_TIME_ALLOCATION: _render_time_allocation,
         ADMIN_PAGE_SOURCES: _render_sources,

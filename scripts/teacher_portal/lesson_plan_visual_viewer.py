@@ -34,6 +34,11 @@ R_NS = (
     "officeDocument/2006/relationships"
 )
 
+WP_NS = (
+    "http://schemas.openxmlformats.org/"
+    "drawingml/2006/wordprocessingDrawing"
+)
+
 
 def iter_block_items(parent):
     if isinstance(parent, DocumentObject):
@@ -81,6 +86,61 @@ def paragraph_alignment(paragraph):
     return "left"
 
 
+def run_images_to_html(run):
+    images = []
+
+    for blip in run._r.xpath(".//a:blip"):
+        relationship_id = blip.get(
+            "{" + R_NS + "}embed"
+        )
+
+        if not relationship_id:
+            continue
+
+        image_part = run.part.related_parts.get(
+            relationship_id
+        )
+
+        if image_part is None:
+            continue
+
+        encoded = base64.b64encode(
+            image_part.blob
+        ).decode("ascii")
+        mime = str(
+            getattr(
+                image_part,
+                "content_type",
+                "image/png",
+            )
+        )
+
+        drawing = blip.getparent()
+
+        while drawing is not None and not drawing.tag.endswith("}drawing"):
+            drawing = drawing.getparent()
+
+        width_style = ""
+
+        if drawing is not None:
+            extents = drawing.xpath(".//wp:extent")
+
+            if extents:
+                try:
+                    width_points = int(extents[0].get("cx")) / 12700.0
+                    width_style = f"width:{width_points:.1f}pt;"
+                except (TypeError, ValueError):
+                    width_style = ""
+
+        images.append(
+            '<img class="doc-inline-image" '
+            f'src="data:{html.escape(mime)};base64,{encoded}" '
+            f'style="{width_style}max-width:100%;height:auto;">'
+        )
+
+    return "".join(images)
+
+
 def run_to_html(run):
     text = html.escape(
         run.text or ""
@@ -89,22 +149,19 @@ def run_to_html(run):
         "<br>"
     )
 
-    if not text:
-        return ""
-
-    if run.bold:
+    if text and run.bold:
         text = f"<strong>{text}</strong>"
 
-    if run.italic:
+    if text and run.italic:
         text = f"<em>{text}</em>"
 
-    if run.underline:
+    if text and run.underline:
         text = f"<u>{text}</u>"
 
-    if run.font.superscript:
+    if text and run.font.superscript:
         text = f"<sup>{text}</sup>"
 
-    if run.font.subscript:
+    if text and run.font.subscript:
         text = f"<sub>{text}</sub>"
 
     styles = []
@@ -119,7 +176,7 @@ def run_to_html(run):
             f"font-size:{run.font.size.pt:.1f}pt"
         )
 
-    if styles:
+    if text and styles:
         text = (
             '<span style="'
             + ";".join(styles)
@@ -128,7 +185,7 @@ def run_to_html(run):
             + "</span>"
         )
 
-    return text
+    return text + run_images_to_html(run)
 
 
 def paragraph_has_math(paragraph):
@@ -156,6 +213,16 @@ def paragraph_to_html(paragraph):
     styles = [
         f"text-align:{paragraph_alignment(paragraph)}"
     ]
+
+    if paragraph._p.xpath("./w:pPr/w:pBdr/w:bottom"):
+        styles.extend(
+            (
+                "border-bottom:1px solid #222",
+                "min-height:1px",
+                "margin-top:6pt",
+                "margin-bottom:0",
+            )
+        )
 
     if fmt.left_indent:
         value = css_length_twips(
@@ -367,39 +434,6 @@ def build_document_html(
                 )
             )
 
-    images = extract_images(
-        docx_bytes
-    )
-
-    if images:
-        image_html = [
-            '<div class="image-section">',
-            '<div class="image-title">'
-            "Hình ảnh trong tài liệu"
-            "</div>",
-        ]
-
-        for (
-            name,
-            mime,
-            encoded,
-        ) in images:
-            image_html.append(
-                '<div class="doc-image">'
-                f'<img src="data:{mime};base64,{encoded}" '
-                'style="max-width:100%;height:auto;">'
-                f'<div class="image-caption">{html.escape(name)}</div>'
-                "</div>"
-            )
-
-        image_html.append(
-            "</div>"
-        )
-
-        blocks.extend(
-            image_html
-        )
-
     body = "\n".join(
         blocks
     )
@@ -459,6 +493,12 @@ body {{
 
 .doc-cell p {{
     margin: 0 0 4px 0;
+}}
+
+.doc-inline-image {{
+    display: block;
+    margin: 6px auto;
+    object-fit: contain;
 }}
 
 .math-block {{

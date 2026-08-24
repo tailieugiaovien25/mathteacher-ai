@@ -9,6 +9,7 @@ from document_standardization.lesson_plan_document_context_applier import (
     LessonPlanDocumentContextApplier,
 )
 from document_standardization.lesson_plan_standardizer import (
+    LessonPlanStandardizationOptions,
     LessonPlanWordStandardizer,
 )
 from lesson_planning_v2.contexts import (
@@ -47,6 +48,7 @@ class LessonPlanDocumentPipeline:
         output: Path,
         report_path: Path,
         context: ScheduledLessonContext,
+        options: LessonPlanStandardizationOptions | None = None,
     ) -> LessonPlanDocumentPipelineResult:
         source = source.resolve()
         output = output.resolve()
@@ -70,21 +72,45 @@ class LessonPlanDocumentPipeline:
                 / "context-applied.docx"
             )
 
-            context_result = (
-                self.context_applier.apply(
-                    source,
-                    context_applied,
-                    context,
-                )
+            resolved_options = (
+                options
+                or LessonPlanStandardizationOptions()
             )
 
-            standardization_report = (
-                self.standardizer.standardize(
-                    context_applied,
-                    output,
-                    report_path,
+            if resolved_options.sync_context:
+                context_result = (
+                    self.context_applier.apply(
+                        source,
+                        context_applied,
+                        context,
+                    )
                 )
-            )
+            else:
+                from shutil import copyfile
+
+                copyfile(source, context_applied)
+                context_result = ContextApplicationResult(
+                    applied_fields=(),
+                    unresolved_fields=(),
+                )
+
+            if options is None:
+                standardization_report = (
+                    self.standardizer.standardize(
+                        context_applied,
+                        output,
+                        report_path,
+                    )
+                )
+            else:
+                standardization_report = (
+                    self.standardizer.standardize(
+                        context_applied,
+                        output,
+                        report_path,
+                        options=resolved_options,
+                    )
+                )
 
         return LessonPlanDocumentPipelineResult(
             context_result=context_result,

@@ -53,6 +53,18 @@ from portal_v2.ui.portal_flash_feedback import (
 _CATALOG_SNAPSHOT_SESSION_KEY = (
     "teacher_timetable_catalog_snapshot"
 )
+_TIMETABLE_DRAFT_KEY = "teacher_timetable_autosaved_draft"
+_TIMETABLE_NOTICE_KEY = "teacher_timetable_floating_notice"
+
+
+def _autosave_timetable_change(st, field_key: str, field_label: str) -> None:
+    """Keep the latest timetable edit across reruns/page navigation."""
+    draft = dict(st.session_state.get(_TIMETABLE_DRAFT_KEY, {}) or {})
+    draft[field_key] = st.session_state.get(field_key)
+    st.session_state[_TIMETABLE_DRAFT_KEY] = draft
+    st.session_state[_TIMETABLE_NOTICE_KEY] = (
+        f"Đã tự lưu thay đổi {field_label}."
+    )
 
 
 class _SubjectCatalogSnapshotRepository:
@@ -139,6 +151,9 @@ def render_teacher_timetable(
         st=st,
         session_state=st.session_state,
     )
+    floating_notice = st.session_state.pop(_TIMETABLE_NOTICE_KEY, "")
+    if floating_notice:
+        st.toast(str(floating_notice), icon="💾")
 
     _perf_started = perf_counter()
     _perf: dict[str, float] = {}
@@ -146,10 +161,23 @@ def render_teacher_timetable(
     st.markdown(
         """
         <style>
+        [data-testid="stHeader"] {height:2.6rem;min-height:2.6rem;background:rgba(255,255,255,.9);}
+        .block-container {max-width: 1320px;padding-top:.35rem;padding-bottom:.8rem;}
+        h1 {font-size: 1.72rem !important; letter-spacing: -.025em; color:#17233b;}
+        .mt-timetable-hero {padding:.7rem 1rem;margin:0 0 .65rem;border:1px solid #8eacd0;border-radius:14px;background:linear-gradient(145deg,#fff,#eaf3ff);box-shadow:4px 5px 0 #b8c9dc,0 10px 22px rgba(38,70,116,.13),inset 0 1px 0 #fff;}
+        .mt-timetable-hero h2 {margin:0;color:#142845;font:750 1.28rem/1.35 Inter,Arial,sans-serif;}
+        .mt-timetable-hero p {margin:.18rem 0 0;color:#52647c;font:500 .86rem/1.35 Inter,Arial,sans-serif;}
+        .mt-day-heading {display:flex;align-items:center;justify-content:space-between;padding:.2rem .15rem .7rem;border-bottom:1px solid #e5edf8;margin-bottom:.65rem;}
+        .mt-day-heading strong {font:750 1.12rem/1.3 Inter,Arial,sans-serif;color:#17345f;}
+        div[data-testid="stTabs"] button {font-weight:650;padding:.55rem .82rem;}
+        div[data-testid="stTabs"] [data-baseweb="tab-list"] {gap:.35rem;background:#edf4fd;border-radius:14px;padding:.35rem;}
+        div[data-testid="stTabs"] [aria-selected="true"] {background:#fff;border-radius:10px;box-shadow:0 4px 12px rgba(39,74,124,.12);}
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            border: 2px solid #3b82f6 !important;
+            border: 1px solid #dce7f5 !important;
             border-radius: 14px !important;
-            box-shadow: 0 2px 8px rgba(30, 64, 175, 0.08);
+            box-shadow:4px 5px 0 #c4d2e3,0 9px 20px rgba(30,64,175,.10);
+            background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(237,245,255,.92));
+            padding:.65rem .75rem!important;
         }
 
         div[data-testid="stSelectbox"] > div {
@@ -158,7 +186,9 @@ def render_teacher_timetable(
 
         div[data-baseweb="select"] > div {
             border: 1.5px solid #94a3b8 !important;
-            min-height: 42px;
+            min-height: 38px;height:38px;
+            font-size:14px!important;
+            background:#fff!important;
         }
 
         div[data-baseweb="select"]:focus-within > div {
@@ -168,7 +198,11 @@ def render_teacher_timetable(
 
         hr {
             border-top: 2px solid #cbd5e1 !important;
+            margin:.55rem 0!important;
         }
+        .st-key-teacher_timetable_week_number {max-width:280px;margin-bottom:.25rem;}
+        .st-key-teacher_timetable_save button {min-height:44px;border-radius:10px!important;box-shadow:3px 4px 0 #12345b!important;}
+        div[data-testid="stAlert"] {margin:.45rem 0!important;}
 
         @media (max-width: 900px) {
             .block-container {
@@ -181,14 +215,14 @@ def render_teacher_timetable(
         unsafe_allow_html=True,
     )
 
-    st.title(
-        "Th\u1eddi kh\u00f3a bi\u1ec3u"
-    )
-
-    st.caption(
-        "Nh\u1eadp th\u1eddi kh\u00f3a bi\u1ec3u "
-        "tr\u1ef1c ti\u1ebfp theo ph\u00e2n c\u00f4ng "
-        "gi\u1ea3ng d\u1ea1y \u0111\u00e3 khai b\u00e1o."
+    st.markdown(
+        """
+        <div class="mt-timetable-hero">
+          <h2>Thời khóa biểu</h2>
+          <p>Mỗi ngày nằm trong một thẻ riêng; chọn lớp, môn và phân môn cho từng tiết rồi lưu một lần.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     profile_repository = (
@@ -278,7 +312,10 @@ def render_teacher_timetable(
             _CATALOG_SNAPSHOT_SESSION_KEY
         )
 
-        if catalog_snapshot is None:
+        if (
+            catalog_snapshot is None
+            or not any(tuple(catalog_snapshot[0] or ()))
+        ):
             _catalog_perf_step = perf_counter()
 
             snapshot_subjects = (
@@ -396,12 +433,30 @@ def render_teacher_timetable(
         return
 
     if not subject_scopes:
-        st.warning(
-            "Ch\u01b0a c\u00f3 M\u00f4n ho\u1eb7c "
-            "Ph\u00e2n m\u00f4n ACTIVE trong "
-            "danh m\u1ee5c canonical."
+        # A stale/temporarily empty catalogue must not blank the entire page.
+        # Active teaching assignments already carry canonical IDs and provide
+        # a safe display fallback until the catalogue is refreshed.
+        subject_scopes = tuple(
+            TeacherTimetableSubjectScope(
+                subject_id=str(item.subject_ref or ""),
+                subject_name=str(item.subject_ref or "Chưa xác định"),
+                component_id=str(item.component_ref or "") or None,
+                component_name=str(item.component_ref or "") or None,
+            )
+            for item in {
+                (
+                    str(assignment.subject_ref or ""),
+                    str(assignment.component_ref or ""),
+                ): assignment
+                for assignment in assignments
+                if str(assignment.subject_ref or "").strip()
+            }.values()
         )
-        return
+        st.toast(
+            "Đang dùng dữ liệu Môn/Phân môn từ phân công giảng dạy; "
+            "danh mục canonical sẽ được tải lại tự động.",
+            icon="ℹ️",
+        )
 
     _perf_step = perf_counter()
 
@@ -935,6 +990,8 @@ def render_teacher_timetable(
                 ),
                 key=class_key,
                 label_visibility="collapsed",
+                on_change=_autosave_timetable_change,
+                args=(st, class_key, "Lớp"),
             )
 
         subject_options = (
@@ -972,6 +1029,8 @@ def render_teacher_timetable(
                 key=subject_key,
                 disabled=not selected_class,
                 label_visibility="collapsed",
+                on_change=_autosave_timetable_change,
+                args=(st, subject_key, "Môn"),
             )
 
         component_options = (
@@ -1021,6 +1080,8 @@ def render_teacher_timetable(
                     label_visibility=(
                         "collapsed"
                     ),
+                    on_change=_autosave_timetable_change,
+                    args=(st, component_key, "Phân môn"),
                 )
             )
 
@@ -1095,8 +1156,21 @@ def render_teacher_timetable(
         with st.container(
             border=True
         ):
+            scheduled_count = sum(
+                1
+                for session in (
+                    TeachingSession.MORNING,
+                    TeachingSession.AFTERNOON,
+                )
+                for period in range(1, 6)
+                if (weekday, session, period) in slot_by_position
+            )
             st.markdown(
-                f"### {label}"
+                "<div class='mt-day-heading'>"
+                f"<strong>{label}</strong>"
+                f"<span>{scheduled_count} tiết đã xếp</span>"
+                "</div>",
+                unsafe_allow_html=True,
             )
 
             render_day_session(
@@ -1137,17 +1211,18 @@ def render_teacher_timetable(
             f"Tu\u1ea7n {value}"
         ),
         key="teacher_timetable_week_number",
+        on_change=_autosave_timetable_change,
+        args=(st, "teacher_timetable_week_number", "Tuần học"),
     )
 
     st.caption(
         f"\u0110ang ch\u1ecdn: Tu\u1ea7n {selected_week}"
     )
 
-    for weekday, label in _WEEKDAYS:
-        render_day_card(
-            weekday,
-            label,
-        )
+    day_tabs = st.tabs(tuple(label for _, label in _WEEKDAYS))
+    for day_tab, (weekday, label) in zip(day_tabs, _WEEKDAYS):
+        with day_tab:
+            render_day_card(weekday, label)
 
     st.caption(
         "L\u1edbp \u0111\u01b0\u1ee3c l\u1ecdc theo "
@@ -1287,6 +1362,10 @@ def render_teacher_timetable(
                 ),
                 level=PortalFlashLevel.SUCCESS,
             )
+            st.toast(
+                f"Đã lưu {changed_count} thay đổi Thời khóa biểu.",
+                icon="✅",
+            )
         else:
             set_portal_flash(
                 st.session_state,
@@ -1295,6 +1374,10 @@ def render_teacher_timetable(
                     "kh\u00f4ng c\u00f3 thay \u0111\u1ed5i."
                 ),
                 level=PortalFlashLevel.INFO,
+            )
+            st.toast(
+                "Thời khóa biểu không có thay đổi mới.",
+                icon="ℹ️",
             )
 
         st.rerun()

@@ -1,7 +1,7 @@
 ﻿from __future__ import annotations
 
 from collections import Counter
-from datetime import timedelta
+from datetime import date, timedelta
 
 from educational_planning_v2.models.weekly_teaching_schedule import (
     AcademicWeek,
@@ -58,18 +58,44 @@ class WeeklyTeachingScheduleService:
             teacher_id=normalized_teacher_id,
             before_date=academic_week.start_date,
         )
+
+        baseline_source = "EXECUTION_RECORDS"
+
+        if not execution_records:
+            completed_counts = (
+                self._scheduled_counts_before_week(
+                    timetable_slots=timetable_slots,
+                    teacher_id=normalized_teacher_id,
+                    academic_week=academic_week,
+                )
+            )
+            baseline_source = "TIMETABLE_FALLBACK"
         occurrences: Counter[tuple[str, str, str | None]] = Counter()
         entries: list[WeeklyTeachingScheduleEntry] = []
 
+        dated_slot_index = {}
+
+        for slot in relevant_slots:
+            teaching_date = (
+                academic_week.start_date
+                + timedelta(days=slot.weekday - 1)
+            )
+            occurrence_key = self._slot_occurrence_key(
+                teaching_date=teaching_date,
+                slot=slot,
+            )
+            dated_slot_index.setdefault(
+                occurrence_key,
+                (teaching_date, slot),
+            )
+
+        duplicate_slot_count = (
+            len(relevant_slots)
+            - len(dated_slot_index)
+        )
+
         dated_slots = sorted(
-            (
-                (
-                    academic_week.start_date
-                    + timedelta(days=slot.weekday - 1),
-                    slot,
-                )
-                for slot in relevant_slots
-            ),
+            dated_slot_index.values(),
             key=lambda item: (
                 item[0],
                 (
@@ -128,9 +154,93 @@ class WeeklyTeachingScheduleService:
             academic_week=academic_week,
             entries=tuple(entries),
             metadata={
-                "timetable_slot_count": len(relevant_slots),
+                "timetable_slot_count": len(dated_slots),
+                "duplicate_timetable_slot_count": (
+                    duplicate_slot_count
+                ),
                 "completed_execution_count": sum(completed_counts.values()),
+                "period_baseline_source": baseline_source,
             },
+        )
+
+    @classmethod
+    def _scheduled_counts_before_week(
+        cls,
+        *,
+        timetable_slots: tuple[TimetableSlot, ...],
+        teacher_id: str,
+        academic_week: AcademicWeek,
+    ) -> Counter[tuple[str, str, str | None]]:
+        """Estimate prior periods from dated TKB occurrences.
+
+        This is used only while no persisted execution history exists.
+        Exact duplicate occurrences are counted once; morning and
+        afternoon occurrences remain distinct.
+        """
+
+        result: Counter[
+            tuple[str, str, str | None]
+        ] = Counter()
+        seen_occurrences = set()
+        last_date = (
+            academic_week.start_date
+            - timedelta(days=1)
+        )
+
+        for slot in timetable_slots:
+            if slot.teacher_id != teacher_id:
+                continue
+
+            occurrence_date = cls._first_weekday_on_or_after(
+                start_date=slot.effective_from,
+                weekday=slot.weekday,
+            )
+            occurrence_end = min(
+                slot.effective_to,
+                last_date,
+            )
+
+            while occurrence_date <= occurrence_end:
+                occurrence_key = cls._slot_occurrence_key(
+                    teaching_date=occurrence_date,
+                    slot=slot,
+                )
+
+                if occurrence_key not in seen_occurrences:
+                    seen_occurrences.add(occurrence_key)
+                    result[slot.curriculum_key] += 1
+
+                occurrence_date += timedelta(days=7)
+
+        return result
+
+    @staticmethod
+    def _first_weekday_on_or_after(
+        *,
+        start_date: date,
+        weekday: int,
+    ) -> date:
+        target_python_weekday = weekday - 1
+        offset = (
+            target_python_weekday
+            - start_date.weekday()
+        ) % 7
+        return start_date + timedelta(days=offset)
+
+    @staticmethod
+    def _slot_occurrence_key(
+        *,
+        teaching_date: date,
+        slot: TimetableSlot,
+    ) -> tuple:
+        return (
+            teaching_date,
+            slot.session.value,
+            slot.timetable_period,
+            slot.teacher_id,
+            slot.class_id,
+            slot.subject_ref,
+            slot.component_ref or "",
         )
 
     @staticmethod

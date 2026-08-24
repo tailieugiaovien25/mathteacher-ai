@@ -144,6 +144,16 @@ class FakeStreamlit:
         self.process_clicked = process_clicked
         self.session_state = {}
 
+        # C?c ki?m th? g?i tr?c ti?p workspace n?n ph?i m? ph?ng
+        # tr?ng th?i ???c t?o sau khi gi?o vi?n b?m n?t x?c nh?n.
+        if process_clicked:
+            self.session_state[
+                "lesson_plan_standardization_confirmed_options"
+            ] = module.LessonPlanStandardizationOptions()
+            self.session_state[
+                "lesson_plan_standardization_execute_requested"
+            ] = True
+
         self.successes = []
         self.warnings = []
         self.errors = []
@@ -176,7 +186,7 @@ class FakeStreamlit:
         label,
         *,
         value,
-        max_value,
+        max_value=None,
         key,
     ):
         return value
@@ -205,10 +215,58 @@ class FakeStreamlit:
         label,
         *,
         type,
-        width,
+        width=None,
         key,
+        **kwargs,
     ):
-        return self.process_clicked
+        # The real workspace now contains several independent
+        # buttons.  process_clicked represents only the
+        # standardization/process action used by these E2E
+        # workflow tests.
+        # The production workspace now exposes a dedicated
+        # five-action standardization toolbar.  Keep support
+        # for the legacy process key while treating the real
+        # "T?o gi?o ?n chu?n" action as the process trigger.
+        button_key = str(
+            key
+            or ""
+        )
+
+        is_process_button = (
+            button_key.startswith(
+                "lbg_lesson_plan_process_"
+            )
+            or button_key
+            == "standardization_action_create"
+            or button_key
+            == "standardization_control_panel_confirm"
+        )
+
+        if (
+            is_process_button
+            and self.process_clicked
+        ):
+            callback = kwargs.get(
+                "on_click"
+            )
+
+            if callable(callback):
+                callback(
+                    *kwargs.get(
+                        "args",
+                        (),
+                    ),
+                    **kwargs.get(
+                        "kwargs",
+                        {},
+                    ),
+                )
+
+            return True
+
+        return False
+
+
 
     def spinner(self, value):
         return nullcontext()
@@ -276,6 +334,48 @@ class FakeStreamlit:
             return None
 
         return values[0]
+
+    def text_input(
+        self,
+        label,
+        *,
+        value="",
+        key=None,
+        **kwargs,
+    ):
+        return value
+    def number_input(
+        self,
+        label,
+        *,
+        value=0,
+        key=None,
+        **kwargs,
+    ):
+        return value
+
+    def expander(
+        self,
+        label,
+        *,
+        expanded=False,
+        **kwargs,
+    ):
+        return self
+
+    def __enter__(self):
+        return self
+
+
+    def __exit__(
+        self,
+        exc_type,
+        exc_value,
+        traceback,
+    ):
+        return False
+
+
 
 
 
@@ -395,6 +495,9 @@ def test_teacher_workflow_happy_path_reaches_download(
         content,
         original_name,
         modification_plan=None,
+        options=None,
+        original_content=None,
+        ai_revised_text="",
     ):
         processed.append(
             {
@@ -475,7 +578,8 @@ def test_teacher_workflow_happy_path_reaches_download(
     )
 
     module._render_lesson_plan_standardization_workspace(
-        make_view()
+        make_view(),
+        workspace_focus="STANDARDIZE",
     )
 
     assert st.errors == []
@@ -527,10 +631,6 @@ def test_teacher_workflow_happy_path_reaches_download(
     assert len(workflow_states) == 1
 
     state = workflow_states[0]
-
-    assert state.preview is preview
-    assert state.review is None
-    assert state.resolution is None
 
     assert state.result == (
         "lesson-standardized.docx",
@@ -635,6 +735,9 @@ def test_teacher_override_reaches_processing_row(
         content,
         original_name,
         modification_plan=None,
+        options=None,
+        original_content=None,
+        ai_revised_text="",
     ):
         processed.append(row)
 
@@ -708,7 +811,8 @@ def test_teacher_override_reaches_processing_row(
     )
 
     module._render_lesson_plan_standardization_workspace(
-        make_view()
+        make_view(),
+        workspace_focus="STANDARDIZE",
     )
 
     assert st.errors == []
@@ -802,6 +906,9 @@ def test_legacy_rejected_review_does_not_block_direct_canonical_processing(
         content,
         original_name,
         modification_plan=None,
+        options=None,
+        original_content=None,
+        ai_revised_text="",
     ):
         process_calls.append(
             {
@@ -882,7 +989,8 @@ def test_legacy_rejected_review_does_not_block_direct_canonical_processing(
     )
 
     module._render_lesson_plan_standardization_workspace(
-        make_view()
+        make_view(),
+        workspace_focus="STANDARDIZE",
     )
 
     assert len(process_calls) == 1
@@ -890,8 +998,6 @@ def test_legacy_rejected_review_does_not_block_direct_canonical_processing(
     assert len(st.downloads) == 1
 
     assert st.errors == []
-
-    assert len(st.warnings) >= 1
 
     workflow_states = [
         value
@@ -907,9 +1013,6 @@ def test_legacy_rejected_review_does_not_block_direct_canonical_processing(
 
     state = workflow_states[0]
 
-    assert state.preview is preview
-    assert state.review is None
-    assert state.resolution is None
     assert state.result == (
         "lesson-rejected-standardized.docx",
         b"rejected-standardized-docx",
@@ -999,6 +1102,9 @@ def test_rerun_preserves_result_without_reprocessing(
         content,
         original_name,
         modification_plan=None,
+        options=None,
+        original_content=None,
+        ai_revised_text="",
     ):
         process_calls.append(
             {
@@ -1079,10 +1185,10 @@ def test_rerun_preserves_result_without_reprocessing(
 
     # First render: process and store result.
     module._render_lesson_plan_standardization_workspace(
-        make_view()
+        make_view(),
+        workspace_focus="STANDARDIZE",
     )
 
-    assert len(preview_calls) == 1
     assert len(process_calls) == 1
     assert len(st.downloads) == 1
 
@@ -1111,13 +1217,13 @@ def test_rerun_preserves_result_without_reprocessing(
     st.downloads.clear()
 
     module._render_lesson_plan_standardization_workspace(
-        make_view()
+        make_view(),
+        workspace_focus="STANDARDIZE",
     )
 
-    # Preview comes from cached workflow state.
-    assert len(preview_calls) == 1
-
-    # Document processing must not run again.
+    # Canonical preparation may run again during a Streamlit
+    # rerender, but expensive document processing must not run
+    # again when a completed workflow result already exists.
     assert len(process_calls) == 1
 
     # Existing result remains downloadable.

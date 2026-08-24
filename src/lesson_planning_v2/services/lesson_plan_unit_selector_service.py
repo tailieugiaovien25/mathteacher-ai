@@ -221,7 +221,7 @@ class LessonPlanUnitSelectorService:
         LessonPlanUnit,
         ...
     ]:
-        result = []
+        grouped = {}
 
         for index, row in enumerate(rows):
             period = self._period(row)
@@ -238,57 +238,35 @@ class LessonPlanUnitSelectorService:
                 or ""
             ).strip()
 
-            class_id = self._class_id(
-                row
-            )
-
-            teaching_date = getattr(
-                row,
-                "teaching_date",
-                None,
-            )
-
-            dates = ()
-
-            if (
-                teaching_date is not None
-                and class_id
-            ):
-                dates = (
-                    LessonPlanUnitTeachingDate(
-                        teaching_date=teaching_date,
-                        class_id=class_id,
-                    ),
-                )
-
-            result.append(
-                LessonPlanUnit(
-                    unit_id=(
-                        f"period:{period}:"
-                        f"{index}"
-                    ),
-                    mode=(
-                        LessonPlanSelectionMode
-                        .PERIOD
-                    ),
-                    title=(
-                        title
-                        or f"Tiết {period}"
-                    ),
-                    curriculum_periods=(
-                        period,
-                    ),
-                    class_ids=(
-                        (class_id,)
-                        if class_id
-                        else ()
-                    ),
-                    teaching_dates=dates,
-                    row_indices=(index,),
+            lesson_id = str(getattr(row, "lesson_id", "") or "").strip()
+            subject_ref = self._subject_ref(row)
+            component_ref = str(
+                getattr(row, "component_ref", "") or ""
+            ).strip()
+            # The same PPCT period taught in several classes is one authoring
+            # option.  Subject/component remain part of the identity so rows
+            # from another curriculum scope can never be merged.
+            identity = ":".join(
+                (
+                    "period",
+                    subject_ref,
+                    component_ref,
+                    str(period),
+                    lesson_id or "title=" + title.casefold(),
                 )
             )
+            self._append(
+                grouped=grouped,
+                identity=identity,
+                title=title or f"Tiết {period}",
+                index=index,
+                row=row,
+            )
 
-        return tuple(result)
+        return self._finish(
+            grouped=grouped,
+            mode=LessonPlanSelectionMode.PERIOD,
+        )
 
     def _build_week_subject_units(
         self,

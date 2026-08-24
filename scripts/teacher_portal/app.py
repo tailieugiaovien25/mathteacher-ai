@@ -18,17 +18,27 @@ from portal_v2.authorization import (
 )
 from portal_v2.ui import render_admin_shell
 from portal_v2.ui.teacher_workspace_styles import apply_teacher_workspace_styles
+from portal_v2.ui.modern_3d_design_system import (
+    apply_modern_3d_design_system,
+)
 
 
 PORTAL_PAGES = (
     'T\u1ed5ng quan',
-    'C\xf4ng c\u1ee5 so\u1ea1n b\xe0i',
+    'Chu\u1ea9n h\xf3a gi\xe1o \xe1n',
+    'Qu\u1ea3n l\xfd gi\xe1o \xe1n',
+    'So\u1ea1n b\xe0i c\xf9ng AI',
+    'L\u1ecbch b\xe1o gi\u1ea3ng & PBSDTB',
     'Th\u1eddi kh\xf3a bi\u1ec3u',
     'D\u1eef li\u1ec7u c\u1ee7a t\xf4i',
     'Kho t\xe0i li\u1ec7u',
-    'M\u1eabu gi\xe1o \xe1n',
-    'H\u1ed3 s\u01a1 gi\xe1o vi\xean',
+    'Thi\u1ebft \u0111\u1eb7t gi\xe1o vi\xean',
 )
+
+# The legacy authoring hub remains wired below for backward-compatible
+# session/deep-link handling, but it is intentionally absent from the visible
+# teacher navigation.  Its data contracts are consumed by the dedicated
+# "Soạn bài cùng AI" and "Chuẩn hóa giáo án" pages.
 PORTAL_SESSION_KEYS = (
     "portal_supabase_client",
     "portal_user_id",
@@ -251,6 +261,28 @@ def select_portal_page(session_state: Any, page: str) -> None:
     session_state["portal_navigation"] = page
 
 
+def _autosave_before_portal_navigation(session_state: Any) -> None:
+    """Keep working contexts intact and queue a floating page-change notice."""
+    previous_page = str(session_state.get("portal_page", "Tổng quan") or "")
+    next_page = str(session_state.get("portal_navigation", previous_page) or "")
+    session_state["portal_navigation_autosave"] = {
+        "previous_page": previous_page,
+        "next_page": next_page,
+        "lesson_context": dict(
+            session_state.get("lesson_authoring_working_context", {}) or {}
+        ),
+        "timetable_draft": dict(
+            session_state.get("teacher_timetable_autosaved_draft", {}) or {}
+        ),
+        "lbg_context": dict(
+            session_state.get("lbg_autosaved_filter_context", {}) or {}
+        ),
+    }
+    session_state["portal_navigation_notice"] = (
+        f"Đã tự lưu dữ liệu trên trang {previous_page} trước khi chuyển trang."
+    )
+
+
 def resolve_authenticated_portal_role(
     *,
     client: Any,
@@ -302,9 +334,27 @@ def build_teacher_profile(
 
 
 def render_login(st, settings: tuple[str, str] | None) -> None:
-    st.title("MathTeacher-AI")
-    st.subheader("Cổng làm việc dành cho giáo viên")
-    st.caption("Một tài khoản · Một không gian · Các công cụ được kết nối")
+    st.markdown(
+        """
+        <section class="mt-login-scene" aria-labelledby="mt-login-title">
+          <div class="mt-login-brand">🎓 MathTeacher-AI</div>
+          <h1 class="mt-login-title" id="mt-login-title">
+            Không gian làm việc số dành cho giáo viên
+          </h1>
+          <p class="mt-login-lead">
+            Soạn bài, chuẩn hóa giáo án, quản lý lịch dạy và tài liệu
+            trong một hệ thống thống nhất, an toàn và thuận tiện.
+          </p>
+          <div class="mt-login-features" aria-label="Chức năng chính">
+            <span class="mt-login-feature">✨ Soạn bài cùng AI</span>
+            <span class="mt-login-feature">📝 Chuẩn hóa giáo án</span>
+            <span class="mt-login-feature">📅 Lịch báo giảng</span>
+            <span class="mt-login-feature">📚 Kho tài liệu</span>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
     if settings is None:
         st.error("Chưa có SUPABASE_URL và SUPABASE_PUBLISHABLE_KEY.")
         st.info("Hãy cấu hình hai biến môi trường công khai rồi khởi động lại ứng dụng.")
@@ -313,6 +363,11 @@ def render_login(st, settings: tuple[str, str] | None) -> None:
         email = st.text_input("Email")
         password = st.text_input("Mật khẩu", type="password")
         submitted = st.form_submit_button("Đăng nhập", use_container_width=True)
+    st.markdown(
+        '<p class="mt-login-note">Một tài khoản · Một không gian · '
+        'Các công cụ được kết nối</p>',
+        unsafe_allow_html=True,
+    )
     if submitted:
         try:
             client = create_supabase_client(*settings)
@@ -337,6 +392,10 @@ def render_dashboard(st) -> None:
     cards = (
         (
             'C\xf4ng c\u1ee5 so\u1ea1n b\xe0i',
+            'Ch\u1ecdn b\xe0i, so\u1ea1n c\xf9ng AI v\xe0 qu\u1ea3n l\xfd quy tr\xecnh so\u1ea1n b\xe0i.',
+        ),
+        (
+            'Chu\u1ea9n h\xf3a gi\xe1o \xe1n',
             'Ch\u1ecdn b\xe0i, so\u1ea1n c\xf9ng AI v\xe0 chu\u1ea9n h\xf3a gi\xe1o \xe1n.',
         ),
         (
@@ -348,12 +407,8 @@ def render_dashboard(st) -> None:
             'T\xecm ki\u1ebfm v\xe0 t\u1ea3i t\xe0i li\u1ec7u l\xean Google Drive.',
         ),
         (
-            'M\u1eabu gi\xe1o \xe1n',
-            'Thi\u1ebft l\u1eadp c\u1ea5u tr\xfac, b\u1ed1 c\u1ee5c, ng\xe0y so\u1ea1n, ng\xe0y d\u1ea1y v\xe0 ph\xea duy\u1ec7t gi\xe1o \xe1n.',
-        ),
-        (
-            'H\u1ed3 s\u01a1 gi\xe1o vi\xean',
-            'Qu\u1ea3n l\xfd th\xf4ng tin d\xf9ng chung khi l\u1eadp v\xe0 xu\u1ea5t l\u1ecbch.',
+            'Thi\u1ebft \u0111\u1eb7t gi\xe1o vi\xean',
+            'Qu\u1ea3n l\xfd th\xf4ng tin, ph\xe2n c\xf4ng, nhi\u1ec7m v\u1ee5 v\xe0 thi\u1ebft \u0111\u1eb7t gi\xe1o \xe1n.',
         ),
     )
     columns = st.columns(2)
@@ -367,24 +422,12 @@ def render_dashboard(st) -> None:
             )
 
 
-def render_profile(st, client: Any, user_id: str) -> None:
-    from dataclasses import replace
-    from datetime import date
-    from uuid import uuid4
-
-    from educational_planning_v2.adapters.supabase_teaching_assignment_repository import (
-        SupabaseTeachingAssignmentRepository,
-    )
-    from educational_planning_v2.models.teaching_assignment import (
-        TeachingAssignment,
-        TeachingAssignmentRole,
-        TeachingAssignmentStatus,
-    )
-    from educational_planning_v2.services.teaching_assignment_legacy_migration_service import (
-        TeachingAssignmentLegacyMigrationService,
-    )
-
-    st.title("H\u1ed3 s\u01a1 gi\u00e1o vi\u00ean")
+def _render_teacher_information_settings(
+    st,
+    client: Any,
+    user_id: str,
+) -> None:
+    st.subheader("Thông tin giáo viên")
     st.caption(
         "Th\u00f4ng tin n\u00e0y \u0111\u01b0\u1ee3c d\u00f9ng chung "
         "cho l\u1ecbch b\u00e1o gi\u1ea3ng v\u00e0 t\u1ec7p xu\u1ea5t."
@@ -463,7 +506,7 @@ def render_profile(st, client: Any, user_id: str) -> None:
             value=(
                 profile.default_academic_year
                 if profile
-                else ""
+                else "2026-2027"
             ),
             placeholder="2026-2027",
         )
@@ -531,12 +574,225 @@ def render_profile(st, client: Any, user_id: str) -> None:
             )
 
 
+def _render_teacher_assignment_settings(
+    st,
+    client: Any,
+    user_id: str,
+    academic_year: str,
+) -> None:
+    from educational_planning_v2.adapters.supabase_class_catalog_repository import (
+        SupabaseClassCatalogRepository,
+    )
+    from educational_planning_v2.adapters.supabase_subject_catalog_repository import (
+        SupabaseSubjectCatalogRepository,
+    )
+    from educational_planning_v2.adapters.supabase_teaching_assignment_repository import (
+        SupabaseTeachingAssignmentRepository,
+    )
+    from educational_planning_v2.models.teaching_assignment import (
+        TeachingAssignmentRole,
+        TeachingAssignmentStatus,
+    )
+
+    st.subheader("Phân công và nhiệm vụ")
+    st.caption(
+        "Danh sách được lấy từ phân công chuyên môn đang hiệu lực "
+        "của giáo viên. Việc thay đổi phân công do quản trị viên thực hiện."
+    )
+
+    try:
+        assignments = (
+            SupabaseTeachingAssignmentRepository(
+                client=client,
+                user_id=user_id,
+            )
+            .list_assignments(
+                owner_id=user_id,
+                academic_year=academic_year,
+                role=TeachingAssignmentRole.TEACHING,
+                status=TeachingAssignmentStatus.ACTIVE,
+            )
+        )
+    except Exception as error:
+        st.error(f"Không thể đọc phân công và nhiệm vụ: {error}")
+        return
+
+    if not assignments:
+        st.info(
+            f"Chưa có phân công chuyên môn đang hiệu lực "
+            f"cho năm học {academic_year}."
+        )
+        return
+
+    class_repository = SupabaseClassCatalogRepository(
+        client=client,
+    )
+    subject_repository = SupabaseSubjectCatalogRepository(
+        client=client,
+    )
+    rows = []
+
+    for assignment in assignments:
+        class_name = "Chưa xác định"
+        subject_name = "Chưa xác định"
+        component_name = ""
+
+        try:
+            class_item = class_repository.get(
+                class_id=assignment.class_id,
+            )
+            if class_item is not None:
+                class_name = str(
+                    class_item.display_name
+                ).strip() or class_name
+        except Exception:
+            pass
+
+        try:
+            subject_item = subject_repository.get_subject(
+                subject_id=assignment.subject_ref,
+            )
+            if subject_item is not None:
+                subject_name = str(
+                    subject_item.name
+                ).strip() or subject_name
+        except Exception:
+            pass
+
+        if assignment.component_ref:
+            try:
+                component_item = subject_repository.get_component(
+                    component_id=assignment.component_ref,
+                )
+                if component_item is not None:
+                    component_name = str(
+                        component_item.name
+                    ).strip()
+            except Exception:
+                pass
+
+        rows.append(
+            {
+                "Lớp": class_name,
+                "Môn": subject_name,
+                "Phân môn": component_name or "—",
+                "Nhiệm vụ": "Giảng dạy",
+                "Năm học": academic_year,
+                "Trạng thái": "Đang hiệu lực",
+            }
+        )
+
+    st.dataframe(
+        rows,
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption(
+        f"Tổng số phân công đang hiệu lực: {len(rows)}"
+    )
+
+
+def render_teacher_settings(
+    st,
+    client: Any,
+    user_id: str,
+) -> None:
+    st.title("Thiết đặt giáo viên")
+    st.caption(
+        "Quản lý tập trung thông tin giáo viên, nhiệm vụ được giao "
+        "và các thông số kỹ thuật dùng khi tạo giáo án."
+    )
+
+    try:
+        profile = SupabaseTeacherProfileRepository(
+            client,
+            user_id,
+        ).get()
+    except Exception:
+        profile = None
+
+    academic_year = (
+        str(profile.default_academic_year).strip()
+        if profile and profile.default_academic_year
+        else "2026-2027"
+    )
+
+    information_tab, assignment_tab, lesson_plan_tab = st.tabs(
+        (
+            "1. Thông tin giáo viên",
+            "2. Phân công và nhiệm vụ",
+            "3. Thiết đặt giáo án (Mẫu giáo án)",
+        )
+    )
+
+    with information_tab:
+        _render_teacher_information_settings(
+            st,
+            client,
+            user_id,
+        )
+
+    with assignment_tab:
+        _render_teacher_assignment_settings(
+            st,
+            client,
+            user_id,
+            academic_year,
+        )
+
+    with lesson_plan_tab:
+        from portal_v2.ui.lesson_plan_template_setup_streamlit import (
+            render_lesson_plan_template_setup,
+        )
+
+        render_lesson_plan_template_setup(
+            client=client,
+            teacher_id=str(user_id),
+            academic_year=academic_year,
+            embedded=True,
+        )
+
+
+def render_profile(st, client: Any, user_id: str) -> None:
+    """Backward-compatible alias for the unified settings page."""
+    render_teacher_settings(st, client, user_id)
+
+
 
 def main() -> None:
     import streamlit as st
 
-    st.set_page_config(page_title="MathTeacher-AI", page_icon="🎓", layout="wide")
+    st.set_page_config(
+        page_title="MathTeacher-AI",
+        page_icon="🎓",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
     apply_teacher_workspace_styles(st)
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] {
+          background:#071a33 !important;
+        }
+        [data-testid="stSidebar"] * {
+          color:#ffffff !important;
+          font-size:18px !important;
+          line-height:1.5 !important;
+        }
+        [data-testid="stSidebarCollapsedControl"] button,
+        [data-testid="collapsedControl"] button {
+          background:#071a33 !important;
+          color:#ffffff !important;
+          border:1px solid #ffffff !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    # Load the modern layer last so legacy page-specific rules cannot
+    # override the shared visual contract.
+    apply_modern_3d_design_system(st)
     settings = supabase_settings()
     client = st.session_state.get("portal_supabase_client")
     user_id = st.session_state.get("portal_user_id")
@@ -679,8 +935,13 @@ def main() -> None:
         index=PORTAL_PAGES.index(current_page),
         key="portal_navigation",
         label_visibility="collapsed",
+        on_change=_autosave_before_portal_navigation,
+        args=(st.session_state,),
     )
     st.session_state["portal_page"] = selected
+    navigation_notice = st.session_state.pop("portal_navigation_notice", "")
+    if navigation_notice:
+        st.toast(str(navigation_notice), icon="💾")
     if st.sidebar.button("Đăng xuất", use_container_width=True):
         try:
             client.auth.sign_out()
@@ -693,9 +954,52 @@ def main() -> None:
 
     elif selected == 'C\xf4ng c\u1ee5 so\u1ea1n b\xe0i':
         from portal_v2.ui.weekly_schedule_streamlit import (
+            render_lesson_authoring_tools_workspace,
+        )
+
+        render_lesson_authoring_tools_workspace(
+            client=client,
+            user_id=str(user_id),
+        )
+
+    elif selected == 'Chu\u1ea9n h\xf3a gi\xe1o \xe1n':
+        from portal_v2.ui.weekly_schedule_streamlit import (
             render_weekly_schedule_workspace,
         )
         render_weekly_schedule_workspace(
+            client=client,
+            user_id=str(user_id),
+            compact_setup_ui=False,
+        )
+
+
+
+    elif selected == 'Qu\u1ea3n l\xfd gi\xe1o \xe1n':
+        from portal_v2.ui.weekly_schedule_streamlit import (
+            render_lesson_plan_management_workspace,
+        )
+
+        render_lesson_plan_management_workspace(
+            client=client,
+            user_id=str(user_id),
+        )
+
+    elif selected == 'So\u1ea1n b\xe0i c\xf9ng AI':
+        from portal_v2.ui.lesson_authoring_ai_streamlit import (
+            render_lesson_authoring_ai_page,
+        )
+
+        render_lesson_authoring_ai_page(
+            client=client,
+            user_id=str(user_id),
+        )
+
+    elif selected == 'L\u1ecbch b\xe1o gi\u1ea3ng & PBSDTB':
+        from portal_v2.ui.weekly_schedule_streamlit import (
+            render_weekly_schedule_and_equipment_workspace,
+        )
+
+        render_weekly_schedule_and_equipment_workspace(
             client=client,
             user_id=str(user_id),
         )
@@ -1147,6 +1451,13 @@ def main() -> None:
                         )
                         render_persisted_ppct_view()
 
+
+    elif selected == "Thiết đặt giáo viên":
+        render_teacher_settings(
+            st,
+            client,
+            str(user_id),
+        )
 
     elif selected == "Kho tài liệu":
         from scripts.document_library.app import main as render_document_library

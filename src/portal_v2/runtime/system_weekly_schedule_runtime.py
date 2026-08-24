@@ -39,6 +39,9 @@ from educational_planning_v2.models.teaching_assignment import (
     TeachingAssignmentRole,
     TeachingAssignmentStatus,
 )
+from educational_planning_v2.models.teacher_timetable import (
+    TeacherTimetableSlotStatus,
+)
 from educational_planning_v2.models.operational_data_source import (
     OperationalDataStatus,
     OperationalDataType,
@@ -306,6 +309,24 @@ class SystemWeeklyScheduleRuntime:
                 role=TeachingAssignmentRole.TEACHING,
                 status=TeachingAssignmentStatus.ACTIVE,
             )
+        )
+
+        timetable_slots = (
+            self._timetable_repository.list_slots(
+                owner_id=self._user_id,
+                academic_year=academic_year,
+                status=TeacherTimetableSlotStatus.ACTIVE,
+            )
+        )
+        scheduled_assignment_ids = {
+            slot.assignment_id
+            for slot in timetable_slots
+        }
+        assignments = tuple(
+            assignment
+            for assignment in assignments
+            if assignment.assignment_id
+            in scheduled_assignment_ids
         )
 
         if not assignments:

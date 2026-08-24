@@ -151,6 +151,22 @@ class WeeklyScheduleApplicationService:
             )
         )
 
+        # WEEKLY_SCHEDULED_ASSIGNMENTS_ONLY_V1
+        # PPCT is required only for assignments that actually occur in the
+        # active timetable.  Keeping an unrelated ACTIVE assignment here
+        # would make the resolver demand a mapping for a class/component that
+        # cannot produce any row in this weekly schedule.
+        scheduled_assignment_ids = {
+            slot.assignment_id
+            for slot in timetable_slots
+        }
+        assignments = tuple(
+            assignment
+            for assignment in assignments
+            if assignment.assignment_id
+            in scheduled_assignment_ids
+        )
+
         canonical_timetable = (
             self._input_builder.build_timetable_slots(
                 teacher_id=request.owner_id,

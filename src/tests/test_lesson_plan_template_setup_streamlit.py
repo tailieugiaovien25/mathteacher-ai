@@ -85,3 +85,19 @@ def test_setup_page_can_save_and_reset():
     assert "Lưu Mẫu giáo án" in text
     assert "Khôi phục mẫu mặc định" in text
     assert "SESSION_KEY" in text
+
+
+def test_setup_page_supports_embedding_in_teacher_settings():
+    text = source()
+
+    assert "embedded: bool = False" in text
+    assert "if not embedded:" in text
+
+
+def test_setup_page_labels_new_selection_modes_safely():
+    text = source()
+
+    assert "def _selection_mode_label(" in text
+    assert "SELECTION_MODE_LABELS.get(" in text
+    assert '"week_subject": "Theo tuần và môn"' in text
+    assert "SELECTION_MODE_LABELS[item]" not in text

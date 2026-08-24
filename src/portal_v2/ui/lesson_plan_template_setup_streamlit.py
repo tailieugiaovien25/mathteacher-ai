@@ -59,6 +59,31 @@ SELECTION_MODE_LABELS = {
 }
 
 
+def _selection_mode_label(
+    mode: LessonPlanSelectionMode,
+) -> str:
+    """Return a safe label for current and future selection modes."""
+    configured = SELECTION_MODE_LABELS.get(
+        mode
+    )
+
+    if configured:
+        return configured
+
+    value = str(
+        getattr(mode, "value", mode)
+    ).strip()
+
+    fallback_labels = {
+        "week_subject": "Theo tuần và môn",
+    }
+
+    return fallback_labels.get(
+        value,
+        value.replace("_", " ").strip().title(),
+    )
+
+
 def _context_session_key(
     *,
     prefix: str,
@@ -702,18 +727,20 @@ def render_lesson_plan_template_setup(
     client=None,
     teacher_id: str | None = None,
     academic_year: str | None = None,
+    embedded: bool = False,
 ):
-    st.title(
-        "M\u1eabu gi\u00e1o \u00e1n"
-    )
+    if not embedded:
+        st.title(
+            "M\u1eabu gi\u00e1o \u00e1n"
+        )
 
-    st.caption(
-        "Thi\u1ebft l\u1eadp ri\u00eang "
-        "theo t\u1eebng m\u00f4n: "
-        "c\u1ea5u tr\u00fac, \u0111\u1ec1 m\u1ee5c, "
-        "b\u1ed1 c\u1ee5c, \u0111\u1ecbnh d\u1ea1ng, "
-        "l\u1ecbch so\u1ea1n v\u00e0 ph\u00ea duy\u1ec7t."
-    )
+        st.caption(
+            "Thi\u1ebft l\u1eadp ri\u00eang "
+            "theo t\u1eebng m\u00f4n: "
+            "c\u1ea5u tr\u00fac, \u0111\u1ec1 m\u1ee5c, "
+            "b\u1ed1 c\u1ee5c, \u0111\u1ecbnh d\u1ea1ng, "
+            "l\u1ecbch so\u1ea1n v\u00e0 ph\u00ea duy\u1ec7t."
+        )
 
     resolved_client = (
         client
@@ -956,7 +983,7 @@ def render_lesson_plan_template_setup(
                 .allowed_selection_modes
             ),
             format_func=lambda item: (
-                SELECTION_MODE_LABELS[item]
+                _selection_mode_label(item)
             ),
             key=(
                 "lesson_plan_setup_"
@@ -996,7 +1023,7 @@ def render_lesson_plan_template_setup(
             default_mode
         ),
         format_func=lambda item: (
-            SELECTION_MODE_LABELS[item]
+            _selection_mode_label(item)
         ),
         key=(
             "lesson_plan_setup_"

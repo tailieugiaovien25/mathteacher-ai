@@ -114,6 +114,16 @@ def run_contract():
         ),
     ))
 
+    tests.append((
+        "TPW11 Combined schedule and equipment page is wired",
+        (
+            "Lịch báo giảng & PBSDTB"
+            in teacher_portal_app.PORTAL_PAGES
+            and "render_weekly_schedule_and_equipment_workspace"
+            in source
+        ),
+    ))
+
     results = []
 
     for label, passed in tests:

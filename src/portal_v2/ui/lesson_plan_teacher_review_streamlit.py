@@ -44,18 +44,18 @@ def render_lesson_plan_teacher_review(
         )
 
     st.subheader(
-        "Th?ng tin ??i chi?u"
+        "Thông tin đối chiếu"
     )
 
     if view.requires_review:
         st.info(
-            "H? th?ng ?? ??i chi?u th?ng tin trong gi?o ?n "
-            "v?i d? li?u b?i d?y hi?n t?i. "
-            "Ki?m tra c?c m?c c?n thi?t tr??c khi ti?p t?c."
+            "Hệ thống đã đối chiếu thông tin trong giáo án "
+            "với dữ liệu bài dạy hiện tại. "
+            "Kiểm tra các mục cần thiết trước khi tiếp tục."
         )
     else:
         st.success(
-            "Th?ng tin gi?o ?n ph? h?p v?i d? li?u b?i d?y."
+            "Thông tin giáo án phù hợp với dữ liệu bài dạy."
         )
 
     decisions = []
@@ -94,18 +94,18 @@ def render_lesson_plan_teacher_review(
         with columns[1]:
             st.write(
                 detected_value
-                or "?"
+                or "—"
             )
 
         with columns[2]:
             st.write(
                 canonical_value
-                or "?"
+                or "—"
             )
 
         with columns[3]:
             action = st.selectbox(
-                "X? l?",
+                "Xử lý",
                 options=_ACTION_OPTIONS,
                 index=default_index,
                 format_func=lambda value: (
@@ -127,7 +127,7 @@ def render_lesson_plan_teacher_review(
         ):
             override_value = st.text_input(
                 (
-                    "Gi? tr? thay th? ? "
+                    "Giá trị thay thế · "
                     + item.field_label
                 ),
                 value=(

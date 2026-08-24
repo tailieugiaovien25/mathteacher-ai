@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 
@@ -39,22 +40,51 @@ def test_lesson_plan_workspace_uses_schedule_rows():
 
 def test_lesson_plan_workspace_accepts_docx():
     source = _source()
+    tree = ast.parse(source)
 
-    assert "st.file_uploader(" in source
+    uploader_calls = []
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+
+        if not isinstance(
+            node.func,
+            ast.Attribute,
+        ):
+            continue
+
+        if node.func.attr != "file_uploader":
+            continue
+
+        uploader_calls.append(node)
+
+    assert uploader_calls
+
+    has_docx = False
+
+    for call in uploader_calls:
+        for keyword in call.keywords:
+            if keyword.arg != "type":
+                continue
+
+            segment = ast.get_source_segment(
+                source,
+                keyword.value,
+            )
+
+            if (
+                segment
+                and "docx" in segment.casefold()
+            ):
+                has_docx = True
+
+    assert has_docx
 
     assert (
-        '"T\\u1ea3i gi\\u00e1o '
-        '\\u00e1n Word (.docx)"'
+        "uploaded.getvalue()"
         in source
     )
-
-    assert 'type=("docx",)' in source
-
-    assert (
-        '"lbg_lesson_plan_upload_"'
-        in source
-    )
-
 
 def test_lesson_plan_workspace_is_rendered_from_lbg():
     source = _source()

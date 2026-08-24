@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from educational_planning_v2.models.academic_week_configuration import (
     AcademicWeekConfiguration,
@@ -53,6 +53,7 @@ class AcademicWeekConfigurationService:
         }
 
         result = []
+        next_start_date = academic_year.start_date
 
         for week_number in range(
             1,
@@ -68,14 +69,10 @@ class AcademicWeekConfigurationService:
                 and current.is_manual_override
             ):
                 result.append(current)
+                next_start_date = current.end_date + timedelta(days=1)
                 continue
 
-            start_date = (
-                academic_year.start_date
-                + timedelta(
-                    days=(week_number - 1) * 7
-                )
-            )
+            start_date = next_start_date
 
             end_date = (
                 start_date
@@ -106,6 +103,7 @@ class AcademicWeekConfigurationService:
             )
 
             result.append(saved)
+            next_start_date = end_date + timedelta(days=1)
 
         return tuple(result)
 
@@ -150,3 +148,49 @@ class AcademicWeekConfigurationService:
         return self._repository.save(
             week=manual_week
         )
+
+    def shift_from_week(
+        self,
+        *,
+        weeks: tuple[AcademicWeekConfiguration, ...],
+        week_number: int,
+        new_start_date: date,
+    ) -> tuple[AcademicWeekConfiguration, ...]:
+        """Shift the selected week and every following week by one delta."""
+
+        if not isinstance(new_start_date, date):
+            raise TypeError("new_start_date must be date")
+
+        ordered = tuple(sorted(weeks, key=lambda item: item.week_number))
+        selected = next(
+            (item for item in ordered if item.week_number == week_number),
+            None,
+        )
+        if selected is None:
+            raise ValueError("week_number does not exist")
+
+        delta = new_start_date - selected.start_date
+        saved_weeks = []
+
+        for item in ordered:
+            if item.week_number < week_number:
+                saved_weeks.append(item)
+                continue
+
+            shifted = AcademicWeekConfiguration(
+                academic_week_id=item.academic_week_id,
+                academic_year_id=item.academic_year_id,
+                academic_year=item.academic_year,
+                week_number=item.week_number,
+                start_date=item.start_date + delta,
+                end_date=item.end_date + delta,
+                status=item.status,
+                is_manual_override=(
+                    item.is_manual_override
+                    or item.week_number == week_number
+                ),
+                note=item.note,
+            )
+            saved_weeks.append(self._repository.save(week=shifted))
+
+        return tuple(saved_weeks)

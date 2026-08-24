@@ -456,9 +456,9 @@ def render_admin_academic_year_configuration(
     st.caption(
         "ADMIN c\u00f3 quy\u1ec1n \u0111i\u1ec1u ch\u1ec9nh "
         "l\u1ecbch Tu\u1ea7n 1 \u0111\u1ebfn Tu\u1ea7n 40. "
-        "Tu\u1ea7n \u0111\u01b0\u1ee3c \u0111i\u1ec1u ch\u1ec9nh "
-        "th\u1ee7 c\u00f4ng s\u1ebd \u0111\u01b0\u1ee3c b\u1ea3o v\u1ec7 "
-        "kh\u1ecfi vi\u1ec7c sinh l\u1ea1i l\u1ecbch t\u1ef1 \u0111\u1ed9ng."
+        "Ch\u1ec9 c\u1ea7n \u0111\u1ed5i ng\u00e0y b\u1eaft \u0111\u1ea7u c\u1ee7a "
+        "m\u1ed9t tu\u1ea7n; h\u1ec7 th\u1ed1ng s\u1ebd t\u1ef1 d\u1ecbch chuy\u1ec3n "
+        "tu\u1ea7n \u0111\u00f3 v\u00e0 to\u00e0n b\u1ed9 c\u00e1c tu\u1ea7n ph\u00eda sau."
     )
 
     if current_configuration is None:
@@ -571,35 +571,26 @@ def render_admin_academic_year_configuration(
             with st.form(
                 "admin_academic_week_edit_form"
             ):
-                week_date_columns = (
-                    st.columns(2)
+                week_start_date = st.date_input(
+                    "Ngày bắt đầu mới",
+                    value=selected_week.start_date,
+                    key="admin_week_start_date",
+                    help=(
+                        "Ngày kết thúc và các tuần phía sau "
+                        "được hệ thống tự động tính lại."
+                    ),
                 )
 
-                with week_date_columns[0]:
-                    week_start_date = (
-                        st.date_input(
-                            "T\u1eeb ng\u00e0y",
-                            value=(
-                                selected_week.start_date
-                            ),
-                            key=(
-                                "admin_week_start_date"
-                            ),
-                        )
-                    )
-
-                with week_date_columns[1]:
-                    week_end_date = (
-                        st.date_input(
-                            "\u0110\u1ebfn ng\u00e0y",
-                            value=(
-                                selected_week.end_date
-                            ),
-                            key=(
-                                "admin_week_end_date"
-                            ),
-                        )
-                    )
+                shifted_week_end = (
+                    selected_week.end_date
+                    + (week_start_date - selected_week.start_date)
+                )
+                st.caption(
+                    "Khoảng mới của Tuần "
+                    f"{selected_week.week_number}: "
+                    f"{week_start_date.strftime('%d/%m/%Y')} – "
+                    f"{shifted_week_end.strftime('%d/%m/%Y')}"
+                )
 
                 week_status = st.selectbox(
                     "Tr\u1ea1ng th\u00e1i",
@@ -640,58 +631,27 @@ def render_admin_academic_year_configuration(
 
             if update_week:
                 try:
-                    if (
-                        week_start_date
-                        > week_end_date
-                    ):
-                        raise ValueError(
-                            "T\u1eeb ng\u00e0y kh\u00f4ng "
-                            "th\u1ec3 sau \u0110\u1ebfn ng\u00e0y."
-                        )
-
-                    if (
-                        week_start_date
-                        < current_configuration.start_date
-                        or week_end_date
-                        > current_configuration.end_date
-                    ):
-                        raise ValueError(
-                            "Kho\u1ea3ng ng\u00e0y c\u1ee7a tu\u1ea7n "
-                            "ph\u1ea3i n\u1eb1m trong ph\u1ea1m vi "
-                            "n\u0103m h\u1ecdc."
-                        )
-
-                    updated_week = (
-                        AcademicWeekConfiguration(
-                            academic_week_id=(
-                                selected_week.academic_week_id
-                            ),
-                            academic_year_id=(
-                                selected_week.academic_year_id
-                            ),
-                            academic_year=(
-                                selected_week.academic_year
-                            ),
-                            week_number=(
-                                selected_week.week_number
-                            ),
-                            start_date=(
-                                week_start_date
-                            ),
-                            end_date=(
-                                week_end_date
-                            ),
-                            status=week_status,
-                            is_manual_override=True,
-                            note=(
-                                week_note.strip()
-                                or None
-                            ),
-                        )
+                    selected_week_with_metadata = AcademicWeekConfiguration(
+                        academic_week_id=selected_week.academic_week_id,
+                        academic_year_id=selected_week.academic_year_id,
+                        academic_year=selected_week.academic_year,
+                        week_number=selected_week.week_number,
+                        start_date=selected_week.start_date,
+                        end_date=selected_week.end_date,
+                        status=week_status,
+                        is_manual_override=selected_week.is_manual_override,
+                        note=week_note.strip() or None,
                     )
-
-                    week_service.override_week(
-                        week=updated_week
+                    cascade_source_weeks = tuple(
+                        selected_week_with_metadata
+                        if item.week_number == selected_week.week_number
+                        else item
+                        for item in weeks
+                    )
+                    week_service.shift_from_week(
+                        weeks=cascade_source_weeks,
+                        week_number=selected_week.week_number,
+                        new_start_date=week_start_date,
                     )
 
                 except Exception as error:
@@ -704,7 +664,7 @@ def render_admin_academic_year_configuration(
                     st.success(
                         "\u0110\u00e3 c\u1eadp nh\u1eadt "
                         f"Tu\u1ea7n "
-                        f"{selected_week.week_number}."
+                        f"{selected_week.week_number} và các tuần phía sau."
                     )
 
                     st.rerun()

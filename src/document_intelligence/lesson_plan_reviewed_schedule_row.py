@@ -150,7 +150,13 @@ class LessonPlanReviewedScheduleRow:
                     TeachingSession,
                 )
                 else TeachingSession(
-                    str(row.session).strip()
+                    (
+                        str(row.session)
+                        .strip()
+                        .removeprefix(
+                            "TeachingSession."
+                        )
+                    )
                 )
             ),
             class_id=class_id,
