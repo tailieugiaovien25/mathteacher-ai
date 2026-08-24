@@ -11,6 +11,7 @@ class PPCTRow:
     subject_grade: str
     period: int
     lesson_name: str
+    sub_subject: str | None = None
 
 
 class PPCTPlanItemAdapter:
@@ -112,6 +113,23 @@ class PPCTPlanItemAdapter:
         subject_grade = row.subject_grade.strip()
         lesson_name = row.lesson_name.strip()
 
+        if row.sub_subject is None:
+            sub_subject = None
+        else:
+            if not isinstance(row.sub_subject, str):
+                raise TypeError(
+                    "sub_subject must be a string or None"
+                )
+
+            normalized_sub_subject = (
+                row.sub_subject.strip()
+            )
+
+            sub_subject = (
+                normalized_sub_subject
+                or None
+            )
+
         if not subject_grade:
             raise ValueError(
                 "subject_grade must not be empty"
@@ -131,4 +149,5 @@ class PPCTPlanItemAdapter:
             subject_grade=subject_grade,
             period=row.period,
             lesson_name=lesson_name,
+            sub_subject=sub_subject,
         )

@@ -9,6 +9,9 @@ from educational_planning_v2 import (
     TimetableSlot,
     WeeklyTeachingScheduleService,
 )
+from educational_planning_v2.models import (
+    TeachingSession,
+)
 
 
 WEEK = AcademicWeek(
@@ -23,6 +26,7 @@ def _slot(
     *,
     weekday: int,
     timetable_period: int,
+    session: TeachingSession = TeachingSession.MORNING,
     component_ref: str = "ALGEBRA",
     teacher_id: str = "GV001",
 ) -> TimetableSlot:
@@ -33,6 +37,7 @@ def _slot(
         component_ref=component_ref,
         weekday=weekday,
         timetable_period=timetable_period,
+        session=session,
         effective_from=date(2026, 9, 1),
         effective_to=date(2026, 12, 31),
     )
@@ -154,6 +159,7 @@ def test_inactive_timetable_version_is_not_included():
         component_ref="ALGEBRA",
         weekday=1,
         timetable_period=1,
+        session=TeachingSession.MORNING,
         effective_from=date(2026, 9, 1),
         effective_to=date(2026, 10, 4),
     )
@@ -190,6 +196,50 @@ def test_duplicate_curriculum_period_is_blocked():
             timetable_slots=(),
             curriculum_periods=(duplicate, duplicate),
         )
+
+
+def test_same_period_morning_and_afternoon_are_distinct_and_ordered():
+    schedule = WeeklyTeachingScheduleService().build(
+        schedule_id="SCHEDULE-GV001-W05-SESSIONS",
+        teacher_id="GV001",
+        academic_week=WEEK,
+        timetable_slots=(
+            _slot(
+                weekday=1,
+                timetable_period=1,
+                session=TeachingSession.AFTERNOON,
+            ),
+            _slot(
+                weekday=1,
+                timetable_period=1,
+                session=TeachingSession.MORNING,
+            ),
+        ),
+        curriculum_periods=(
+            _curriculum(1),
+            _curriculum(2),
+        ),
+    )
+
+    assert len(schedule.entries) == 2
+
+    assert [
+        entry.session
+        for entry in schedule.entries
+    ] == [
+        TeachingSession.MORNING,
+        TeachingSession.AFTERNOON,
+    ]
+
+    assert [
+        entry.timetable_period
+        for entry in schedule.entries
+    ] == [1, 1]
+
+    assert [
+        entry.curriculum_period
+        for entry in schedule.entries
+    ] == [1, 2]
 
 
 def test_core_service_contains_no_storage_or_spreadsheet_dependency():

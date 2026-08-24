@@ -240,3 +240,16 @@ source_code_tree.txt
 # Local Excel data / working artifacts
 /data/
 project-tree.txt
+
+# ---------------------------------------------------------
+# Local backup / debug artifacts
+# ---------------------------------------------------------
+*.before_*
+*.before-*
+
+# Supabase local working state
+supabase/.temp/
+
+# Temporary database dumps / inspection exports
+remote_public_schema.sql
+tmp_public_data.sql

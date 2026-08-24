@@ -36,6 +36,39 @@ class DocumentInventory:
     drawings: int
     images: int
     fonts: dict[str, int] = field(default_factory=dict)
+    body_text_sha256: str = ""
+    header_footer_text_sha256: str = ""
+    media_fingerprints: tuple[str, ...] = ()
+    embedded_fingerprints: tuple[str, ...] = ()
+    external_relationships: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class LessonPlanStandardizationOptions:
+    """User-confirmed operations for one standardization run."""
+
+    preserve_original_maximum: bool = False
+    sync_context: bool = True
+    normalize_font: bool = True
+    normalize_equations: bool = True
+    normalize_tables: bool = True
+    normalize_page_layout: bool = True
+    normalize_spacing: bool = True
+    normalize_header_footer: bool = True
+
+    @property
+    def has_selected_operation(self) -> bool:
+        return any(
+            (
+                self.sync_context,
+                self.normalize_font,
+                self.normalize_equations,
+                self.normalize_tables,
+                self.normalize_page_layout,
+                self.normalize_spacing,
+                self.normalize_header_footer,
+            )
+        )
 
 
 def _sha256(path: Path) -> str:
@@ -61,28 +94,313 @@ def _package_counts(path: Path) -> dict[str, int]:
     return dict(counts)
 
 
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _text_sha256(values) -> str:
+    payload = json.dumps(
+        list(values),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    return _sha256_bytes(payload)
+
+
+def _body_text_fingerprint(document) -> str:
+    values = []
+
+    for index, paragraph in enumerate(
+        document.paragraphs
+    ):
+        values.append(
+            (
+                "paragraph",
+                index,
+                paragraph.text,
+            )
+        )
+
+    for table_index, table in enumerate(
+        document.tables
+    ):
+        for row_index, row in enumerate(
+            table.rows
+        ):
+            for cell_index, cell in enumerate(
+                row.cells
+            ):
+                values.append(
+                    (
+                        "cell",
+                        table_index,
+                        row_index,
+                        cell_index,
+                        cell.text,
+                    )
+                )
+
+    return _text_sha256(values)
+
+
+def _header_footer_text_fingerprint(
+    document,
+) -> str:
+    values = []
+
+    for section_index, section in enumerate(
+        document.sections
+    ):
+        containers = (
+            (
+                "header",
+                section.header,
+            ),
+            (
+                "first_page_header",
+                section.first_page_header,
+            ),
+            (
+                "even_page_header",
+                section.even_page_header,
+            ),
+            (
+                "footer",
+                section.footer,
+            ),
+            (
+                "first_page_footer",
+                section.first_page_footer,
+            ),
+            (
+                "even_page_footer",
+                section.even_page_footer,
+            ),
+        )
+
+        for kind, container in containers:
+            values.append(
+                (
+                    section_index,
+                    kind,
+                    tuple(
+                        paragraph.text
+                        for paragraph
+                        in container.paragraphs
+                    ),
+                )
+            )
+
+    return _text_sha256(values)
+
+
+def _package_fingerprints(
+    path: Path,
+) -> dict[str, tuple[str, ...]]:
+    media = []
+    embedded = []
+    external_relationships = []
+
+    with zipfile.ZipFile(path) as archive:
+        names = set(
+            archive.namelist()
+        )
+
+        for name in sorted(names):
+            if name.startswith(
+                "word/media/"
+            ):
+                media.append(
+                    (
+                        name
+                        + ":"
+                        + _sha256_bytes(
+                            archive.read(name)
+                        )
+                    )
+                )
+
+            elif name.startswith(
+                "word/embeddings/"
+            ):
+                embedded.append(
+                    (
+                        name
+                        + ":"
+                        + _sha256_bytes(
+                            archive.read(name)
+                        )
+                    )
+                )
+
+        relationship_names = sorted(
+            name
+            for name in names
+            if (
+                name.endswith(".rels")
+                and (
+                    name.startswith(
+                        "word/"
+                    )
+                    or name.startswith(
+                        "_rels/"
+                    )
+                )
+            )
+        )
+
+        rel_ns = (
+            "http://schemas.openxmlformats.org/"
+            "package/2006/relationships"
+        )
+
+        for name in relationship_names:
+            root = etree.fromstring(
+                archive.read(name)
+            )
+
+            for relationship in root:
+                if (
+                    relationship.tag
+                    != f"{{{rel_ns}}}Relationship"
+                ):
+                    continue
+
+                if (
+                    relationship.get(
+                        "TargetMode"
+                    )
+                    != "External"
+                ):
+                    continue
+
+                external_relationships.append(
+                    "|".join(
+                        (
+                            name,
+                            relationship.get(
+                                "Type",
+                                "",
+                            ),
+                            relationship.get(
+                                "Target",
+                                "",
+                            ),
+                        )
+                    )
+                )
+
+    return {
+        "media": tuple(media),
+        "embedded": tuple(embedded),
+        "external_relationships": tuple(
+            sorted(
+                external_relationships
+            )
+        ),
+    }
+
+
 def inventory(path: Path) -> DocumentInventory:
     document = Document(path)
+
     fonts = Counter()
     table_cells = 0
-    paragraphs = list(document.paragraphs)
+
+    paragraphs = list(
+        document.paragraphs
+    )
+
     for table in document.tables:
         for row in table.rows:
             for cell in row.cells:
                 table_cells += 1
-                paragraphs.extend(cell.paragraphs)
+                paragraphs.extend(
+                    cell.paragraphs
+                )
+
     for paragraph in paragraphs:
         for run in paragraph.runs:
             if run.font.name:
-                fonts[run.font.name] += 1
-    package = _package_counts(path)
+                fonts[
+                    run.font.name
+                ] += 1
+
+    package = _package_counts(
+        path
+    )
+
+    fingerprints = (
+        _package_fingerprints(
+            path
+        )
+    )
+
     return DocumentInventory(
-        paragraphs=len(paragraphs), tables=len(document.tables), table_cells=table_cells,
-        inline_shapes=len(document.inline_shapes), sections=len(document.sections),
-        omml_equations=package.get("omml_equations", 0),
-        equation_paragraphs=package.get("equation_paragraphs", 0),
-        ole_objects=package.get("ole_objects", 0), drawings=package.get("drawings", 0),
-        images=package.get("images", 0), fonts=dict(sorted(fonts.items())),
+        paragraphs=len(
+            paragraphs
+        ),
+        tables=len(
+            document.tables
+        ),
+        table_cells=table_cells,
+        inline_shapes=len(
+            document.inline_shapes
+        ),
+        sections=len(
+            document.sections
+        ),
+        omml_equations=package.get(
+            "omml_equations",
+            0,
+        ),
+        equation_paragraphs=package.get(
+            "equation_paragraphs",
+            0,
+        ),
+        ole_objects=package.get(
+            "ole_objects",
+            0,
+        ),
+        drawings=package.get(
+            "drawings",
+            0,
+        ),
+        images=package.get(
+            "images",
+            0,
+        ),
+        fonts=dict(
+            sorted(
+                fonts.items()
+            )
+        ),
+        body_text_sha256=(
+            _body_text_fingerprint(
+                document
+            )
+        ),
+        header_footer_text_sha256=(
+            _header_footer_text_fingerprint(
+                document
+            )
+        ),
+        media_fingerprints=(
+            fingerprints[
+                "media"
+            ]
+        ),
+        embedded_fingerprints=(
+            fingerprints[
+                "embedded"
+            ]
+        ),
+        external_relationships=(
+            fingerprints[
+                "external_relationships"
+            ]
+        ),
     )
 
 
@@ -96,7 +414,14 @@ class LessonPlanWordStandardizer:
     def from_json(cls, path: Path) -> "LessonPlanWordStandardizer":
         return cls(json.loads(path.read_text(encoding="utf-8")))
 
-    def standardize(self, source: Path, output: Path, report_path: Path) -> dict[str, object]:
+    def standardize(
+        self,
+        source: Path,
+        output: Path,
+        report_path: Path,
+        *,
+        options: LessonPlanStandardizationOptions | None = None,
+    ) -> dict[str, object]:
         source = source.resolve()
         output = output.resolve()
         if source == output:
@@ -104,19 +429,33 @@ class LessonPlanWordStandardizer:
         if source.suffix.lower() != ".docx" or output.suffix.lower() != ".docx":
             raise ValueError("Công cụ V1 chỉ xử lý tệp .docx.")
 
+        options = options or LessonPlanStandardizationOptions()
         before = inventory(source)
         source_hash = _sha256(source)
         document = Document(source)
         changes = Counter()
-        self._normalize_sections(document, changes)
-        self._normalize_styles(document)
-        self._normalize_paragraphs(document, changes)
-        self._normalize_tables(document, changes)
-        self._normalize_headers_and_footers(document, changes)
+        if options.normalize_page_layout:
+            self._normalize_sections(document, changes)
+        if options.normalize_font:
+            self._normalize_styles(document)
+        if options.normalize_font or options.normalize_spacing:
+            self._normalize_paragraphs(
+                document,
+                changes,
+                normalize_font=options.normalize_font,
+                normalize_spacing=options.normalize_spacing,
+            )
+        if options.normalize_tables:
+            self._normalize_tables(document, changes)
+        if options.normalize_header_footer:
+            self._normalize_headers_and_footers(document, changes)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         document.save(output)
-        if self.profile.get("equations", {}).get("mode") == "force_times":
+        if (
+            options.normalize_equations
+            and self.profile.get("equations", {}).get("mode") == "force_times"
+        ):
             changes["omml_runs_forced_to_times"] = self._force_omml_font(
                 output,
                 self.profile["equations"].get("text_font", "Times New Roman"),
@@ -130,6 +469,7 @@ class LessonPlanWordStandardizer:
             "source": str(source), "output": str(output), "source_sha256": source_hash,
             "source_preserved": _sha256(source) == source_hash,
             "profile_name": self.profile.get("profile_name", "lesson-plan-default"),
+            "selected_options": asdict(options),
             "before": asdict(before), "after": asdict(after), "changes": dict(changes),
             "equations": {
                 "mode": self.profile.get("equations", {}).get("mode", "safe"),
@@ -169,50 +509,154 @@ class LessonPlanWordStandardizer:
             element.remove(child)
         element.append(OxmlElement("w:p"))
 
-    def _normalize_headers_and_footers(self, document, changes):
-        profile = self.profile.get("header_footer", {})
-        if not profile.get("remove_existing", False):
+    def _normalize_headers_and_footers(
+        self,
+        document,
+        changes,
+    ):
+        profile = self.profile.get(
+            "header_footer",
+            {},
+        )
+
+        # Preservation-first contract:
+        # existing headers and footers belong to
+        # the teacher's source document and must
+        # remain untouched unless destructive
+        # replacement is explicitly requested.
+        if not profile.get(
+            "remove_existing",
+            False,
+        ):
+            changes[
+                "headers_footers_preserved"
+            ] += 1
             return
 
         body = self.profile["body"]
+
         for section in document.sections:
-            headers = (section.header, section.first_page_header, section.even_page_header)
-            footers = (section.footer, section.first_page_footer, section.even_page_footer)
+            headers = (
+                section.header,
+                section.first_page_header,
+                section.even_page_header,
+            )
+
+            footers = (
+                section.footer,
+                section.first_page_footer,
+                section.even_page_footer,
+            )
+
             for header in headers:
                 header.is_linked_to_previous = False
-                self._clear_header_or_footer(header)
-                changes["headers_cleared"] += 1
+                self._clear_header_or_footer(
+                    header
+                )
+                changes[
+                    "headers_cleared"
+                ] += 1
+
             for footer in footers:
                 footer.is_linked_to_previous = False
-                self._clear_header_or_footer(footer)
-                changes["footers_cleared"] += 1
+                self._clear_header_or_footer(
+                    footer
+                )
+                changes[
+                    "footers_cleared"
+                ] += 1
 
-            if profile.get("page_number", True):
+
+            if profile.get(
+                "page_number",
+                True,
+            ):
                 for footer in footers:
-                    paragraph = footer.paragraphs[0]
-                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    paragraph = (
+                        footer.paragraphs[0]
+                    )
+
+                    paragraph.alignment = (
+                        WD_ALIGN_PARAGRAPH.CENTER
+                    )
+
                     run = paragraph.add_run()
                     run.font.name = body["font"]
-                    run.font.size = Pt(body["size_pt"])
-                    fonts = run._element.get_or_add_rPr().rFonts
-                    for key in ("ascii", "hAnsi", "eastAsia", "cs"):
-                        fonts.set(qn(f"w:{key}"), body["font"])
-                    field_begin = OxmlElement("w:fldChar")
-                    field_begin.set(qn("w:fldCharType"), "begin")
-                    instruction = OxmlElement("w:instrText")
-                    instruction.set(qn("xml:space"), "preserve")
+                    run.font.size = Pt(
+                        body["size_pt"]
+                    )
+
+                    fonts = (
+                        run._element
+                        .get_or_add_rPr()
+                        .rFonts
+                    )
+
+                    for key in (
+                        "ascii",
+                        "hAnsi",
+                        "eastAsia",
+                        "cs",
+                    ):
+                        fonts.set(
+                            qn(f"w:{key}"),
+                            body["font"],
+                        )
+
+                    field_begin = OxmlElement(
+                        "w:fldChar"
+                    )
+                    field_begin.set(
+                        qn("w:fldCharType"),
+                        "begin",
+                    )
+
+                    instruction = OxmlElement(
+                        "w:instrText"
+                    )
+                    instruction.set(
+                        qn("xml:space"),
+                        "preserve",
+                    )
                     instruction.text = " PAGE "
-                    field_end = OxmlElement("w:fldChar")
-                    field_end.set(qn("w:fldCharType"), "end")
-                    run._r.extend((field_begin, instruction, field_end))
-                    changes["automatic_page_numbers_added"] += 1
+
+                    field_end = OxmlElement(
+                        "w:fldChar"
+                    )
+                    field_end.set(
+                        qn("w:fldCharType"),
+                        "end",
+                    )
+
+                    run._r.extend(
+                        (
+                            field_begin,
+                            instruction,
+                            field_end,
+                        )
+                    )
+
+                    changes[
+                        "automatic_page_numbers_added"
+                    ] += 1
 
         settings = document.settings._element
-        update_fields = settings.find(qn("w:updateFields"))
+
+        update_fields = settings.find(
+            qn("w:updateFields")
+        )
+
         if update_fields is None:
-            update_fields = OxmlElement("w:updateFields")
+            update_fields = OxmlElement(
+                "w:updateFields"
+            )
             settings.append(update_fields)
-        update_fields.set(qn("w:val"), "true")
+
+        update_fields.set(
+            qn("w:val"),
+            "true",
+        )
+
 
     def _paragraph_kind(self, text: str) -> str:
         stripped = " ".join(text.split())
@@ -229,29 +673,47 @@ class LessonPlanWordStandardizer:
                 for cell in row.cells:
                     yield from cell.paragraphs
 
-    def _normalize_paragraphs(self, document, changes):
+    def _normalize_paragraphs(
+        self,
+        document,
+        changes,
+        *,
+        normalize_font=True,
+        normalize_spacing=True,
+    ):
         body = self.profile["body"]
         for paragraph in self._all_paragraphs(document):
             kind = self._paragraph_kind(paragraph.text)
             in_table = paragraph._p.getparent().tag == qn("w:tc")
             size = self.profile["table"]["size_pt"] if in_table else body["size_pt"]
-            for run in paragraph.runs:
-                run.font.name = body["font"]
-                run.font.size = Pt(size)
-                fonts = run._element.get_or_add_rPr().rFonts
-                for key in ("ascii", "hAnsi", "eastAsia", "cs"):
-                    fonts.set(qn(f"w:{key}"), body["font"])
+            if normalize_font:
+                for run in paragraph.runs:
+                    run.font.name = body["font"]
+                    run.font.size = Pt(size)
+                    fonts = run._element.get_or_add_rPr().rFonts
+                    for key in ("ascii", "hAnsi", "eastAsia", "cs"):
+                        fonts.set(qn(f"w:{key}"), body["font"])
             fmt = paragraph.paragraph_format
-            fmt.line_spacing = body["line_spacing"]
-            fmt.space_before = Pt(0)
-            fmt.space_after = Pt(0)
-            if kind == "body" and paragraph.text.strip():
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            elif kind == "title":
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for run in paragraph.runs: run.bold = True; run.font.size = Pt(self.profile["title"]["size_pt"])
-            elif kind in {"heading_1", "heading_2", "activity"}:
-                for run in paragraph.runs: run.bold = True
+            if normalize_spacing:
+                fmt.line_spacing = body["line_spacing"]
+                fmt.space_before = Pt(0)
+                fmt.space_after = Pt(0)
+                if kind == "body" and paragraph.text.strip():
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                elif kind == "title":
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            if normalize_font and kind in {
+                "title",
+                "heading_1",
+                "heading_2",
+                "activity",
+            }:
+                for run in paragraph.runs:
+                    run.bold = True
+                    if kind == "title":
+                        run.font.size = Pt(
+                            self.profile["title"]["size_pt"]
+                        )
             changes[f"paragraph_{kind}"] += 1
 
     def _normalize_tables(self, document, changes):
@@ -348,11 +810,82 @@ class LessonPlanWordStandardizer:
                 os.unlink(temporary_name)
         return forced
 
-    @staticmethod
-    def _validate_integrity(before, after):
-        for name in ("tables", "table_cells", "inline_shapes", "sections", "omml_equations", "ole_objects", "images"):
-            if getattr(before, name) != getattr(after, name):
-                raise ValueError(f"Kiểm tra toàn vẹn thất bại: số lượng {name} đã thay đổi.")
+    def _validate_integrity(
+        self,
+        before,
+        after,
+    ):
+        count_fields = (
+            "paragraphs",
+            "tables",
+            "table_cells",
+            "inline_shapes",
+            "sections",
+            "omml_equations",
+            "equation_paragraphs",
+            "ole_objects",
+            "drawings",
+            "images",
+        )
+
+        for name in count_fields:
+            if (
+                getattr(before, name)
+                != getattr(after, name)
+            ):
+                raise ValueError(
+                    "Document integrity failure: "
+                    + name
+                    + " count changed."
+                )
+
+        if (
+            before.body_text_sha256
+            != after.body_text_sha256
+        ):
+            raise ValueError(
+                "Document integrity failure: "
+                "body or table text changed."
+            )
+
+        immutable_fields = (
+            "media_fingerprints",
+            "embedded_fingerprints",
+            "external_relationships",
+        )
+
+        for name in immutable_fields:
+            if (
+                getattr(before, name)
+                != getattr(after, name)
+            ):
+                raise ValueError(
+                    "Document integrity failure: "
+                    + name
+                    + " changed."
+                )
+
+        remove_existing = bool(
+            self.profile.get(
+                "header_footer",
+                {},
+            ).get(
+                "remove_existing",
+                False,
+            )
+        )
+
+        if (
+            not remove_existing
+            and (
+                before.header_footer_text_sha256
+                != after.header_footer_text_sha256
+            )
+        ):
+            raise ValueError(
+                "Document integrity failure: "
+                "header/footer content changed."
+            )
 
     @staticmethod
     def _warnings(before):

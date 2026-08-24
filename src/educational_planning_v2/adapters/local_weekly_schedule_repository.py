@@ -10,7 +10,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from educational_planning_v2.models import AcademicWeek, WeeklyTeachingSchedule, WeeklyTeachingScheduleEntry
+from educational_planning_v2.models import AcademicWeek, TeachingSession, WeeklyTeachingSchedule, WeeklyTeachingScheduleEntry
 from educational_planning_v2.repositories import SavedWeeklyScheduleSummary
 
 
@@ -101,7 +101,7 @@ class LocalWeeklyScheduleRepository:
             },
             "entries": [{
                 "teaching_date": item.teaching_date.isoformat(), "weekday": item.weekday,
-                "timetable_period": item.timetable_period, "teacher_id": item.teacher_id,
+                "timetable_period": item.timetable_period, "session": item.session.value, "teacher_id": item.teacher_id,
                 "class_id": item.class_id, "subject_ref": item.subject_ref,
                 "component_ref": item.component_ref, "curriculum_period": item.curriculum_period,
                 "lesson_id": item.lesson_id, "lesson_title": item.lesson_title,
@@ -119,7 +119,7 @@ class LocalWeeklyScheduleRepository:
             academic_week=AcademicWeek(week["academic_year"], week["week_number"], date.fromisoformat(week["start_date"]), date.fromisoformat(week["end_date"])),
             entries=tuple(WeeklyTeachingScheduleEntry(
                 teaching_date=date.fromisoformat(item["teaching_date"]), weekday=item["weekday"],
-                timetable_period=item["timetable_period"], teacher_id=item["teacher_id"],
+                timetable_period=item["timetable_period"], session=TeachingSession(item.get("session", "MORNING")), teacher_id=item["teacher_id"],
                 class_id=item["class_id"], subject_ref=item["subject_ref"],
                 component_ref=item.get("component_ref"), curriculum_period=item["curriculum_period"],
                 lesson_id=item["lesson_id"], lesson_title=item["lesson_title"],

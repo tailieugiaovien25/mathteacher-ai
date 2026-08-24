@@ -4,6 +4,10 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from educational_planning_v2.models.teacher_timetable import (
+    TeachingSession,
+)
+
 
 def _required_text(value: str, field_name: str) -> str:
     if not isinstance(value, str):
@@ -70,6 +74,7 @@ class TimetableSlot:
     subject_ref: str
     weekday: int
     timetable_period: int
+    session: TeachingSession
     effective_from: date
     effective_to: date
     component_ref: str | None = None
@@ -88,6 +93,14 @@ class TimetableSlot:
             _optional_text(self.component_ref, "component_ref"),
         )
         _positive_int(self.timetable_period, "timetable_period")
+
+        if not isinstance(
+            self.session,
+            TeachingSession,
+        ):
+            raise TypeError(
+                "session must be TeachingSession"
+            )
 
         if not isinstance(self.weekday, int) or isinstance(self.weekday, bool):
             raise TypeError("weekday must be an int")
@@ -207,6 +220,7 @@ class WeeklyTeachingScheduleEntry:
     teaching_date: date
     weekday: int
     timetable_period: int
+    session: TeachingSession
     teacher_id: str
     class_id: str
     subject_ref: str

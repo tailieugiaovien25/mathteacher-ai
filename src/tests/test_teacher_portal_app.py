@@ -4,6 +4,7 @@ from scripts.teacher_portal.app import (
     build_teacher_profile,
     clear_portal_session,
     connect_feature_repositories,
+    has_complete_portal_session,
     select_portal_page,
     supabase_settings,
 )
@@ -37,6 +38,11 @@ def test_portal_connects_feature_adapters_to_same_user():
     assert state["portal_supabase_client"] is client
     assert state["weekly_supabase_repository"].user_id == "user-123"
     assert state["document_library_repository"]._user_id == "user-123"
+    assert "notification_repository" in state
+    assert (
+        state["notification_repository"]._owner_id
+        == "user-123"
+    )
 
 
 def test_portal_logout_clears_shared_and_feature_sessions():
@@ -45,6 +51,7 @@ def test_portal_logout_clears_shared_and_feature_sessions():
         "portal_user_id": "user-123",
         "weekly_supabase_repository": object(),
         "document_library_repository": object(),
+        "portal_flash_feedback": object(),
         "google_drive_credentials": {},
         "unrelated": "keep",
     }
@@ -71,6 +78,10 @@ def test_portal_builds_normalized_teacher_profile():
     assert profile.teacher_code == "GV001"
     assert profile.subjects == ("Toán", "Tin học")
     assert "Kho tài liệu" in PORTAL_PAGES
+    assert "Công cụ soạn bài" not in PORTAL_PAGES
+    assert "Chuẩn hóa giáo án" in PORTAL_PAGES
+    assert "Soạn bài cùng AI" in PORTAL_PAGES
+    assert "Lịch báo giảng & PBSDTB" in PORTAL_PAGES
 
 
 def test_feature_apps_support_embedded_rendering():
@@ -81,3 +92,47 @@ def test_feature_apps_support_embedded_rendering():
 
     for function in (document_main, weekly_main, word_main):
         assert "embedded" in inspect.signature(function).parameters
+
+
+
+def test_portal_session_requires_complete_identity():
+    client = object()
+
+    assert has_complete_portal_session(
+        {
+            "portal_supabase_client": client,
+            "portal_user_id": "user-123",
+            "portal_user_email": "teacher@example.com",
+        }
+    )
+
+    assert not has_complete_portal_session(
+        {
+            "portal_supabase_client": client,
+            "portal_user_id": "user-123",
+        }
+    )
+
+    assert not has_complete_portal_session(
+        {
+            "portal_supabase_client": client,
+            "portal_user_email": "teacher@example.com",
+        }
+    )
+
+    assert not has_complete_portal_session(
+        {
+            "portal_user_id": "user-123",
+            "portal_user_email": "teacher@example.com",
+        }
+    )
+
+
+def test_portal_session_rejects_blank_email():
+    assert not has_complete_portal_session(
+        {
+            "portal_supabase_client": object(),
+            "portal_user_id": "user-123",
+            "portal_user_email": "",
+        }
+    )
