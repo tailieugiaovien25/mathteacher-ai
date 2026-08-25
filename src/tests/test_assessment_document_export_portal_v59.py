@@ -67,7 +67,7 @@ class Client:
             "assessment_document_template_sets": [
                 {
                     "template_code": "PHONG-DIEN-BIEN",
-                    "display_name": "Mẫu Phòng GDĐT",
+                    "template_name": "Mẫu Phòng GDĐT",
                     "authority_scope": "DISTRICT",
                     "lifecycle_status": "ACTIVE",
                     "current_version_number": 2,

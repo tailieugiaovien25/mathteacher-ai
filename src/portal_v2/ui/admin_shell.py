@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Any
 
@@ -14,6 +14,9 @@ from portal_v2.ui.admin_assignment_workspace_streamlit import (
 )
 from portal_v2.ui.admin_academic_year_configuration_streamlit import (
     render_admin_academic_year_configuration,
+)
+from portal_v2.ui.admin_assessment_runtime_readiness_streamlit import (
+    render_admin_assessment_runtime_readiness,
 )
 
 from portal_v2.ui.admin_navigation import (
@@ -391,14 +394,6 @@ def _render_users(st, *, client=None) -> None:
                 st.rerun()
 
 
-def _render_system_health(st) -> None:
-    st.title("System Health")
-    st.caption(
-        "Theo dõi trạng thái dữ liệu, provider, persistence và architecture guards."
-    )
-    st.info("Health services sẽ được nối sau khi UI shell được khóa.")
-
-
 def render_admin_page(
     st,
     *,
@@ -460,11 +455,17 @@ def render_admin_page(
         ADMIN_PAGE_TRUSTED_DATA: _render_trusted_data,
         ADMIN_PAGE_TIME_ALLOCATION: _render_time_allocation,
         ADMIN_PAGE_SOURCES: _render_sources,
-        ADMIN_PAGE_SYSTEM_HEALTH: _render_system_health,
     }
 
     if page.page_id == ADMIN_PAGE_USERS:
         _render_users(st, client=client)
+        return
+
+    if page.page_id == ADMIN_PAGE_SYSTEM_HEALTH:
+        render_admin_assessment_runtime_readiness(
+            st,
+            client=client,
+        )
         return
 
     renderers[page.page_id](st)

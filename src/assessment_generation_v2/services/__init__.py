@@ -21,6 +21,11 @@ from assessment_generation_v2.services.assessment_document_export_service import
     PublishedAssessmentRenderSource,
     RenderedAssessmentDocument,
 )
+from assessment_generation_v2.services.assessment_runtime_readiness_service import (
+    AssessmentRuntimeReadinessCheck,
+    AssessmentRuntimeReadinessReport,
+    SupabaseAssessmentRuntimeReadinessService,
+)
 
 __all__ = [
     "ApprovedAssessmentTemplate",
@@ -36,8 +41,11 @@ __all__ = [
     "AssessmentExamGenerationResult",
     "AssessmentExamGenerationService",
     "AssessmentGenerationValidationError",
+    "AssessmentRuntimeReadinessCheck",
+    "AssessmentRuntimeReadinessReport",
     "AssessmentValidationReport",
     "ExamGenerationState",
     "PublishedAssessmentRenderSource",
     "RenderedAssessmentDocument",
+    "SupabaseAssessmentRuntimeReadinessService",
 ]

@@ -177,7 +177,7 @@ class SupabaseAssessmentExportCatalog:
         response = (
             self._client.table("assessment_document_template_sets")
             .select(
-                "template_code,display_name,authority_scope,"
+                "template_code,template_name,authority_scope,"
                 "lifecycle_status,current_version_number,"
                 "assessment_document_template_versions!inner("
                 "version_number,review_status)"
@@ -187,7 +187,7 @@ class SupabaseAssessmentExportCatalog:
                 "assessment_document_template_versions.review_status",
                 "APPROVED",
             )
-            .order("display_name")
+            .order("template_name")
             .execute()
         )
         options: list[ActiveTemplateSetOption] = []
@@ -213,7 +213,7 @@ class SupabaseAssessmentExportCatalog:
                         row.get("template_code")
                     ).upper(),
                     display_name=_text(
-                        row.get("display_name"), "Bộ mẫu"
+                        row.get("template_name"), "Bộ mẫu"
                     ),
                     authority_scope=_text(
                         row.get("authority_scope"), "USER"
