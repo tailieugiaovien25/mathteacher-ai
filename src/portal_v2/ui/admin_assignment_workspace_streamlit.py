@@ -125,6 +125,24 @@ def render_admin_assignment_workspace(
             teacher_repository.list_teachers()
         )
 
+        active_role_response = (
+            client.table("portal_roles")
+            .select("user_id,is_active")
+            .eq("role", "teacher")
+            .eq("is_active", True)
+            .execute()
+        )
+        active_teacher_ids = {
+            str(row.get("user_id", "") or "").strip()
+            for row in (getattr(active_role_response, "data", ()) or ())
+            if isinstance(row, dict)
+        }
+        teachers = tuple(
+            teacher
+            for teacher in teachers
+            if teacher.user_id in active_teacher_ids
+        )
+
         subjects = (
             subject_repository.list_subjects(
                 status=CatalogStatus.ACTIVE,
@@ -448,6 +466,20 @@ def render_admin_assignment_workspace(
         teacher.user_id: teacher
         for teacher in teachers
     }
+
+    target_teacher_id = st.session_state.pop(
+        "admin_assignment_target_teacher_id",
+        None,
+    )
+
+    if target_teacher_id in teacher_by_id:
+        st.session_state[
+            "admin_assignment_row_teacher"
+        ] = target_teacher_id
+    elif target_teacher_id:
+        st.warning(
+            "Giáo viên được chọn không còn hiệu lực hoặc không có hồ sơ hợp lệ."
+        )
 
     subject_by_id = {
         subject.subject_id: subject

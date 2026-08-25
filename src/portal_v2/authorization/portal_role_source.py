@@ -24,6 +24,7 @@ class PortalRoleResolution:
     role: str
     source_ref: str
     trusted: bool
+    active: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -68,10 +69,20 @@ class PortalRoleResolution:
                 "trusted must be bool"
             )
 
+        if not isinstance(self.active, bool):
+            raise TypeError(
+                "active must be bool"
+            )
+
+    @property
+    def can_access_portal(self) -> bool:
+        return self.trusted and self.active
+
     @property
     def grants_admin_access(self) -> bool:
         return (
             self.trusted
+            and self.active
             and
             self.role == PORTAL_ROLE_ADMIN
         )

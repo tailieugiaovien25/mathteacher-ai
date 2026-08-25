@@ -295,6 +295,13 @@ def resolve_authenticated_portal_role(
     resolution = source.resolve_role(
         user_id=user_id
     )
+
+    if not resolution.can_access_portal:
+        raise PermissionError(
+            "Tài khoản chưa được kích hoạt hoặc đã ngừng hoạt động. "
+            "Vui lòng liên hệ ADMIN."
+        )
+
     return resolution.effective_role
 
 
@@ -711,11 +718,42 @@ def render_teacher_settings(
     except Exception:
         profile = None
 
-    academic_year = (
-        str(profile.default_academic_year).strip()
-        if profile and profile.default_academic_year
-        else "2026-2027"
+    from educational_planning_v2.models.academic_year_configuration import (
+        normalize_academic_year,
     )
+
+    academic_year = ""
+
+    try:
+        from educational_planning_v2.adapters.supabase_academic_year_configuration_repository import (
+            SupabaseAcademicYearConfigurationRepository,
+        )
+
+        current_year = (
+            SupabaseAcademicYearConfigurationRepository(
+                client=client,
+            )
+            .get_current()
+        )
+        if current_year is not None:
+            academic_year = current_year.academic_year
+    except Exception:
+        academic_year = ""
+
+    if not academic_year and profile and profile.default_academic_year:
+        try:
+            academic_year = normalize_academic_year(
+                str(profile.default_academic_year)
+            )
+        except (TypeError, ValueError):
+            academic_year = ""
+
+    if not academic_year:
+        st.warning(
+            "Chưa xác định được năm học hiện hành. "
+            "Vui lòng liên hệ ADMIN để cấu hình năm học."
+        )
+        return
 
     information_tab, assignment_tab, lesson_plan_tab = st.tabs(
         (

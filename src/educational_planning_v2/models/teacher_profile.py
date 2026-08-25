@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from educational_planning_v2.models.academic_year_configuration import (
+    normalize_academic_year,
+)
+
 
 def _required_text(value: str, field_name: str, maximum: int) -> str:
     if not isinstance(value, str):
@@ -42,7 +46,17 @@ class TeacherProfile:
         object.__setattr__(self, "school_name", _required_text(self.school_name, "school_name", 250))
         object.__setattr__(self, "subjects", _text_tuple(self.subjects, "subjects"))
         object.__setattr__(self, "grade_levels", _text_tuple(self.grade_levels, "grade_levels"))
-        object.__setattr__(self, "default_academic_year", _required_text(self.default_academic_year, "default_academic_year", 30))
+        object.__setattr__(
+            self,
+            "default_academic_year",
+            normalize_academic_year(
+                _required_text(
+                    self.default_academic_year,
+                    "default_academic_year",
+                    30,
+                )
+            ),
+        )
         if not self.subjects:
             raise ValueError("subjects must not be empty")
         if not self.grade_levels:

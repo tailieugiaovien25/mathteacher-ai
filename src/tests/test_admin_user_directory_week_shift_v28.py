@@ -49,7 +49,8 @@ def test_admin_dashboard_joins_roles_and_profiles():
     assert 'client.table("portal_roles")' in text
     assert 'client.table("teacher_profiles")' in text
     assert '"Mới đăng ký"' in text
-    assert '"Đã là người dùng"' in text
+    assert '"Đang có hiệu lực"' in text
+    assert '"Ngừng hoạt động"' in text
     assert "admin_dashboard_user_status" in text
 
 

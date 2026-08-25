@@ -52,7 +52,7 @@ class SupabaseTrustedPortalRoleSource(
             response = (
                 self._client
                 .table(self.TABLE_NAME)
-                .select("user_id,role")
+                .select("user_id,role,is_active")
                 .eq(
                     "user_id",
                     normalized_user_id,
@@ -103,12 +103,23 @@ class SupabaseTrustedPortalRoleSource(
             or ""
         ).strip().lower()
 
+        is_active = record.get(
+            "is_active",
+            True,
+        )
+
+        if not isinstance(is_active, bool):
+            return self._fallback(
+                normalized_user_id
+            )
+
         try:
             return PortalRoleResolution(
                 user_id=normalized_user_id,
                 role=role,
                 source_ref=self.SOURCE_REF,
                 trusted=True,
+                active=is_active,
             )
         except (
             TypeError,
@@ -128,6 +139,7 @@ class SupabaseTrustedPortalRoleSource(
             role=PORTAL_ROLE_TEACHER,
             source_ref=cls.SOURCE_REF,
             trusted=False,
+            active=False,
         )
 
     @staticmethod
