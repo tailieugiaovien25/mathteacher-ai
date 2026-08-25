@@ -32,6 +32,7 @@ PORTAL_PAGES = (
     'Th\u1eddi kh\xf3a bi\u1ec3u',
     'D\u1eef li\u1ec7u c\u1ee7a t\xf4i',
     'Kho t\xe0i li\u1ec7u',
+    'Xu\u1ea5t \u0111\u1ec1 ki\u1ec3m tra',
     'Thi\u1ebft \u0111\u1eb7t gi\xe1o vi\xean',
 )
 
@@ -1489,6 +1490,17 @@ def main() -> None:
                         )
                         render_persisted_ppct_view()
 
+
+    elif selected == "Xuất đề kiểm tra":
+        from portal_v2.ui.assessment_document_export_streamlit import (
+            render_assessment_document_export_page,
+        )
+
+        render_assessment_document_export_page(
+            st=st,
+            client=client,
+            user_id=str(user_id),
+        )
 
     elif selected == "Thiết đặt giáo viên":
         render_teacher_settings(
