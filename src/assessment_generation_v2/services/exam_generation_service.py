@@ -54,7 +54,6 @@ class AssessmentExamGenerationRequest:
     owner_user_id: str
     exam_code: str
     title: str
-    variant_count: int = 1
     submit_for_review: bool = True
     idempotency_key: str = ""
 
@@ -100,22 +99,7 @@ class AssessmentExamGenerationRequest:
             ),
         )
 
-        if isinstance(self.variant_count, bool):
-            raise TypeError(
-                "variant_count must be an integer"
-            )
-        if not isinstance(self.variant_count, int):
-            raise TypeError(
-                "variant_count must be an integer"
-            )
-        if self.variant_count < 1:
-            raise AssessmentGenerationValidationError(
-                "variant_count must be at least 1"
-            )
-        if self.variant_count > 24:
-            raise AssessmentGenerationValidationError(
-                "variant_count must not exceed 24"
-            )
+
         if not isinstance(self.submit_for_review, bool):
             raise TypeError(
                 "submit_for_review must be a boolean"
@@ -168,7 +152,6 @@ class AssessmentExamGenerationResult:
     blueprint_version_id: str
     state: ExamGenerationState
     validation_report: AssessmentValidationReport
-    variant_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -204,11 +187,7 @@ class AssessmentExamGenerationResult:
                 "validation_report must be "
                 "AssessmentValidationReport"
             )
-        if not isinstance(self.variant_ids, tuple):
-            raise TypeError("variant_ids must be a tuple")
 
-        for variant_id in self.variant_ids:
-            _required_uuid(variant_id, "variant_id")
 
 
 @dataclass(frozen=True)
@@ -312,13 +291,6 @@ class AssessmentExamGenerationGateway(Protocol):
     ) -> AssessmentValidationReport:
         ...
 
-    def create_exam_variants(
-        self,
-        *,
-        exam_version_id: str,
-        variant_count: int,
-    ) -> tuple[str, ...]:
-        ...
 
     def submit_exam_for_review(
         self,
@@ -417,42 +389,6 @@ class AssessmentExamGenerationService:
                 validation_report=report,
             )
 
-        variant_ids = self._gateway.create_exam_variants(
-            exam_version_id=draft.exam_version_id,
-            variant_count=request.variant_count,
-        )
-
-        if not isinstance(variant_ids, tuple):
-            raise RuntimeError(
-                "gateway must return variants as a tuple"
-            )
-
-        if len(variant_ids) != request.variant_count:
-            raise RuntimeError(
-                "gateway returned an unexpected "
-                "number of variants"
-            )
-
-        if len(set(variant_ids)) != len(variant_ids):
-            raise RuntimeError(
-                "gateway returned duplicate variant identifiers"
-            )
-
-        for variant_id in variant_ids:
-            try:
-                _required_uuid(
-                    variant_id,
-                    "variant_id",
-                )
-            except (
-                TypeError,
-                AssessmentGenerationValidationError,
-            ) as error:
-                raise RuntimeError(
-                    "gateway returned an invalid "
-                    "variant identifier"
-                ) from error
-
         state = ExamGenerationState.READY_FOR_REVIEW
 
         if request.submit_for_review:
@@ -469,5 +405,4 @@ class AssessmentExamGenerationService:
             ),
             state=state,
             validation_report=report,
-            variant_ids=variant_ids,
         )

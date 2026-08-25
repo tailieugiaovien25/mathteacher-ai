@@ -24,19 +24,12 @@ EXAM_ID = "33333333-3333-4333-8333-333333333333"
 EXAM_VERSION_ID = (
     "44444444-4444-4444-8444-444444444444"
 )
-VARIANT_IDS = (
-    "55555555-5555-4555-8555-555555555551",
-    "55555555-5555-4555-8555-555555555552",
-)
-
-
 class FakeAssessmentGenerationGateway:
     def __init__(
         self,
         *,
         report: AssessmentValidationReport | None = None,
         blueprint: AssessmentBlueprintSelection | None = None,
-        variant_ids: tuple[str, ...] = VARIANT_IDS,
     ) -> None:
         self.report = report or AssessmentValidationReport(
             is_valid=True,
@@ -52,7 +45,6 @@ class FakeAssessmentGenerationGateway:
                 review_status="APPROVED",
             )
         )
-        self.variant_ids = variant_ids
         self.calls: list[str] = []
 
     def find_active_approved_blueprint(
@@ -91,15 +83,6 @@ class FakeAssessmentGenerationGateway:
         self.calls.append("validate")
         return self.report
 
-    def create_exam_variants(
-        self,
-        *,
-        exam_version_id: str,
-        variant_count: int,
-    ) -> tuple[str, ...]:
-        self.calls.append("create_variants")
-        return self.variant_ids[:variant_count]
-
     def submit_exam_for_review(
         self,
         *,
@@ -111,14 +94,12 @@ class FakeAssessmentGenerationGateway:
 def _request(
     *,
     submit_for_review: bool = True,
-    variant_count: int = 2,
 ) -> AssessmentExamGenerationRequest:
     return AssessmentExamGenerationRequest(
         blueprint_code="TOAN6_GIUA_HK1",
         owner_user_id=OWNER_ID,
         exam_code="KT_GHK1_TOAN6_001",
-        title="Kiểm tra giữa học kỳ I môn Toán 6",
-        variant_count=variant_count,
+        title="Kiá»ƒm tra giá»¯a há»c ká»³ I mÃ´n ToÃ¡n 6",
         submit_for_review=submit_for_review,
         idempotency_key="teacher-1-toan6-ghk1-001",
     )
@@ -137,11 +118,9 @@ def test_generation_runs_in_governed_order() -> None:
         "create_draft",
         "assemble",
         "validate",
-        "create_variants",
         "submit_review",
     ]
     assert result.state is ExamGenerationState.PENDING_REVIEW
-    assert result.variant_ids == VARIANT_IDS
     assert result.validation_report.is_valid
 
 
@@ -178,8 +157,6 @@ def test_invalid_exam_stops_before_variant_generation() -> None:
         result.state
         is ExamGenerationState.REVISION_REQUIRED
     )
-    assert result.variant_ids == ()
-    assert "create_variants" not in gateway.calls
     assert "submit_review" not in gateway.calls
 
 
@@ -235,77 +212,27 @@ def test_request_requires_valid_owner_uuid() -> None:
             blueprint_code="TOAN6_GIUA_HK1",
             owner_user_id="not-a-uuid",
             exam_code="KT01",
-            title="Đề kiểm tra",
+            title="Äá» kiá»ƒm tra",
             idempotency_key="request-1",
         )
 
 
-@pytest.mark.parametrize("variant_count", (0, 25))
-def test_variant_count_is_bounded(
-    variant_count: int,
-) -> None:
-    with pytest.raises(
-        AssessmentGenerationValidationError
-    ):
-        _request(variant_count=variant_count)
-
-
-def test_gateway_must_return_requested_variant_count() -> None:
-    gateway = FakeAssessmentGenerationGateway(
-        variant_ids=(VARIANT_IDS[0],)
-    )
-    service = AssessmentExamGenerationService(
-        gateway=gateway
-    )
-
-    with pytest.raises(
-        RuntimeError,
-        match="unexpected number of variants",
-    ):
-        service.generate(request=_request(variant_count=2))
-
-
-@pytest.mark.parametrize(
-    ("variant_ids", "message"),
-    (
-        (
-            [
-                VARIANT_IDS[0],
-                VARIANT_IDS[1],
-            ],
-            "tuple",
-        ),
-        (
-            (
-                VARIANT_IDS[0],
-                VARIANT_IDS[0],
-            ),
-            "duplicate",
-        ),
-        (
-            (
-                VARIANT_IDS[0],
-                "not-a-uuid",
-            ),
-            "invalid",
-        ),
-    ),
-)
-def test_invalid_gateway_variants_stop_before_submission(
-    variant_ids: object,
-    message: str,
-) -> None:
+def test_draft_generation_has_no_post_publication_artifacts() -> None:
     gateway = FakeAssessmentGenerationGateway()
-    gateway.variant_ids = variant_ids
     service = AssessmentExamGenerationService(
         gateway=gateway
     )
 
-    with pytest.raises(RuntimeError, match=message):
-        service.generate(request=_request())
+    result = service.generate(request=_request())
 
-    assert "submit_review" not in gateway.calls
-
+    assert not hasattr(result, "variant_ids")
+    assert gateway.calls == [
+        "find_blueprint",
+        "create_draft",
+        "assemble",
+        "validate",
+        "submit_review",
+    ]
 
 def test_contracts_are_immutable() -> None:
     request = _request()
