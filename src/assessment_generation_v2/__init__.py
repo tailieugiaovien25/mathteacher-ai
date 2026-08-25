@@ -1,0 +1,1 @@
+﻿"""Assessment generation application domain."""
