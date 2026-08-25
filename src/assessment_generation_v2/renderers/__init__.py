@@ -6,10 +6,16 @@ from .dynamic_document_renderer import (
     DynamicAssessmentDocumentRenderer,
     DynamicAssessmentRendererError,
 )
+from .docx_render_plan_renderer import (
+    AssessmentDocxRendererError,
+    AssessmentDocxRenderPlanRenderer,
+)
 
 __all__ = (
     "AssessmentDocumentRenderPlan",
     "AssessmentTemplateDefinition",
     "DynamicAssessmentDocumentRenderer",
     "DynamicAssessmentRendererError",
+    "AssessmentDocxRendererError",
+    "AssessmentDocxRenderPlanRenderer",
 )
