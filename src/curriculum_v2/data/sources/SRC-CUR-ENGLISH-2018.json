@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "source_id": "SRC-CUR-ENGLISH-2018",
+  "source_type": "OFFICIAL_CURRICULUM",
+  "title": "Chương trình giáo dục phổ thông môn Tiếng Anh",
+  "legal_authority": {
+    "country": "Việt Nam",
+    "organization": "Bộ Giáo dục và Đào tạo"
+  },
+  "legal_basis": {
+    "regulation_id": "32/2018/TT-BGDĐT",
+    "issued_date": "2018-12-26"
+  },
+  "scope": {
+    "education_system": "GENERAL_EDUCATION",
+    "subject": "ENGLISH",
+    "target_grades": [
+      6,
+      7,
+      8,
+      9
+    ]
+  },
+  "canonical_usage": [
+    "CURRICULUM_STRUCTURE",
+    "LEARNING_REQUIREMENTS",
+    "LANGUAGE_COMPETENCY_REFERENCE"
+  ],
+  "verification": {
+    "authority_verified": true,
+    "regulation_verified": true,
+    "source_status": "AUTHORITATIVE"
+  },
+  "lifecycle": {
+    "record_version": 1,
+    "status": "ACTIVE"
+  }
+}

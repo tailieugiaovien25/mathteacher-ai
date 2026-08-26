@@ -1,0 +1,242 @@
+[
+  {
+    "canonical_id": "YCCD-ENG-08-0001",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-003",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/LISTENING/1",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Nghe và nhận biết âm, trọng âm, ngữ điệu và nhịp điệu trong các câu ghép cơ bản.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0002",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-003",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/LISTENING/2",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Nghe hiểu nội dung chính, nội dung chi tiết các đoạn hội thoại, độc thoại đơn giản khoảng 140 - 160 từ về các chủ đề trong Chương trình.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0003",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-003",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/LISTENING/3",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Nghe hiểu nội dung chính các thông báo đơn giản, được nói rõ ràng liên quan đến các chủ đề trong Chương trình.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0004",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-004",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/SPEAKING/1",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Phát âm các âm, trọng âm, ngữ điệu và nhịp điệu trong các câu ghép cơ bản.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0005",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-004",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/SPEAKING/2",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Nói các chỉ dẫn đơn giản sử dụng trong giao tiếp hằng ngày liên quan đến các chủ điểm đã học.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0006",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-004",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/SPEAKING/3",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Tham gia các hội thoại ngắn, đơn giản về các chủ điểm quen thuộc.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0007",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-004",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/SPEAKING/4",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Trình bày ngắn gọn, có chuẩn bị trước các dự án về các chủ điểm quen thuộc.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0008",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-005",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/READING/1",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Đọc hiểu nội dung chính, nội dung chi tiết các đoạn hội thoại, độc thoại đơn giản khoảng 150 - 180 từ về các chủ đề quen thuộc.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0009",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-005",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/READING/2",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Đọc hiểu nội dung chính, nội dung chi tiết các chỉ dẫn, thông báo, biển báo... ngắn, đơn giản về các chủ đề quen thuộc trong cuộc sống hằng ngày.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0010",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-005",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/READING/3",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Đọc hiểu và đoán được nghĩa của từ mới dựa vào ngữ cảnh.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0011",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-006",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/WRITING/1",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Viết (có hướng dẫn) một đoạn văn ngắn, đơn giản về các chủ đề quen thuộc trong cuộc sống hằng ngày.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  },
+  {
+    "canonical_id": "YCCD-ENG-08-0012",
+    "curriculum_node_ref": "CURR-NODE-ENG-G8-006",
+    "provenance": {
+      "legal_authority": "Bộ Giáo dục và Đào tạo",
+      "regulation_id": "32/2018/TT-BGDĐT",
+      "source_document_id": "SRC-CUR-ENGLISH-2018",
+      "source_location": "GRADE_8/LANGUAGE_SKILL/WRITING/2",
+      "source_version": "2018",
+      "verified_copy_id": "sha256:3fda4047158558216149df61610f6a72adc817c46d45c051fa5d704a7baefae7"
+    },
+    "requirement_text_original": "Viết các hướng dẫn, chỉ dẫn, thông báo, … ngắn, đơn giản khoảng 80 - 100 từ liên quan đến các chủ đề quen thuộc.",
+    "status": "VERIFIED",
+    "validation": {
+      "identity_integrity": "PASS",
+      "provenance_integrity": "PASS",
+      "structural_integrity": "PASS",
+      "text_integrity": "PASS"
+    }
+  }
+]
