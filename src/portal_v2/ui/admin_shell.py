@@ -18,9 +18,13 @@ from portal_v2.ui.admin_academic_year_configuration_streamlit import (
 from portal_v2.ui.admin_assessment_runtime_readiness_streamlit import (
     render_admin_assessment_runtime_readiness,
 )
+from portal_v2.ui.admin_assessment_template_workflow_streamlit import (
+    render_admin_assessment_template_workflow,
+)
 
 from portal_v2.ui.admin_navigation import (
     ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION,
+    ADMIN_PAGE_ASSESSMENT_TEMPLATES,
     ADMIN_PAGE_DASHBOARD,
     ADMIN_PAGE_SOURCES,
     ADMIN_PAGE_SYSTEM_HEALTH,
@@ -463,6 +467,13 @@ def render_admin_page(
 
     if page.page_id == ADMIN_PAGE_SYSTEM_HEALTH:
         render_admin_assessment_runtime_readiness(
+            st,
+            client=client,
+        )
+        return
+
+    if page.page_id == ADMIN_PAGE_ASSESSMENT_TEMPLATES:
+        render_admin_assessment_template_workflow(
             st,
             client=client,
         )
