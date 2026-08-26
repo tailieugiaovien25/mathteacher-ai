@@ -71,14 +71,14 @@ def test_catalog_lists_only_governed_blueprints() -> None:
         [
             {
                 "profile_code": "TOAN6_90P",
-                "grade_level": 6,
+                "blueprint_name": 'Giữa học kỳ I',
                 "duration_minutes": 90,
                 "total_score": 10,
                 "review_status": "APPROVED",
                 "locked_at": "2026-08-26T00:00:00Z",
                 "assessment_blueprints": {
                     "blueprint_code": "TOAN6_GHK1",
-                    "blueprint_name": "Giữa học kỳ I",
+                    "grade_level": 6,
                     "owner_user_id": USER_ID,
                     "lifecycle_status": "ACTIVE",
                 },

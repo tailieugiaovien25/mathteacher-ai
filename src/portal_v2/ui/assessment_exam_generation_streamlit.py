@@ -102,10 +102,10 @@ class SupabaseAssessmentGenerationCatalog:
         response = (
             self._client.table("assessment_blueprint_versions")
             .select(
-                "blueprint_version_id,profile_code,grade_level,"
+                "blueprint_version_id,profile_code,blueprint_name,"
                 "duration_minutes,total_score,review_status,locked_at,"
                 "assessment_blueprints!inner("
-                "blueprint_code,blueprint_name,owner_user_id,"
+                "blueprint_code,grade_level,owner_user_id,"
                 "lifecycle_status)"
             )
             .eq("assessment_blueprints.owner_user_id", self._user_id)
@@ -132,14 +132,16 @@ class SupabaseAssessmentGenerationCatalog:
                         "blueprint_code",
                     ),
                     blueprint_name=_required_text(
-                        blueprint.get("blueprint_name"),
+                        row.get("blueprint_name"),
                         "blueprint_name",
                     ),
                     profile_code=_required_text(
                         row.get("profile_code"),
                         "profile_code",
                     ),
-                    grade_level=int(row.get("grade_level", 0)),
+                    grade_level=int(
+                        blueprint.get("grade_level", 0)
+                    ),
                     duration_minutes=int(
                         row.get("duration_minutes", 0)
                     ),
