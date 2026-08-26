@@ -75,13 +75,13 @@ class SupabaseAssessmentRuntimeReadinessService:
             "schema_curriculum",
             "Dữ liệu chương trình",
             "assessment_curriculum_programs",
-            "curriculum_program_id",
+            "program_code",
         ),
         (
             "schema_question_bank",
             "Ngân hàng câu hỏi",
             "assessment_question_items",
-            "question_item_id",
+            "question_id",
         ),
         (
             "schema_blueprints",
