@@ -32,6 +32,7 @@ PORTAL_PAGES = (
     'Th\u1eddi kh\xf3a bi\u1ec3u',
     'D\u1eef li\u1ec7u c\u1ee7a t\xf4i',
     'Kho t\xe0i li\u1ec7u',
+    'Thi\u1ebft \u0111\u1eb7t \u0111\u1ec1 ki\u1ec3m tra',
     'Ma tr\u1eadn & b\u1ea3n \u0111\u1eb7c t\u1ea3',
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra',
     'Xu\u1ea5t \u0111\u1ec1 ki\u1ec3m tra',
@@ -1491,6 +1492,17 @@ def main() -> None:
                             "PPCT \u0111\u00e3 nh\u1eadp"
                         )
                         render_persisted_ppct_view()
+
+    elif selected == "Thiết đặt đề kiểm tra":
+        from portal_v2.ui.assessment_exam_settings_streamlit import (
+            render_assessment_exam_settings_page,
+        )
+
+        render_assessment_exam_settings_page(
+            st=st,
+            client=client,
+            user_id=str(user_id),
+        )
 
     elif selected == "Ma trận & bản đặc tả":
         from portal_v2.ui.assessment_blueprint_authoring_streamlit import (
