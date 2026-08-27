@@ -8,10 +8,14 @@ from assessment_generation_v2.adapters.supabase_assessment_document_export_gatew
     AssessmentDocumentExportGatewayError,
     SupabaseAssessmentDocumentExportGateway,
 )
+from assessment_generation_v2.adapters.supabase_blueprint_requirement_link_gateway import (
+    SupabaseBlueprintRequirementLinkGateway,
+)
 
 __all__ = [
     "AssessmentDocumentExportGatewayError",
     "AssessmentGatewayResponseError",
     "SupabaseAssessmentExamGenerationGateway",
+    "SupabaseBlueprintRequirementLinkGateway",
     "SupabaseAssessmentDocumentExportGateway",
 ]

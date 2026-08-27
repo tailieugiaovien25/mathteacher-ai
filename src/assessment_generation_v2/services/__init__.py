@@ -26,6 +26,12 @@ from assessment_generation_v2.services.assessment_runtime_readiness_service impo
     AssessmentRuntimeReadinessReport,
     SupabaseAssessmentRuntimeReadinessService,
 )
+from assessment_generation_v2.services.blueprint_requirement_link_service import (
+    BlueprintRequirementAssignment,
+    BlueprintRequirementLinkError,
+    BlueprintRequirementLinkGateway,
+    BlueprintRequirementLinkService,
+)
 
 __all__ = [
     "ApprovedAssessmentTemplate",
@@ -44,6 +50,10 @@ __all__ = [
     "AssessmentRuntimeReadinessCheck",
     "AssessmentRuntimeReadinessReport",
     "AssessmentValidationReport",
+    "BlueprintRequirementAssignment",
+    "BlueprintRequirementLinkError",
+    "BlueprintRequirementLinkGateway",
+    "BlueprintRequirementLinkService",
     "ExamGenerationState",
     "PublishedAssessmentRenderSource",
     "RenderedAssessmentDocument",
