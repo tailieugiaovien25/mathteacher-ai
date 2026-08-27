@@ -21,9 +21,13 @@ from portal_v2.ui.admin_assessment_runtime_readiness_streamlit import (
 from portal_v2.ui.admin_assessment_template_workflow_streamlit import (
     render_admin_assessment_template_workflow,
 )
+from portal_v2.ui.admin_competency_catalog_streamlit import (
+    render_admin_competency_catalog,
+)
 
 from portal_v2.ui.admin_navigation import (
     ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION,
+    ADMIN_PAGE_COMPETENCY_CATALOG,
     ADMIN_PAGE_ASSESSMENT_TEMPLATES,
     ADMIN_PAGE_DASHBOARD,
     ADMIN_PAGE_SOURCES,
@@ -410,6 +414,16 @@ def render_admin_page(
 
     if page.page_id == ADMIN_PAGE_DASHBOARD:
         _render_admin_dashboard(
+            st,
+            client=client,
+        )
+        return
+
+    if (
+        page.page_id
+        == ADMIN_PAGE_COMPETENCY_CATALOG
+    ):
+        render_admin_competency_catalog(
             st,
             client=client,
         )
