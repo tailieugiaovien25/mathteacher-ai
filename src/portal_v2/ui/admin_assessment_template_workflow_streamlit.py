@@ -19,6 +19,100 @@ class TemplateWorkflowState:
     version_number: int
 
 
+@dataclass(frozen=True, slots=True)
+class AssessmentProfileWorkflowState:
+    profile_code: str
+    profile_name: str
+    subject_code: str
+    grade_min: int
+    grade_max: int
+    total_score: float
+    duration_minutes: int
+    status: str
+
+
+def _load_assessment_profiles(
+    *,
+    client: Any,
+) -> tuple[AssessmentProfileWorkflowState, ...]:
+    response = (
+        client.table("assessment_profiles")
+        .select(
+            "profile_code,profile_name,subject_code,grade_min,grade_max,"
+            "total_score,duration_minutes,status"
+        )
+        .order("subject_code")
+        .order("profile_code")
+        .execute()
+    )
+    data = getattr(response, "data", None)
+    rows = data if isinstance(data, list) else []
+    return tuple(
+        AssessmentProfileWorkflowState(
+            profile_code=str(row.get("profile_code", "")),
+            profile_name=str(row.get("profile_name", "")),
+            subject_code=str(row.get("subject_code", "")),
+            grade_min=int(row.get("grade_min", 0) or 0),
+            grade_max=int(row.get("grade_max", 0) or 0),
+            total_score=float(row.get("total_score", 0) or 0),
+            duration_minutes=int(row.get("duration_minutes", 0) or 0),
+            status=str(row.get("status", "DRAFT")).upper(),
+        )
+        for row in rows
+        if isinstance(row, Mapping)
+    )
+
+
+def _render_assessment_profile_activation(
+    *,
+    st: Any,
+    client: Any,
+) -> None:
+    st.subheader("Hồ sơ cấu trúc đề kiểm tra")
+    st.caption(
+        "Hồ sơ là dữ liệu cấu hình số câu, điểm, thời lượng và mức độ; "
+        "không được mã hóa cứng trong giao diện giáo viên."
+    )
+    try:
+        profiles = _load_assessment_profiles(client=client)
+    except Exception as error:
+        st.error(f"Không thể tải hồ sơ đánh giá: {error}")
+        return
+    if not profiles:
+        st.warning("Chưa có hồ sơ đánh giá trong cơ sở dữ liệu.")
+        return
+    for profile in profiles:
+        with st.container(border=True):
+            st.write(
+                f"**{profile.profile_name}**  "
+                f"`{profile.profile_code}`"
+            )
+            st.caption(
+                f"{profile.subject_code} · Lớp "
+                f"{profile.grade_min}–{profile.grade_max} · "
+                f"{profile.duration_minutes} phút · "
+                f"{profile.total_score:g} điểm · {profile.status}"
+            )
+            if profile.status == "ACTIVE":
+                st.success("Hồ sơ đang hoạt động.")
+                continue
+            _action(
+                st=st,
+                client=client,
+                label="Kiểm tra và kích hoạt hồ sơ",
+                key=(
+                    "assessment_profile_activate_"
+                    + profile.profile_code
+                ),
+                function_name="activate_assessment_profile",
+                parameters={
+                    "target_profile_code": profile.profile_code,
+                },
+                success_message="Đã kích hoạt hồ sơ đánh giá.",
+                disabled=profile.status != "DRAFT",
+            )
+
+
 def _load_state(*, client: Any) -> TemplateWorkflowState | None:
     response = (
         client.table("assessment_document_template_sets")
@@ -113,6 +207,12 @@ def render_admin_assessment_template_workflow(
     if client is None:
         st.warning("Chưa có kết nối Supabase.")
         return
+    _render_assessment_profile_activation(
+        st=st,
+        client=client,
+    )
+    st.divider()
+    st.subheader("Bộ mẫu tài liệu đề kiểm tra")
     try:
         state = _load_state(client=client)
     except Exception as error:
