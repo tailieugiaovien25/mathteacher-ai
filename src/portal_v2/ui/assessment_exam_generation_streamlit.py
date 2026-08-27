@@ -21,6 +21,8 @@ class AssessmentGenerationCatalogError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class ApprovedBlueprintOption:
+    blueprint_version_id: str
+    setting_version_id: str
     blueprint_code: str
     blueprint_name: str
     profile_code: str
@@ -103,6 +105,7 @@ class SupabaseAssessmentGenerationCatalog:
             self._client.table("assessment_blueprint_versions")
             .select(
                 "blueprint_version_id,profile_code,blueprint_name,"
+                "setting_version_id,"
                 "duration_minutes,total_score,review_status,locked_at,"
                 "assessment_blueprints!inner("
                 "blueprint_code,grade_level,owner_user_id,"
@@ -112,6 +115,7 @@ class SupabaseAssessmentGenerationCatalog:
             .eq("assessment_blueprints.lifecycle_status", "ACTIVE")
             .eq("review_status", "APPROVED")
             .not_.is_("locked_at", "null")
+            .not_.is_("setting_version_id", "null")
             .order("created_at", desc=True)
             .execute()
         )
@@ -127,6 +131,14 @@ class SupabaseAssessmentGenerationCatalog:
                 )
             options.append(
                 ApprovedBlueprintOption(
+                    blueprint_version_id=_required_text(
+                        row.get("blueprint_version_id"),
+                        "blueprint_version_id",
+                    ),
+                    setting_version_id=_required_text(
+                        row.get("setting_version_id"),
+                        "setting_version_id",
+                    ),
                     blueprint_code=_required_text(
                         blueprint.get("blueprint_code"),
                         "blueprint_code",
@@ -209,6 +221,10 @@ def render_assessment_exam_generation_page(
             f"Hồ sơ: {selected.profile_code} · "
             f"Thời lượng: {selected.duration_minutes} phút · "
             f"Điểm: {selected.total_score:g}"
+        )
+        st.caption(
+            "Thiết đặt quản trị: "
+            + selected.setting_version_id
         )
         exam_code = st.text_input(
             "Mã đề nội bộ",

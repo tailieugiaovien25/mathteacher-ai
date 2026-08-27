@@ -70,6 +70,12 @@ def test_catalog_lists_only_governed_blueprints() -> None:
     client = _Client(
         [
             {
+                "blueprint_version_id": (
+                    "22222222-2222-4222-8222-222222222222"
+                ),
+                "setting_version_id": (
+                    "33333333-3333-4333-8333-333333333333"
+                ),
                 "profile_code": "TOAN6_90P",
                 "blueprint_name": 'Giữa học kỳ I',
                 "duration_minutes": 90,
@@ -102,6 +108,11 @@ def test_catalog_lists_only_governed_blueprints() -> None:
         "ACTIVE",
     ) in client.query.operations
     assert ("not_is", "locked_at", "null") in client.query.operations
+    assert (
+        "not_is",
+        "setting_version_id",
+        "null",
+    ) in client.query.operations
 
 
 def test_catalog_accepts_empty_state() -> None:

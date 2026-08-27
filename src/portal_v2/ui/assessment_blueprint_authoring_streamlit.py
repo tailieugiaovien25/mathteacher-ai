@@ -58,12 +58,37 @@ class EditableBlueprintOption:
     review_status: str
     version_number: int
     total_score: Decimal
+    setting_version_id: str | None
+    academic_year: str
+    semester_number: int | None
+    duration_minutes: int
 
     @property
     def label(self) -> str:
         return (
             f"{self.blueprint_code} — {self.blueprint_name} "
             f"(Lớp {self.grade_level}, v{self.version_number})"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ApprovedExamSettingOption:
+    setting_version_id: str
+    setting_code: str
+    setting_name: str
+    profile_code: str
+    subject_code: str
+    grade_level: int
+    academic_year: str
+    semester_number: int | None
+    duration_minutes: int
+    total_score: Decimal
+
+    @property
+    def label(self) -> str:
+        return (
+            f"{self.setting_code} — {self.setting_name} "
+            f"(Lớp {self.grade_level}, {self.academic_year})"
         )
 
 
@@ -156,6 +181,7 @@ class SupabaseAssessmentBlueprintAuthoringCatalog:
     REPLACE_CELLS_RPC = "replace_assessment_blueprint_cells"
     READY_RPC = "assessment_blueprint_ready_for_review"
     SUBMIT_RPC = "submit_assessment_blueprint_for_review"
+    BIND_SETTING_RPC = "bind_assessment_setting_to_blueprint"
 
     def __init__(self, *, client: Any, user_id: str) -> None:
         self._client = client
@@ -204,7 +230,9 @@ class SupabaseAssessmentBlueprintAuthoringCatalog:
             self._client.table("assessment_blueprint_versions")
             .select(
                 "blueprint_version_id,version_number,profile_code,"
-                "blueprint_name,total_score,review_status,locked_at,"
+                "blueprint_name,total_score,duration_minutes,academic_year,"
+                "semester_number,review_status,locked_at,"
+                "setting_version_id,"
                 "assessment_blueprints!inner(blueprint_code,subject_code,"
                 "grade_level,owner_user_id,lifecycle_status)"
             )
@@ -258,9 +286,96 @@ class SupabaseAssessmentBlueprintAuthoringCatalog:
                     ),
                     version_number=int(row.get("version_number", 0)),
                     total_score=Decimal(str(row.get("total_score", 0))),
+                    setting_version_id=(
+                        str(row.get("setting_version_id")).strip()
+                        if row.get("setting_version_id")
+                        else None
+                    ),
+                    academic_year=_text(
+                        row.get("academic_year"), "academic_year"
+                    ),
+                    semester_number=(
+                        int(row["semester_number"])
+                        if row.get("semester_number") is not None
+                        else None
+                    ),
+                    duration_minutes=int(row.get("duration_minutes", 0)),
                 )
             )
         return tuple(result)
+
+    def list_approved_settings(
+        self,
+    ) -> tuple[ApprovedExamSettingOption, ...]:
+        response = (
+            self._client.table("assessment_exam_setting_versions")
+            .select(
+                "setting_version_id,profile_code,subject_code,grade_level,"
+                "academic_year,semester_number,duration_minutes,total_score,"
+                "review_status,locked_at,assessment_exam_setting_sets!inner("
+                "setting_code,setting_name,owner_user_id,visibility,"
+                "lifecycle_status)"
+            )
+            .eq("review_status", "APPROVED")
+            .not_.is_("locked_at", "null")
+            .eq(
+                "assessment_exam_setting_sets.lifecycle_status",
+                "ACTIVE",
+            )
+            .order("created_at", desc=True)
+            .execute()
+        )
+        options: list[ApprovedExamSettingOption] = []
+        for row in _rows(response):
+            setting_set = _relation(
+                row.get("assessment_exam_setting_sets"),
+                "assessment_exam_setting_sets",
+            )
+            owner_id = _text(setting_set.get("owner_user_id"), "owner_user_id")
+            visibility = _text(setting_set.get("visibility"), "visibility")
+            if owner_id != self._user_id and visibility != "SHARED":
+                continue
+            options.append(
+                ApprovedExamSettingOption(
+                    setting_version_id=_text(
+                        row.get("setting_version_id"), "setting_version_id"
+                    ),
+                    setting_code=_text(
+                        setting_set.get("setting_code"), "setting_code"
+                    ),
+                    setting_name=_text(
+                        setting_set.get("setting_name"), "setting_name"
+                    ),
+                    profile_code=_text(row.get("profile_code"), "profile_code"),
+                    subject_code=_text(row.get("subject_code"), "subject_code"),
+                    grade_level=int(row.get("grade_level", 0)),
+                    academic_year=_text(
+                        row.get("academic_year"), "academic_year"
+                    ),
+                    semester_number=(
+                        int(row["semester_number"])
+                        if row.get("semester_number") is not None
+                        else None
+                    ),
+                    duration_minutes=int(row.get("duration_minutes", 0)),
+                    total_score=Decimal(str(row.get("total_score", 0))),
+                )
+            )
+        return tuple(options)
+
+    def bind_setting(
+        self,
+        *,
+        blueprint_version_id: str,
+        setting_version_id: str,
+    ) -> None:
+        self._client.rpc(
+            self.BIND_SETTING_RPC,
+            {
+                "target_blueprint_version_id": blueprint_version_id,
+                "target_setting_version_id": setting_version_id,
+            },
+        ).execute()
 
     def create_draft(
         self,
@@ -830,6 +945,66 @@ def render_assessment_blueprint_authoring_page(
         "assessment_blueprint_version_id"
     ] = draft.blueprint_version_id
 
+    st.subheader("2. Liên kết thiết đặt đề kiểm tra đã duyệt")
+    try:
+        approved_settings = catalog.list_approved_settings()
+    except Exception as error:
+        st.error(f"Không thể tải thiết đặt đã duyệt: {error}")
+        return
+    compatible_settings = tuple(
+        setting
+        for setting in approved_settings
+        if setting.profile_code == draft.profile_code
+        and setting.subject_code == draft.subject_code
+        and setting.grade_level == draft.grade_level
+        and setting.academic_year == draft.academic_year
+        and setting.semester_number == draft.semester_number
+        and setting.duration_minutes == draft.duration_minutes
+        and setting.total_score == draft.total_score
+    )
+    if not compatible_settings:
+        st.warning(
+            "Chưa có thiết đặt ACTIVE, APPROVED và đã khóa khớp hoàn "
+            "toàn bộ hồ sơ, môn, lớp, năm học, học kỳ, thời lượng và điểm."
+        )
+        return
+    setting_by_label = {
+        setting.label: setting for setting in compatible_settings
+    }
+    setting_labels = tuple(setting_by_label)
+    setting_index = next(
+        (
+            index
+            for index, label in enumerate(setting_labels)
+            if setting_by_label[label].setting_version_id
+            == draft.setting_version_id
+        ),
+        0,
+    )
+    selected_setting_label = st.selectbox(
+        "Thiết đặt đề kiểm tra đã duyệt",
+        setting_labels,
+        index=setting_index,
+        key="assessment_blueprint_governed_setting",
+    )
+    selected_setting = setting_by_label[selected_setting_label]
+    if draft.setting_version_id == selected_setting.setting_version_id:
+        st.success("Ma trận đang dùng đúng phiên bản thiết đặt này.")
+    elif st.button(
+        "Gắn thiết đặt vào ma trận",
+        use_container_width=True,
+    ):
+        try:
+            catalog.bind_setting(
+                blueprint_version_id=draft.blueprint_version_id,
+                setting_version_id=selected_setting.setting_version_id,
+            )
+        except Exception as error:
+            st.error(f"Không thể gắn thiết đặt vào ma trận: {error}")
+        else:
+            st.success("Đã gắn phiên bản thiết đặt vào ma trận.")
+            st.rerun()
+
     curriculum_reader = AssessmentCurriculumQueryService(
         catalog=SupabaseAssessmentCurriculumCatalog(client=client)
     )
@@ -863,7 +1038,7 @@ def render_assessment_blueprint_authoring_page(
         if requirement.requirement_code in existing_requirement_codes
     }
 
-    st.subheader("2. Chọn chủ đề và yêu cầu cần đạt")
+    st.subheader("3. Chọn chủ đề và yêu cầu cần đạt")
     topic_by_label = {
         f"{topic.topic_name} [{topic.topic_code}]": topic
         for topic in curriculum.topics
@@ -930,7 +1105,7 @@ def render_assessment_blueprint_authoring_page(
         for label in selected_requirement_labels
     )
 
-    st.subheader("3. Phân bổ YCCĐ trong bản đặc tả")
+    st.subheader("4. Phân bổ YCCĐ trong bản đặc tả")
     editor_rows = _assignment_rows(
         requirement_codes=selected_requirement_codes,
         existing_links=existing_links,
@@ -991,7 +1166,7 @@ def render_assessment_blueprint_authoring_page(
                 "assessment_blueprint_last_saved_count"
             ] = len(saved)
 
-    st.subheader("4. Phân bổ ô ma trận")
+    st.subheader("5. Phân bổ ô ma trận")
     st.caption(
         "Có thể thêm nhiều dòng cho cùng một phần đề để chia theo "
         "chủ đề và mức độ. Tổng số câu, số ý và điểm của từng phần "
@@ -1088,7 +1263,7 @@ def render_assessment_blueprint_authoring_page(
             )
             st.rerun()
 
-    st.subheader("5. Gửi ma trận để duyệt")
+    st.subheader("6. Gửi ma trận để duyệt")
     try:
         ready_for_review = catalog.ready_for_review(
             blueprint_version_id=draft.blueprint_version_id
