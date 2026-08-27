@@ -476,6 +476,7 @@ def render_admin_page(
         render_admin_assessment_template_workflow(
             st,
             client=client,
+            reviewer_user_id=authorization.user_id,
         )
         return
 

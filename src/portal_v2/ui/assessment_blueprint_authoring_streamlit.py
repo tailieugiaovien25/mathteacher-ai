@@ -67,6 +67,42 @@ class EditableBlueprintOption:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class AssessmentProfileSectionOption:
+    section_code: str
+    section_name: str
+    question_type_code: str
+    sequence_number: int
+    question_count: int
+    response_count: int
+    section_score: Decimal
+
+    @property
+    def label(self) -> str:
+        return f"{self.section_code} — {self.section_name}"
+
+
+@dataclass(frozen=True, slots=True)
+class CognitiveLevelOption:
+    cognitive_level_code: str
+    cognitive_level_name: str
+    sequence_number: int
+
+    @property
+    def label(self) -> str:
+        return (
+            f"{self.cognitive_level_code} — "
+            f"{self.cognitive_level_name}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileLevelAllocation:
+    cognitive_level_code: str
+    target_score: Decimal
+    target_percentage: Decimal
+
+
 def _data(response: object) -> object:
     if isinstance(response, Mapping):
         return response.get("data")
@@ -117,6 +153,9 @@ class SupabaseAssessmentBlueprintAuthoringCatalog:
     """Read teacher drafts and create drafts only through governed RPCs."""
 
     CREATE_DRAFT_RPC = "create_assessment_blueprint_draft"
+    REPLACE_CELLS_RPC = "replace_assessment_blueprint_cells"
+    READY_RPC = "assessment_blueprint_ready_for_review"
+    SUBMIT_RPC = "submit_assessment_blueprint_for_review"
 
     def __init__(self, *, client: Any, user_id: str) -> None:
         self._client = client
@@ -272,6 +311,165 @@ class SupabaseAssessmentBlueprintAuthoringCatalog:
         )
         return tuple(_rows(response))
 
+    def list_profile_sections(
+        self,
+        *,
+        profile_code: str,
+    ) -> tuple[AssessmentProfileSectionOption, ...]:
+        response = (
+            self._client.table("assessment_profile_sections")
+            .select(
+                "section_code,section_name,question_type_code,"
+                "sequence_number,question_count,response_count,"
+                "section_score"
+            )
+            .eq("profile_code", profile_code)
+            .order("sequence_number")
+            .execute()
+        )
+        return tuple(
+            AssessmentProfileSectionOption(
+                section_code=_text(
+                    row.get("section_code"), "section_code"
+                ),
+                section_name=_text(
+                    row.get("section_name"), "section_name"
+                ),
+                question_type_code=_text(
+                    row.get("question_type_code"),
+                    "question_type_code",
+                ),
+                sequence_number=int(row.get("sequence_number", 0)),
+                question_count=int(row.get("question_count", 0)),
+                response_count=int(row.get("response_count", 0)),
+                section_score=Decimal(
+                    str(row.get("section_score", 0))
+                ),
+            )
+            for row in _rows(response)
+        )
+
+    def list_cognitive_levels(
+        self,
+    ) -> tuple[CognitiveLevelOption, ...]:
+        response = (
+            self._client.table("assessment_cognitive_levels")
+            .select(
+                "cognitive_level_code,cognitive_level_name,"
+                "sequence_number"
+            )
+            .eq("status", "ACTIVE")
+            .order("sequence_number")
+            .execute()
+        )
+        return tuple(
+            CognitiveLevelOption(
+                cognitive_level_code=_text(
+                    row.get("cognitive_level_code"),
+                    "cognitive_level_code",
+                ),
+                cognitive_level_name=_text(
+                    row.get("cognitive_level_name"),
+                    "cognitive_level_name",
+                ),
+                sequence_number=int(row.get("sequence_number", 0)),
+            )
+            for row in _rows(response)
+        )
+
+    def list_profile_level_allocations(
+        self,
+        *,
+        profile_code: str,
+    ) -> tuple[ProfileLevelAllocation, ...]:
+        response = (
+            self._client.table("assessment_profile_level_allocations")
+            .select(
+                "cognitive_level_code,target_score,target_percentage"
+            )
+            .eq("profile_code", profile_code)
+            .order("cognitive_level_code")
+            .execute()
+        )
+        return tuple(
+            ProfileLevelAllocation(
+                cognitive_level_code=_text(
+                    row.get("cognitive_level_code"),
+                    "cognitive_level_code",
+                ),
+                target_score=Decimal(str(row.get("target_score", 0))),
+                target_percentage=Decimal(
+                    str(row.get("target_percentage", 0))
+                ),
+            )
+            for row in _rows(response)
+        )
+
+    def list_cells(
+        self,
+        *,
+        blueprint_version_id: str,
+    ) -> tuple[dict[str, Any], ...]:
+        response = (
+            self._client.table("assessment_blueprint_cells")
+            .select(
+                "section_code,topic_code,cognitive_level_code,"
+                "question_type_code,question_count,response_count,"
+                "target_score,sequence_number,specification_note"
+            )
+            .eq("blueprint_version_id", blueprint_version_id)
+            .order("sequence_number")
+            .execute()
+        )
+        return tuple(_rows(response))
+
+    def replace_cells(
+        self,
+        *,
+        blueprint_version_id: str,
+        cells: Sequence[Mapping[str, object]],
+    ) -> tuple[dict[str, Any], ...]:
+        response = self._client.rpc(
+            self.REPLACE_CELLS_RPC,
+            {
+                "target_blueprint_version_id": blueprint_version_id,
+                "target_cells": [dict(cell) for cell in cells],
+            },
+        ).execute()
+        return tuple(_rows(response))
+
+    def ready_for_review(
+        self,
+        *,
+        blueprint_version_id: str,
+    ) -> bool:
+        response = self._client.rpc(
+            self.READY_RPC,
+            {
+                "target_blueprint_version_id": blueprint_version_id,
+            },
+        ).execute()
+        data = _data(response)
+        if isinstance(data, list):
+            if len(data) != 1:
+                return False
+            data = data[0]
+        if isinstance(data, Mapping):
+            data = next(iter(data.values()), False)
+        return bool(data)
+
+    def submit_for_review(
+        self,
+        *,
+        blueprint_version_id: str,
+    ) -> None:
+        self._client.rpc(
+            self.SUBMIT_RPC,
+            {
+                "target_blueprint_version_id": blueprint_version_id,
+            },
+        ).execute()
+
 
 def _assignment_rows(
     *,
@@ -335,6 +533,169 @@ def _build_assignments(
             )
         )
     return tuple(assignments)
+
+
+def _default_cell_rows(
+    *,
+    sections: Sequence[AssessmentProfileSectionOption],
+    topic_codes: Sequence[str],
+    cognitive_levels: Sequence[CognitiveLevelOption],
+    level_allocations: Sequence[ProfileLevelAllocation],
+    existing_cells: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    if existing_cells:
+        return [
+            {
+                "section_code": str(row.get("section_code", "")),
+                "topic_code": str(row.get("topic_code", "")),
+                "cognitive_level_code": str(
+                    row.get("cognitive_level_code", "")
+                ),
+                "question_count": int(
+                    row.get("question_count", 0) or 0
+                ),
+                "response_count": int(
+                    row.get("response_count", 0) or 0
+                ),
+                "target_score": float(
+                    row.get("target_score", 0) or 0
+                ),
+                "sequence_number": int(
+                    row.get("sequence_number", 0) or 0
+                ),
+                "specification_note": str(
+                    row.get("specification_note") or ""
+                ),
+            }
+            for row in existing_cells
+        ]
+    if not topic_codes or not cognitive_levels:
+        return []
+    allocation_by_level = {
+        item.cognitive_level_code: item.target_score
+        for item in level_allocations
+    }
+    ordered_targets = [
+        [
+            level.cognitive_level_code,
+            allocation_by_level.get(level.cognitive_level_code, Decimal(0)),
+        ]
+        for level in cognitive_levels
+        if allocation_by_level.get(level.cognitive_level_code, Decimal(0))
+        > 0
+    ]
+    allocated_rows: list[dict[str, object]] = []
+    target_index = 0
+    allocation_possible = bool(ordered_targets)
+    for section_index, section in enumerate(sections):
+        remaining_score = section.section_score
+        section_part = 0
+        while remaining_score > 0 and target_index < len(ordered_targets):
+            level_code, level_remaining = ordered_targets[target_index]
+            chunk_score = min(remaining_score, level_remaining)
+            question_fraction = (
+                Decimal(section.question_count)
+                * chunk_score
+                / section.section_score
+            )
+            response_fraction = (
+                Decimal(section.response_count)
+                * chunk_score
+                / section.section_score
+            )
+            if (
+                question_fraction != question_fraction.to_integral_value()
+                or response_fraction
+                != response_fraction.to_integral_value()
+            ):
+                allocation_possible = False
+                break
+            allocated_rows.append(
+                {
+                    "section_code": section.section_code,
+                    "topic_code": topic_codes[
+                        len(allocated_rows) % len(topic_codes)
+                    ],
+                    "cognitive_level_code": level_code,
+                    "question_count": int(question_fraction),
+                    "response_count": int(response_fraction),
+                    "target_score": float(chunk_score),
+                    "sequence_number": (
+                        section.sequence_number + section_part
+                    ),
+                    "specification_note": "",
+                }
+            )
+            section_part += 1
+            remaining_score -= chunk_score
+            ordered_targets[target_index][1] -= chunk_score
+            if ordered_targets[target_index][1] == 0:
+                target_index += 1
+        if not allocation_possible or remaining_score != 0:
+            allocation_possible = False
+            break
+    if (
+        allocation_possible
+        and all(remaining == 0 for _, remaining in ordered_targets)
+    ):
+        return allocated_rows
+    result: list[dict[str, object]] = []
+    for index, section in enumerate(sections):
+        level = cognitive_levels[index % len(cognitive_levels)]
+        result.append(
+            {
+                "section_code": section.section_code,
+                "topic_code": topic_codes[index % len(topic_codes)],
+                "cognitive_level_code": level.cognitive_level_code,
+                "question_count": section.question_count,
+                "response_count": section.response_count,
+                "target_score": float(section.section_score),
+                "sequence_number": section.sequence_number,
+                "specification_note": "",
+            }
+        )
+    return result
+
+
+def _cell_payload(
+    rows: Sequence[Mapping[str, object]],
+) -> tuple[dict[str, object], ...]:
+    result = []
+    for row in rows:
+        section_code = str(row.get("section_code", "")).strip()
+        topic_code = str(row.get("topic_code", "")).strip()
+        cognitive_level_code = str(
+            row.get("cognitive_level_code", "")
+        ).strip()
+        if not section_code or not topic_code or not cognitive_level_code:
+            raise AssessmentBlueprintAuthoringError(
+                "Mỗi ô ma trận phải có phần đề, chủ đề và mức độ."
+            )
+        try:
+            target_score = Decimal(str(row.get("target_score", 0)))
+        except InvalidOperation as error:
+            raise AssessmentBlueprintAuthoringError(
+                "Điểm của ô ma trận phải là số hợp lệ."
+            ) from error
+        result.append(
+            {
+                "section_code": section_code,
+                "topic_code": topic_code,
+                "cognitive_level_code": cognitive_level_code,
+                "question_count": int(row.get("question_count", 0)),
+                "response_count": int(row.get("response_count", 0)),
+                "target_score": str(target_score),
+                "sequence_number": int(row.get("sequence_number", 0)),
+                "specification_note": str(
+                    row.get("specification_note") or ""
+                ).strip(),
+            }
+        )
+    if not result:
+        raise AssessmentBlueprintAuthoringError(
+            "Ma trận phải có ít nhất một ô phân bổ."
+        )
+    return tuple(result)
 
 
 def render_assessment_blueprint_authoring_page(
@@ -593,40 +954,172 @@ def render_assessment_blueprint_authoring_page(
                 hide_index=True,
             )
 
-    if not st.button(
+    if st.button(
         "Lưu YCCĐ vào ma trận",
         type="primary",
         use_container_width=True,
         disabled=not selected_requirement_codes,
     ):
-        return
+        try:
+            editing_selection = selection_service.build_editing_selection(
+                subject_code=draft.subject_code,
+                grade_level=draft.grade_level,
+                program_code=curriculum.program.program_code,
+                selected_topic_codes=selected_topic_codes,
+                selected_requirement_codes=selected_requirement_codes,
+            )
+            finalized_selection = selection_service.finalize_selection(
+                editing_selection
+            )
+            assignments = _build_assignments(edited_rows)
+            saved = BlueprintRequirementLinkService(
+                gateway=SupabaseBlueprintRequirementLinkGateway(
+                    client=client
+                )
+            ).replace_from_selection(
+                blueprint_version_id=draft.blueprint_version_id,
+                selection=finalized_selection,
+                assignments=assignments,
+            )
+        except Exception as error:
+            st.error(f"Không thể lưu phạm vi YCCĐ: {error}")
+        else:
+            st.success(
+                f"Đã lưu nguyên tử {len(saved)} YCCĐ vào ma trận."
+            )
+            st.session_state[
+                "assessment_blueprint_last_saved_count"
+            ] = len(saved)
 
+    st.subheader("4. Phân bổ ô ma trận")
+    st.caption(
+        "Có thể thêm nhiều dòng cho cùng một phần đề để chia theo "
+        "chủ đề và mức độ. Tổng số câu, số ý và điểm của từng phần "
+        "phải khớp hồ sơ đánh giá."
+    )
     try:
-        editing_selection = selection_service.build_editing_selection(
-            subject_code=draft.subject_code,
-            grade_level=draft.grade_level,
-            program_code=curriculum.program.program_code,
-            selected_topic_codes=selected_topic_codes,
-            selected_requirement_codes=selected_requirement_codes,
+        sections = catalog.list_profile_sections(
+            profile_code=draft.profile_code
         )
-        finalized_selection = selection_service.finalize_selection(
-            editing_selection
+        cognitive_levels = catalog.list_cognitive_levels()
+        level_allocations = catalog.list_profile_level_allocations(
+            profile_code=draft.profile_code
         )
-        assignments = _build_assignments(edited_rows)
-        saved = BlueprintRequirementLinkService(
-            gateway=SupabaseBlueprintRequirementLinkGateway(client=client)
-        ).replace_from_selection(
-            blueprint_version_id=draft.blueprint_version_id,
-            selection=finalized_selection,
-            assignments=assignments,
+        existing_cells = catalog.list_cells(
+            blueprint_version_id=draft.blueprint_version_id
         )
     except Exception as error:
-        st.error(f"Không thể lưu phạm vi YCCĐ: {error}")
+        st.error(f"Không thể tải cấu trúc ô ma trận: {error}")
         return
 
-    st.success(
-        f"Đã lưu nguyên tử {len(saved)} YCCĐ vào ma trận."
+    if not sections or not cognitive_levels:
+        st.warning(
+            "Hồ sơ chưa có phần đề hoặc mức độ nhận thức hoạt động."
+        )
+        return
+
+    section_reference = [
+        {
+            "section_code": section.section_code,
+            "section_name": section.section_name,
+            "question_type_code": section.question_type_code,
+            "question_count": section.question_count,
+            "response_count": section.response_count,
+            "section_score": float(section.section_score),
+        }
+        for section in sections
+    ]
+    with st.expander("Cấu hình phần đề cần đáp ứng", expanded=True):
+        st.dataframe(
+            section_reference,
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption(
+            "Mức độ hợp lệ: "
+            + ", ".join(
+                level.cognitive_level_code
+                for level in cognitive_levels
+            )
+        )
+        if level_allocations:
+            st.caption(
+                "Phân bổ điểm theo mức độ: "
+                + ", ".join(
+                    f"{item.cognitive_level_code} "
+                    f"{item.target_score:g} điểm"
+                    for item in level_allocations
+                )
+            )
+
+    cell_rows = _default_cell_rows(
+        sections=sections,
+        topic_codes=selected_topic_codes,
+        cognitive_levels=cognitive_levels,
+        level_allocations=level_allocations,
+        existing_cells=existing_cells,
     )
-    st.session_state[
-        "assessment_blueprint_last_saved_count"
-    ] = len(saved)
+    edited_cells = st.data_editor(
+        cell_rows,
+        use_container_width=True,
+        hide_index=True,
+        num_rows="dynamic",
+        key=(
+            "assessment_blueprint_cell_editor_"
+            + draft.blueprint_version_id
+        ),
+    )
+    if st.button(
+        "Lưu các ô ma trận",
+        type="primary",
+        use_container_width=True,
+        disabled=not selected_topic_codes,
+    ):
+        try:
+            saved_cells = catalog.replace_cells(
+                blueprint_version_id=draft.blueprint_version_id,
+                cells=_cell_payload(edited_cells),
+            )
+        except Exception as error:
+            st.error(f"Không thể lưu các ô ma trận: {error}")
+        else:
+            st.success(
+                f"Đã lưu nguyên tử {len(saved_cells)} ô ma trận."
+            )
+            st.rerun()
+
+    st.subheader("5. Gửi ma trận để duyệt")
+    try:
+        ready_for_review = catalog.ready_for_review(
+            blueprint_version_id=draft.blueprint_version_id
+        )
+    except Exception as error:
+        st.error(f"Không thể kiểm tra điều kiện gửi duyệt: {error}")
+        return
+
+    if ready_for_review:
+        st.success(
+            "Ma trận đã đủ YCCĐ chính và phân bổ điểm; có thể gửi duyệt."
+        )
+    else:
+        st.warning(
+            "Ma trận chưa đủ điều kiện: cần ít nhất một YCCĐ PRIMARY, "
+            "các ô ma trận hợp lệ và tổng điểm khớp hồ sơ."
+        )
+    if not st.button(
+        "Gửi ma trận để duyệt",
+        type="primary",
+        use_container_width=True,
+        disabled=not ready_for_review,
+    ):
+        return
+    try:
+        catalog.submit_for_review(
+            blueprint_version_id=draft.blueprint_version_id
+        )
+    except Exception as error:
+        st.error(f"Không thể gửi ma trận để duyệt: {error}")
+        return
+    st.session_state.pop("assessment_blueprint_version_id", None)
+    st.success("Đã gửi ma trận cho quản trị viên duyệt.")
+    st.rerun()
