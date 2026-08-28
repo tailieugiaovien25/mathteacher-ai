@@ -15,6 +15,7 @@ ADMIN_PAGE_CLASS_CATALOG = "class_catalog"
 ADMIN_PAGE_ASSIGNMENTS = "assignments"
 ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION = "academic_year_configuration"
 ADMIN_PAGE_COMPETENCY_CATALOG = "competency_catalog"
+ADMIN_PAGE_LEARNING_CONTENT_CATALOG = "learning_content_catalog"
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,10 @@ ADMIN_PORTAL_PAGES = (
     AdminPortalPage(
         ADMIN_PAGE_COMPETENCY_CATALOG,
         "Bộ mã năng lực",
+    ),
+    AdminPortalPage(
+        ADMIN_PAGE_LEARNING_CONTENT_CATALOG,
+        "Nội dung dạy học",
     ),
     AdminPortalPage(
         ADMIN_PAGE_SUBJECT_CATALOG,
