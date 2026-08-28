@@ -18,7 +18,7 @@ def test_migration_exists_and_is_transactional():
 
 def test_catalog_is_english_global_success_only():
     text = source()
-    assert "subject-english" in text
+    assert "subject-foreign-language-1" in text
     assert "ENGLISH-GLOBAL-SUCCESS" in text
     assert "subject-math" not in text
 
@@ -37,8 +37,8 @@ def test_all_reference_hashes_are_sha256():
 
 def test_five_textbooks_are_seeded():
     text = source()
-    book_rows = re.findall(r"\((6,[12]|[789],0),'Tiáº¿ng Anh", text)
-    assert len(book_rows) == 10  # repeated once for sources and once for catalog
+    book_rows = re.findall(r"\((6,[12]|[789],0),'[^']+',20(?:21|22|23|24)\)", text)
+    assert len(book_rows) == 5  # five textbook catalog rows
 
 
 def test_48_units_are_seeded():

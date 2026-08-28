@@ -22,7 +22,7 @@ select
     'source-textbook-english-global-success-g'||grade_number||
         case when volume_number=0 then '' else '-v'||volume_number end,
     'TB-ENG-GS-G'||grade_number||case when volume_number=0 then '' else '-V'||volume_number end,
-    title,'TEXTBOOK','program-vn-gdpt-2018','subject-english',
+    title,'TEXTBOOK','program-vn-gdpt-2018','subject-foreign-language-1',
     'grade-'||lpad(grade_number::text,2,'0'),
     'RESTRICTED','AUTHORIZED_USERS','ACTIVE',
     jsonb_build_object(
@@ -81,7 +81,7 @@ insert into public.textbook_catalog(
 select
     'textbook-english-global-success-g'||grade_number||case when volume_number=0 then '' else '-v'||volume_number end,
     'source-textbook-english-global-success-g'||grade_number||case when volume_number=0 then '' else '-v'||volume_number end,
-    'program-vn-gdpt-2018','subject-english','grade-'||lpad(grade_number::text,2,'0'),
+    'program-vn-gdpt-2018','subject-foreign-language-1','grade-'||lpad(grade_number::text,2,'0'),
     'ENGLISH-GLOBAL-SUCCESS','ENG-GS-G'||grade_number||case when volume_number=0 then '' else '-V'||volume_number end,
     title,'Bản danh mục tham chiếu','Nhà xuất bản Giáo dục Việt Nam',publication_year,
     case when volume_number=0 then 'FULL_YEAR' else 'TAP_'||volume_number end,
