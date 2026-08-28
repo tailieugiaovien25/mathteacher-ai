@@ -20,9 +20,9 @@ def run_contract():
     )
 
     tests.append((
-        "TPW1 Drafting tool remains a Teacher Portal page",
+        "TPW1 Drafting tool is hidden as a standalone Teacher Portal page",
         "C\u00f4ng c\u1ee5 so\u1ea1n b\u00e0i"
-        in teacher_portal_app.PORTAL_PAGES,
+        not in teacher_portal_app.PORTAL_PAGES,
     ))
 
     tests.append((
@@ -58,9 +58,9 @@ def run_contract():
     ))
 
     tests.append((
-        "TPW5 Drafting tool remains in portal navigation",
+        "TPW5 Drafting tool is absent from visible portal navigation",
         "C\u00f4ng c\u1ee5 so\u1ea1n b\u00e0i"
-        in teacher_portal_app.PORTAL_PAGES,
+        not in teacher_portal_app.PORTAL_PAGES,
     ))
 
     tests.append((

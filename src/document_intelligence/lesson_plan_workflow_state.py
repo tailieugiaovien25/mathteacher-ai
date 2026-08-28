@@ -127,6 +127,11 @@ class LessonPlanWorkflowState:
         self,
         result: Any,
     ) -> "LessonPlanWorkflowState":
+        if self.resolution is None:
+            raise ValueError(
+                "resolution is required before storing a result"
+            )
+
         return replace(
             self,
             result=result,

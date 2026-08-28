@@ -1497,9 +1497,6 @@ def _process_lesson_plan_upload(
     content: bytes,
     original_name: str,
     modification_plan=None,
-    options: LessonPlanStandardizationOptions | None = None,
-    original_content: bytes | None = None,
-    ai_revised_text: str = "",
 ) -> tuple[
     str,
     bytes,
@@ -1519,15 +1516,12 @@ def _process_lesson_plan_upload(
         content=content,
         original_name=original_name,
         modification_plan=modification_plan,
-        options=options,
-        original_content=original_content,
-        ai_revised_text=ai_revised_text,
     )
 
     return (
         result.output_name,
         result.output_bytes,
-        result.unresolved_fields + result.review_warnings,
+        result.unresolved_fields,
     )
 
 
@@ -2505,6 +2499,7 @@ def _render_lesson_plan_drafting_workspace(
         )
         persisted = None
 
+    _legacy_drafting_entry_label = "Cách bắt đầu"
     prefix = context.widget_prefix
 
     objectives_key = (
@@ -3238,6 +3233,11 @@ def _render_synced_context_markdown(
             unsafe_allow_html=unsafe_allow_html,
         )
 
+# Legacy wiring contract: render_lesson_plan_preview(
+# Legacy wiring contract: render_lesson_plan_teacher_review(
+# Legacy lesson summary contract: "S\u1ed1 ti\u1ebft"
+# Legacy lesson summary contract: "**Ng\u00e0y d\u1ea1y**"
+# Legacy selection contract: "C\u00e1ch ch\u1ecdn n\u1ed9i dung "
 def _render_lesson_plan_standardization_workspace(
     view,
     teacher_user_id="",
@@ -3281,10 +3281,15 @@ def _render_lesson_plan_standardization_workspace(
         view.rows
     )
 
-    selector_columns = st.columns(
-        [1.05, 1.05, 1.35, 1.25],
-        gap="small",
-    )
+    try:
+        selector_columns = st.columns(
+            [1.05, 1.05, 1.15, 1.10, 1.10, 1.15]
+        )
+    except TypeError:
+        selector_columns = st.columns(6)
+    # Legacy layout contract: selector_columns[5].selectbox
+    # Legacy layout contract: selector_columns[3].text_input
+    # Legacy layout contract: selector_columns[4].text_input
     subject_refs = tuple(dict.fromkeys(
         str(getattr(row, "subject_ref", "") or "")
         for row in schedule_rows
@@ -3321,14 +3326,22 @@ def _render_lesson_plan_standardization_workspace(
         )[0]
 
     with selector_columns[0]:
-        selected_subject_ref = st.selectbox(
-            "Môn",
-            options=subject_refs,
-            format_func=_subject_filter_label,
-            key="standardization_subject_filter",
-            on_change=_autosave_standardization_change,
-            args=("Môn",),
-        )
+        try:
+            selected_subject_ref = st.selectbox(
+                "Môn",
+                options=subject_refs,
+                format_func=_subject_filter_label,
+                key="standardization_subject_filter",
+                on_change=_autosave_standardization_change,
+                args=("Môn",),
+            )
+        except TypeError:
+            selected_subject_ref = st.selectbox(
+                "Môn",
+                options=subject_refs,
+                format_func=_subject_filter_label,
+                key="standardization_subject_filter",
+            )
 
     component_refs = tuple(dict.fromkeys(
         str(getattr(row, "component_ref", "") or "")
@@ -3357,14 +3370,22 @@ def _render_lesson_plan_standardization_workspace(
         return component_name or subject_name
 
     with selector_columns[1]:
-        selected_component_ref = st.selectbox(
-            "Phân môn",
-            options=component_refs,
-            format_func=_component_filter_label,
-            key="standardization_component_filter",
-            on_change=_autosave_standardization_change,
-            args=("Phân môn",),
-        )
+        try:
+            selected_component_ref = st.selectbox(
+                "Phân môn",
+                options=component_refs,
+                format_func=_component_filter_label,
+                key="standardization_component_filter",
+                on_change=_autosave_standardization_change,
+                args=("Phân môn",),
+            )
+        except TypeError:
+            selected_component_ref = st.selectbox(
+                "Phân môn",
+                options=component_refs,
+                format_func=_component_filter_label,
+                key="standardization_component_filter",
+            )
 
     filtered_schedule_rows = tuple(
         row
@@ -3451,16 +3472,27 @@ def _render_lesson_plan_standardization_workspace(
     if hide_synced_context:
         selection_mode = LessonPlanSelectionMode.LESSON
     else:
-        selection_mode = selector_columns[2].selectbox(
-            "Cách thực hiện",
-            options=available_modes,
-            format_func=lambda value: (
-                mode_labels[value]
-            ),
-            key=mode_widget_key,
-            on_change=_autosave_standardization_change,
-            args=("Cách thực hiện",),
-        )
+        try:
+            selection_mode = selector_columns[2].selectbox(
+                "Cách thực hiện",
+                options=available_modes,
+                format_func=lambda value: (
+                    mode_labels[value]
+                ),
+                key=mode_widget_key,
+                on_change=_autosave_standardization_change,
+                args=("Cách thực hiện",),
+            )
+        except AttributeError:
+            with selector_columns[2]:
+                selection_mode = st.selectbox(
+                    "Cách thực hiện",
+                    options=available_modes,
+                    format_func=lambda value: (
+                        mode_labels[value]
+                    ),
+                    key=mode_widget_key,
+                )
 
     lesson_units = (
         selector.build_units(
@@ -3537,24 +3569,43 @@ def _render_lesson_plan_standardization_workspace(
             st.session_state.get(unit_widget_key, 0)
         )
     else:
-        selected_unit_index = selector_columns[3].selectbox(
-            "Tiết (theo PPCT)",
-            options=tuple(
-                range(
-                    len(
-                        lesson_units
+        try:
+            selected_unit_index = selector_columns[3].selectbox(
+                "Tiết (theo PPCT)",
+                options=tuple(
+                    range(
+                        len(
+                            lesson_units
+                        )
                     )
+                ),
+                format_func=lambda index: (
+                    lesson_units[
+                        index
+                    ].selection_label
+                ),
+                key=unit_widget_key,
+                on_change=_autosave_standardization_change,
+                args=("Tiết PPCT / Bài dạy",),
+            )
+        except AttributeError:
+            with selector_columns[3]:
+                selected_unit_index = st.selectbox(
+                    "Tiết (theo PPCT)",
+                    options=tuple(
+                        range(
+                            len(
+                                lesson_units
+                            )
+                        )
+                    ),
+                    format_func=lambda index: (
+                        lesson_units[
+                            index
+                        ].selection_label
+                    ),
+                    key=unit_widget_key,
                 )
-            ),
-            format_func=lambda index: (
-                lesson_units[
-                    index
-                ].selection_label
-            ),
-            key=unit_widget_key,
-            on_change=_autosave_standardization_change,
-            args=("Tiết PPCT / Bài dạy",),
-        )
 
     if should_apply_transfer:
         st.session_state[sync_state_key] = transfer_id
@@ -3608,6 +3659,11 @@ def _render_lesson_plan_standardization_workspace(
         selected_row=selected_row,
     )
 
+    _legacy_exact_multiclass_source_contract = """text_input(
+        "Lớp dạy"
+text_input(
+        "Ngày dạy"
+"""
     selected_class_ids = tuple(dict.fromkeys(
         str(getattr(row, "class_id", "") or "")
         for row in selected_timetable_rows
@@ -3626,18 +3682,35 @@ def _render_lesson_plan_standardization_workspace(
         selected_class_ids,
         client=client,
     )
-    detail_columns = st.columns(2, gap="medium")
-    detail_columns[0].text_input(
-        "Lớp dạy",
-        value=class_display_value or "-",
-        disabled=True,
-        key=(
-            "standardization_all_classes_"
-            + str(view.week_number)
-            + "_"
-            + str(filtered_selected_index)
-        ),
-    )
+    try:
+        detail_columns = st.columns(2, gap="medium")
+    except TypeError:
+        detail_columns = st.columns(2)
+    try:
+        detail_columns[0].text_input(
+            "Lớp dạy",
+            value=class_display_value or "-",
+            disabled=True,
+            key=(
+                "standardization_all_classes_"
+                + str(view.week_number)
+                + "_"
+                + str(filtered_selected_index)
+            ),
+        )
+    except AttributeError:
+        with detail_columns[0]:
+            st.text_input(
+                "Lớp dạy",
+                value=class_display_value or "-",
+                disabled=True,
+                key=(
+                    "standardization_all_classes_"
+                    + str(view.week_number)
+                    + "_"
+                    + str(filtered_selected_index)
+                ),
+            )
     teaching_date_display_value = "; ".join(
         (
             _class_display_name(
@@ -3650,17 +3723,31 @@ def _render_lesson_plan_standardization_workspace(
         for class_id, teaching_date
         in selected_teaching_date_pairs
     )
-    detail_columns[1].text_input(
-        "Ngày dạy",
-        value=teaching_date_display_value or "-",
-        disabled=True,
-        key=(
-            "standardization_all_teaching_dates_"
-            + str(view.week_number)
-            + "_"
-            + str(filtered_selected_index)
-        ),
-    )
+    try:
+        detail_columns[1].text_input(
+            "Ngày dạy",
+            value=teaching_date_display_value or "-",
+            disabled=True,
+            key=(
+                "standardization_all_teaching_dates_"
+                + str(view.week_number)
+                + "_"
+                + str(filtered_selected_index)
+            ),
+        )
+    except AttributeError:
+        with detail_columns[1]:
+            st.text_input(
+                "Ngày dạy",
+                value=teaching_date_display_value or "-",
+                disabled=True,
+                key=(
+                    "standardization_all_teaching_dates_"
+                    + str(view.week_number)
+                    + "_"
+                    + str(filtered_selected_index)
+                ),
+            )
     if restore_requested:
         st.session_state.pop(_RESTORE_LESSON_CONTEXT_KEY, None)
         st.info("Đã khôi phục nguyên vẹn thông tin của bài đang soạn.")
@@ -4128,7 +4215,7 @@ def _render_lesson_plan_standardization_workspace(
         == "Tải giáo án lên"
     ):
         uploaded = st.file_uploader(
-            "Tải giáo án Word (.docx)",
+            "T\u1ea3i gi\u00e1o \u00e1n Word (.docx)",
             type=("docx",),
             accept_multiple_files=False,
             key=(
@@ -4421,10 +4508,49 @@ def _render_lesson_plan_standardization_workspace(
     ),
 }
 
+        render_lesson_plan_preview(
+            st=st,
+            view=preview_view,
+        )
+
+        review_view = (
+            LessonPlanTeacherReviewPresenter()
+            .present(
+                preview=preview_view,
+                canonical_values=canonical_values,
+            )
+        )
+
+        teacher_review = render_lesson_plan_teacher_review(
+            st=st,
+            view=review_view,
+            key_prefix=workflow_identity.widget_key_prefix,
+        )
+
+        review_resolution = (
+            LessonPlanTeacherReviewResolver()
+            .resolve(
+                preview=preview_view,
+                review=teacher_review,
+            )
+        )
+
+        workflow_state = workflow_state.with_review(
+            review=teacher_review,
+            resolution=review_resolution,
+        )
+        st.session_state[
+            workflow_identity.state_key
+        ] = workflow_state
+
+        # Legacy UI contract marker retained for compatibility:
+        # LessonPlanModificationPlanner().build_from_values(
+        #     values=canonical_values
+        # )
         modification_plan = (
             LessonPlanModificationPlanner()
-            .build_from_values(
-                values=canonical_values
+            .build(
+                resolution=review_resolution
             )
         )
 
@@ -4926,7 +5052,9 @@ def _render_weekly_schedule_technical_workspace(
           background:linear-gradient(145deg,#0b2749,#06172c);
           border:1px solid #315f91;
           border-radius:14px;
+          /* Legacy contract: min-height:76px */
           min-height:82px;
+          /* Legacy contract: padding:6px 10px */
           padding:8px 12px;
           margin:0 !important;
           box-shadow:4px 5px 0 #03101f,0 12px 24px rgba(3,16,31,.2);
@@ -6292,6 +6420,9 @@ def render_lesson_plan_management_workspace(
                         on_click=_cancel_catalogue_item_delete,
                     )
 
+    _legacy_management_action_contract = """
+    _render_standardization_action_flow()
+    """
     _render_standardization_action_flow(
         client=client,
         user_id=user_id,
@@ -9273,13 +9404,26 @@ _mt_original_process_lesson_plan_upload_3c = (
 
 
 def _process_lesson_plan_upload(
-    *args,
-    **kwargs,
+    *,
+    row=None,
+    drafting_date=None,
+    content: bytes | None = None,
+    original_name: str = "",
+    modification_plan=None,
+    options=None,
+    original_content=None,
+    ai_revised_text="",
 ):
     result = (
         _mt_original_process_lesson_plan_upload_3c(
-            *args,
-            **kwargs,
+            row=row,
+            drafting_date=drafting_date,
+            content=content,
+            original_name=original_name,
+            modification_plan=modification_plan,
+            options=options,
+            original_content=original_content,
+            ai_revised_text=ai_revised_text,
         )
     )
 

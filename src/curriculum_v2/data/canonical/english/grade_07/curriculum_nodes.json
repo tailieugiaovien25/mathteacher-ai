@@ -1,0 +1,92 @@
+﻿[
+    {
+        "code":  "ENG-G7",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-001",
+        "name":  "English Grade 7",
+        "node_type":  "GRADE",
+        "parent_id":  null,
+        "sequence":  1,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "LANGUAGE_SKILL",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-002",
+        "name":  "Language skills",
+        "node_type":  "DOMAIN",
+        "parent_id":  "CURR-NODE-ENG-G7-001",
+        "sequence":  1,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "LISTENING",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-003",
+        "name":  "Listening",
+        "node_type":  "CATEGORY",
+        "parent_id":  "CURR-NODE-ENG-G7-002",
+        "sequence":  1,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "SPEAKING",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-004",
+        "name":  "Speaking",
+        "node_type":  "CATEGORY",
+        "parent_id":  "CURR-NODE-ENG-G7-002",
+        "sequence":  2,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "READING",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-005",
+        "name":  "Reading",
+        "node_type":  "CATEGORY",
+        "parent_id":  "CURR-NODE-ENG-G7-002",
+        "sequence":  3,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "WRITING",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-006",
+        "name":  "Writing",
+        "node_type":  "CATEGORY",
+        "parent_id":  "CURR-NODE-ENG-G7-002",
+        "sequence":  4,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "LANGUAGE_KNOWLEDGE",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-007",
+        "name":  "Language knowledge",
+        "node_type":  "DOMAIN",
+        "parent_id":  "CURR-NODE-ENG-G7-001",
+        "sequence":  2,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "PRONUNCIATION",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-008",
+        "name":  "Pronunciation",
+        "node_type":  "CATEGORY",
+        "parent_id":  "CURR-NODE-ENG-G7-007",
+        "sequence":  1,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "VOCABULARY",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-009",
+        "name":  "Vocabulary",
+        "node_type":  "CATEGORY",
+        "parent_id":  "CURR-NODE-ENG-G7-007",
+        "sequence":  2,
+        "status":  "ACTIVE"
+    },
+    {
+        "code":  "GRAMMAR",
+        "curriculum_node_id":  "CURR-NODE-ENG-G7-010",
+        "name":  "Grammar",
+        "node_type":  "CATEGORY",
+        "parent_id":  "CURR-NODE-ENG-G7-007",
+        "sequence":  3,
+        "status":  "ACTIVE"
+    }
+]

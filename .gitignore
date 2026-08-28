@@ -253,3 +253,26 @@ supabase/.temp/
 # Temporary database dumps / inspection exports
 remote_public_schema.sql
 tmp_public_data.sql
+
+# Local repair / diagnostic artifacts
+tmp/
+*.bak
+*.zip
+*.patch
+input/
+v56b_package/
+APPLY_*.ps1
+CONTINUE_*.ps1
+CREATE_*.ps1
+FIX_*.ps1
+INSPECT_*.ps1
+PATCH_*.ps1
+REPAIR_*.ps1
+mathteacher_ai_system_diagnostic.ps1
+README_CAI_DAT.txt
+README_CAI_DAT_V26.txt
+README_CAI_DAT_V27.txt
+README_CAI_DAT_V28.txt
+README_CAI_DAT_V29.txt
+authoring-context-persistence-display-notifications-v30/
+cong-cu-soan-bai-modern-ui-v2/

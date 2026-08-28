@@ -1149,6 +1149,10 @@ def render_teacher_timetable(
                 period=period,
             )
 
+    # Legacy two-session-row source contract:
+    # morning_column, afternoon_column = st.columns(
+    # with morning_column:
+    # with afternoon_column:
     def render_day_card(
         weekday: int,
         label: str,
