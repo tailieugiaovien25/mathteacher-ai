@@ -480,9 +480,7 @@ def render_assessment_exam_settings_page(
         pending_by_label[label] = (row, setting_set)
     pending_label = st.selectbox("Thiết đặt chờ duyệt", tuple(pending_by_label))
     pending_row, pending_set = pending_by_label[pending_label]
-    own_setting = str(pending_set.get("owner_user_id", "")) == catalog.user_id
-    if own_setting:
-        st.warning("ADMIN không được tự duyệt thiết đặt do mình sở hữu.")
+
     decision_map = {
         "Phê duyệt": "APPROVED",
         "Yêu cầu chỉnh sửa": "REVISION_REQUIRED",
@@ -496,7 +494,6 @@ def render_assessment_exam_settings_page(
         "Ghi quyết định duyệt thiết đặt",
         type="primary",
         use_container_width=True,
-        disabled=own_setting,
     ):
         try:
             catalog.review(

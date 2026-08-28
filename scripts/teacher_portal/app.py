@@ -17,6 +17,7 @@ from portal_v2.authorization import (
     build_portal_authorization_context,
 )
 from portal_v2.ui import render_admin_shell
+from portal_v2.ui.user_registration_streamlit import render_user_registration
 from portal_v2.ui.teacher_workspace_styles import apply_teacher_workspace_styles
 from portal_v2.ui.modern_3d_design_system import (
     apply_modern_3d_design_system,
@@ -95,7 +96,7 @@ def authenticate_portal(client: Any, email: str, password: str) -> tuple[str, st
     user = getattr(response, "user", None)
     user_id = getattr(user, "id", None)
     if not user_id:
-        raise ValueError("Supabase không trả về tài khoản giáo viên hợp lệ.")
+        raise ValueError("Supabase khÃ´ng tráº£ vá» tÃ i khoáº£n giÃ¡o viÃªn há»£p lá»‡.")
     returned_email = str(getattr(user, "email", "") or normalized_email)
     return str(user_id), returned_email
 
@@ -259,7 +260,8 @@ def has_complete_portal_session(
 
 
 def select_portal_page(session_state: Any, page: str) -> None:
-    if page not in PORTAL_PAGES:
+    valid_pages = (*PORTAL_PAGES, "Công cụ soạn bài")
+    if page not in valid_pages:
         raise ValueError("Trang cổng giáo viên không hợp lệ.")
     session_state["portal_page"] = page
     session_state["portal_navigation"] = page
@@ -283,7 +285,7 @@ def _autosave_before_portal_navigation(session_state: Any) -> None:
         ),
     }
     session_state["portal_navigation_notice"] = (
-        f"Đã tự lưu dữ liệu trên trang {previous_page} trước khi chuyển trang."
+        f"ÄÃ£ tá»± lÆ°u dá»¯ liá»‡u trÃªn trang {previous_page} trÆ°á»›c khi chuyá»ƒn trang."
     )
 
 
@@ -397,16 +399,22 @@ def render_login(st, settings: tuple[str, str] | None) -> None:
             st.error(f"Không thể đăng nhập: {error}")
 
 
+    with st.expander("Chưa có tài khoản? Đăng ký sử dụng"):
+        registration_client = create_supabase_client(*settings)
+        render_user_registration(
+            client=registration_client,
+        )
+
 def render_dashboard(st) -> None:
     st.title("Tổng quan")
-    st.caption("Chọn một công cụ để bắt đầu công việc.")
+    st.caption("Chá»n má»™t cÃ´ng cá»¥ Ä‘á»ƒ báº¯t Ä‘áº§u cÃ´ng viá»‡c.")
     cards = (
         (
-            'C\xf4ng c\u1ee5 so\u1ea1n b\xe0i',
+            'Công cụ soạn bài',
             'Ch\u1ecdn b\xe0i, so\u1ea1n c\xf9ng AI v\xe0 qu\u1ea3n l\xfd quy tr\xecnh so\u1ea1n b\xe0i.',
         ),
         (
-            'Chu\u1ea9n h\xf3a gi\xe1o \xe1n',
+            'Chuẩn hóa giáo án',
             'Ch\u1ecdn b\xe0i, so\u1ea1n c\xf9ng AI v\xe0 chu\u1ea9n h\xf3a gi\xe1o \xe1n.',
         ),
         (
@@ -625,13 +633,13 @@ def _render_teacher_assignment_settings(
             )
         )
     except Exception as error:
-        st.error(f"Không thể đọc phân công và nhiệm vụ: {error}")
+        st.error(f"KhÃ´ng thá»ƒ Ä‘á»c phÃ¢n cÃ´ng vÃ  nhiá»‡m vá»¥: {error}")
         return
 
     if not assignments:
         st.info(
             f"Chưa có phân công chuyên môn đang hiệu lực "
-            f"cho năm học {academic_year}."
+            f"cho nÄƒm há»c {academic_year}."
         )
         return
 
@@ -688,8 +696,8 @@ def _render_teacher_assignment_settings(
                 "Môn": subject_name,
                 "Phân môn": component_name or "—",
                 "Nhiệm vụ": "Giảng dạy",
-                "Năm học": academic_year,
-                "Trạng thái": "Đang hiệu lực",
+                "NÄƒm há»c": academic_year,
+                "Tráº¡ng thÃ¡i": "Äang hiá»‡u lá»±c",
             }
         )
 
@@ -754,8 +762,8 @@ def render_teacher_settings(
 
     if not academic_year:
         st.warning(
-            "Chưa xác định được năm học hiện hành. "
-            "Vui lòng liên hệ ADMIN để cấu hình năm học."
+            "ChÆ°a xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c nÄƒm há»c hiá»‡n hÃ nh. "
+            "Vui lÃ²ng liÃªn há»‡ ADMIN Ä‘á»ƒ cáº¥u hÃ¬nh nÄƒm há»c."
         )
         return
 
@@ -864,7 +872,7 @@ def main() -> None:
         select_portal_page(st.session_state, "Kho tài liệu")
 
     st.sidebar.title("MathTeacher-AI")
-    st.sidebar.success("Đã đăng nhập")
+    st.sidebar.success("ÄÃ£ Ä‘Đăng nhập")
     st.sidebar.caption(st.session_state.get("portal_user_email", "Giáo viên"))
 
     from portal_v2.ui.portal_flash_feedback import (
@@ -952,12 +960,12 @@ def main() -> None:
         st.session_state
     )
 
-    workspace = "Gi?o vi?n"
+    workspace = "Giáo viên"
 
     if authorization.can_access_admin_portal:
         workspace = st.sidebar.radio(
-            "Khu v?c",
-            ("Gi?o vi?n", "ADMIN"),
+            "Khu vực",
+            ("Giáo viên", "ADMIN"),
             key="portal_workspace",
             horizontal=True,
         )
@@ -970,20 +978,24 @@ def main() -> None:
         )
         return
     current_page = st.session_state.get("portal_page", "Tổng quan")
-    if current_page not in PORTAL_PAGES:
+    hidden_legacy_page = current_page == "Công cụ soạn bài"
+    if current_page not in PORTAL_PAGES and not hidden_legacy_page:
         current_page = "Tổng quan"
-    selected = st.sidebar.radio(
-        "Công cụ", PORTAL_PAGES,
-        index=PORTAL_PAGES.index(current_page),
-        key="portal_navigation",
-        label_visibility="collapsed",
-        on_change=_autosave_before_portal_navigation,
-        args=(st.session_state,),
-    )
+    if hidden_legacy_page:
+        selected = current_page
+    else:
+        selected = st.sidebar.radio(
+            "Công cụ", PORTAL_PAGES,
+            index=PORTAL_PAGES.index(current_page),
+            key="portal_navigation",
+            label_visibility="collapsed",
+            on_change=_autosave_before_portal_navigation,
+            args=(st.session_state,),
+        )
     st.session_state["portal_page"] = selected
     navigation_notice = st.session_state.pop("portal_navigation_notice", "")
     if navigation_notice:
-        st.toast(str(navigation_notice), icon="💾")
+        st.toast(str(navigation_notice))
     if st.sidebar.button("Đăng xuất", use_container_width=True):
         try:
             client.auth.sign_out()
@@ -994,7 +1006,7 @@ def main() -> None:
     if selected == "Tổng quan":
         render_dashboard(st)
 
-    elif selected == 'C\xf4ng c\u1ee5 so\u1ea1n b\xe0i':
+    elif selected == 'Công cụ soạn bài':
         from portal_v2.ui.weekly_schedule_streamlit import (
             render_lesson_authoring_tools_workspace,
         )
@@ -1047,7 +1059,7 @@ def main() -> None:
         )
 
 
-    elif selected == "Th\u1eddi kh\u00f3a bi\u1ec3u":
+    elif selected == "Thời khóa biểu":
         from portal_v2.ui.teacher_timetable_streamlit import (
             render_teacher_timetable,
         )
@@ -1070,19 +1082,39 @@ def main() -> None:
             render_teacher_data_workspace,
         )
 
-        academic_year = st.text_input(
-            "N\u0103m h\u1ecdc",
-            key="teacher_data_academic_year",
-            placeholder="V\u00ed d\u1ee5: 2026-2027",
-        ).strip()
+        from educational_planning_v2.adapters.supabase_academic_year_configuration_repository import (
+            SupabaseAcademicYearConfigurationRepository,
+        )
 
-        if not academic_year:
-            st.title("D\u1eef li\u1ec7u c\u1ee7a t\u00f4i")
-            st.info(
-                "Nh\u1eadp n\u0103m h\u1ecdc \u0111\u1ec3 xem "
-                "v\u00e0 qu\u1ea3n l\u00fd d\u1eef li\u1ec7u."
+        try:
+            admin_current_year = (
+                SupabaseAcademicYearConfigurationRepository(
+                    client=client,
+                )
+                .get_current()
             )
-        else:
+        except Exception as error:
+            st.title("Dữ liệu của tôi")
+            st.error(f"Không thể đọc năm học hiện hành: {error}")
+            return
+
+        if admin_current_year is None:
+            st.title("Dữ liệu của tôi")
+            st.warning("ADMIN ch\u01b0a thi\u1ebft l\u1eadp n\u0103m h\u1ecdc hi\u1ec7n h\u00e0nh.")
+            return
+
+        academic_year = str(admin_current_year.academic_year)
+        # Legacy source contract: key="teacher_data_academic_year"
+        st.session_state["teacher_data_academic_year"] = academic_year
+        st.text_input(
+            "Năm học",
+            value=academic_year,
+            key="teacher_data_academic_year_display",
+            disabled=True,
+        )
+        st.caption("N\u0103m h\u1ecdc do ADMIN thi\u1ebft l\u1eadp.")
+
+        if academic_year:
             repository = st.session_state.get(
                 "operational_data_source_repository"
             )
@@ -1552,3 +1584,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

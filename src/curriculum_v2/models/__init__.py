@@ -22,4 +22,9 @@ __all__ = [
     "CanonicalLearningRequirement",
     "RequirementProvenance",
     "RequirementValidation",
-] 
+]
+from .competency_catalog import (
+    CompetencyFramework,
+    CompetencyGradeDescriptor,
+    CompetencyIndicator,
+)

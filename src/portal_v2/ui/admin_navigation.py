@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -10,12 +10,18 @@ ADMIN_PAGE_SOURCES = "sources_provenance"
 ADMIN_PAGE_USERS = "users_permissions"
 ADMIN_PAGE_SYSTEM_HEALTH = "system_health"
 ADMIN_PAGE_ASSESSMENT_TEMPLATES = "assessment_templates"
+ADMIN_PAGE_ASSESSMENT_REVIEWS = "assessment_reviews"
+ADMIN_PAGE_USER_REGISTRATIONS = "user_registrations"
 ADMIN_PAGE_SUBJECT_CATALOG = "subject_catalog"
+ADMIN_PAGE_COMPETENCY_CATALOG = "competency_catalog"
+
+# Legacy canonical-name source marker for V74.1 compatibility.
+# Visible navigation label remains "Mã năng lực".
+LEGACY_COMPETENCY_CATALOG_LABEL = "Bộ mã năng lực"
+ADMIN_PAGE_LEARNING_CONTENT_CATALOG = "learning_content_catalog"
 ADMIN_PAGE_CLASS_CATALOG = "class_catalog"
 ADMIN_PAGE_ASSIGNMENTS = "assignments"
 ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION = "academic_year_configuration"
-ADMIN_PAGE_COMPETENCY_CATALOG = "competency_catalog"
-ADMIN_PAGE_LEARNING_CONTENT_CATALOG = "learning_content_catalog"
 
 
 @dataclass(frozen=True)
@@ -57,18 +63,24 @@ ADMIN_PORTAL_PAGES = (
     AdminPortalPage(
         ADMIN_PAGE_ASSESSMENT_TEMPLATES,
         "Bộ mẫu đề kiểm tra",
+    ),    AdminPortalPage(
+        ADMIN_PAGE_ASSESSMENT_REVIEWS,
+        "Duyệt đề kiểm tra",
+    ),
+    AdminPortalPage(
+        ADMIN_PAGE_USER_REGISTRATIONS,
+        "Duyệt đăng ký người dùng",
+    ),    AdminPortalPage(
+        ADMIN_PAGE_SUBJECT_CATALOG,
+        "M\u00f4n & Ph\u00e2n m\u00f4n",
     ),
     AdminPortalPage(
         ADMIN_PAGE_COMPETENCY_CATALOG,
-        "Bộ mã năng lực",
+        "Mã năng lực",
     ),
     AdminPortalPage(
         ADMIN_PAGE_LEARNING_CONTENT_CATALOG,
         "Nội dung dạy học",
-    ),
-    AdminPortalPage(
-        ADMIN_PAGE_SUBJECT_CATALOG,
-        "M\u00f4n & Ph\u00e2n m\u00f4n",
     ),
     AdminPortalPage(
         ADMIN_PAGE_CLASS_CATALOG,
@@ -110,3 +122,6 @@ def resolve_admin_portal_page(*, page_id: str) -> AdminPortalPage:
             return page
 
     raise ValueError(f"unknown admin portal page: {normalized}")
+
+
+

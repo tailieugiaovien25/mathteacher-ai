@@ -39,12 +39,12 @@ def test_matrix_and_specification_are_snapshot_scoped() -> None:
 
     assert (
         "'MATRIX',\n"
-        "        'Ma trÃ¡ÂºÂ­n Ã„â€˜Ã¡Â»Â kiÃ¡Â»Æ’m tra',\n"
+        "        'Ma trận đề kiểm tra',\n"
         "        'SNAPSHOT'"
     ) in text
     assert (
         "'SPECIFICATION',\n"
-        "        'BÃ¡ÂºÂ£n Ã„â€˜Ã¡ÂºÂ·c tÃ¡ÂºÂ£ Ã„â€˜Ã¡Â»Â kiÃ¡Â»Æ’m tra',\n"
+        "        'Bản đặc tả đề kiểm tra',\n"
         "        'SNAPSHOT'"
     ) in text
 
@@ -53,9 +53,9 @@ def test_exam_outputs_are_variant_scoped() -> None:
     text = _text()
 
     for label in (
-        "Ã„ÂÃ¡Â»Â dÃƒÂ nh cho hÃ¡Â»Âc sinh",
-        "Ã„ÂÃƒÂ¡p ÃƒÂ¡n",
-        "HÃ†Â°Ã¡Â»â€ºng dÃ¡ÂºÂ«n chÃ¡ÂºÂ¥m",
+        "Đề dành cho học sinh",
+        "Đáp án",
+        "Hướng dẫn chấm",
     ):
         start = text.index(f"'{label}'")
         block = text[start:start + 150]

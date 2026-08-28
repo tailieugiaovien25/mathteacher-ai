@@ -274,35 +274,35 @@ insert into public.assessment_document_types (
 values
     (
         'MATRIX',
-        'Ma trÃ¡ÂºÂ­n Ã„â€˜Ã¡Â»Â kiÃ¡Â»Æ’m tra',
+        'Ma trận đề kiểm tra',
         'SNAPSHOT',
         false,
         1
     ),
     (
         'SPECIFICATION',
-        'BÃ¡ÂºÂ£n Ã„â€˜Ã¡ÂºÂ·c tÃ¡ÂºÂ£ Ã„â€˜Ã¡Â»Â kiÃ¡Â»Æ’m tra',
+        'Bản đặc tả đề kiểm tra',
         'SNAPSHOT',
         false,
         2
     ),
     (
         'STUDENT_EXAM',
-        'Ã„ÂÃ¡Â»Â dÃƒÂ nh cho hÃ¡Â»Âc sinh',
+        'Đề dành cho học sinh',
         'VARIANT',
         false,
         3
     ),
     (
         'ANSWER_KEY',
-        'Ã„ÂÃƒÂ¡p ÃƒÂ¡n',
+        'Đáp án',
         'VARIANT',
         true,
         4
     ),
     (
         'SCORING_GUIDE',
-        'HÃ†Â°Ã¡Â»â€ºng dÃ¡ÂºÂ«n chÃ¡ÂºÂ¥m',
+        'Hướng dẫn chấm',
         'VARIANT',
         true,
         5
