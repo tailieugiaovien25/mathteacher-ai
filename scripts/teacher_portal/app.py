@@ -96,7 +96,7 @@ def authenticate_portal(client: Any, email: str, password: str) -> tuple[str, st
     user = getattr(response, "user", None)
     user_id = getattr(user, "id", None)
     if not user_id:
-        raise ValueError("Supabase khÃ´ng tráº£ vá» tÃ i khoáº£n giÃ¡o viÃªn há»£p lá»‡.")
+        raise ValueError("Supabase không trả về tài khoản giáo viên hợp lệ.")
     returned_email = str(getattr(user, "email", "") or normalized_email)
     return str(user_id), returned_email
 
@@ -285,7 +285,7 @@ def _autosave_before_portal_navigation(session_state: Any) -> None:
         ),
     }
     session_state["portal_navigation_notice"] = (
-        f"ÄÃ£ tá»± lÆ°u dá»¯ liá»‡u trÃªn trang {previous_page} trÆ°á»›c khi chuyá»ƒn trang."
+        f"Đã tự lưu dữ liệu trên trang {previous_page} trước khi chuyển trang."
     )
 
 
@@ -407,7 +407,7 @@ def render_login(st, settings: tuple[str, str] | None) -> None:
 
 def render_dashboard(st) -> None:
     st.title("Tổng quan")
-    st.caption("Chá»n má»™t cÃ´ng cá»¥ Ä‘á»ƒ báº¯t Ä‘áº§u cÃ´ng viá»‡c.")
+    st.caption("Chọn một công cụ để bắt đầu công việc.")
     cards = (
         (
             'Công cụ soạn bài',
@@ -633,13 +633,13 @@ def _render_teacher_assignment_settings(
             )
         )
     except Exception as error:
-        st.error(f"KhÃ´ng thá»ƒ Ä‘á»c phÃ¢n cÃ´ng vÃ  nhiá»‡m vá»¥: {error}")
+        st.error(f"Không thể đọc phân công và nhiệm vụ: {error}")
         return
 
     if not assignments:
         st.info(
             f"Chưa có phân công chuyên môn đang hiệu lực "
-            f"cho nÄƒm há»c {academic_year}."
+            f"cho năm học {academic_year}."
         )
         return
 
@@ -696,8 +696,8 @@ def _render_teacher_assignment_settings(
                 "Môn": subject_name,
                 "Phân môn": component_name or "—",
                 "Nhiệm vụ": "Giảng dạy",
-                "NÄƒm há»c": academic_year,
-                "Tráº¡ng thÃ¡i": "Äang hiá»‡u lá»±c",
+                "Năm học": academic_year,
+                "Trạng thái": "Đang hiệu lực",
             }
         )
 
@@ -762,8 +762,8 @@ def render_teacher_settings(
 
     if not academic_year:
         st.warning(
-            "ChÆ°a xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c nÄƒm há»c hiá»‡n hÃ nh. "
-            "Vui lÃ²ng liÃªn há»‡ ADMIN Ä‘á»ƒ cáº¥u hÃ¬nh nÄƒm há»c."
+            "Chưa xác định được năm học hiện hành. "
+            "Vui lòng liên hệ ADMIN để cấu hình năm học."
         )
         return
 
@@ -872,7 +872,7 @@ def main() -> None:
         select_portal_page(st.session_state, "Kho tài liệu")
 
     st.sidebar.title("MathTeacher-AI")
-    st.sidebar.success("ÄÃ£ Ä‘Đăng nhập")
+    st.sidebar.success("Đã đăng nhập")
     st.sidebar.caption(st.session_state.get("portal_user_email", "Giáo viên"))
 
     from portal_v2.ui.portal_flash_feedback import (
