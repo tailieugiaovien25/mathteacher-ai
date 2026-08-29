@@ -128,7 +128,7 @@ def render_admin_assignment_workspace(
         active_role_response = (
             client.table("portal_roles")
             .select("user_id,is_active")
-            .eq("role", "teacher")
+            .in_("role", ("teacher", "admin"))
             .eq("is_active", True)
             .execute()
         )

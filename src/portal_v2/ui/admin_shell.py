@@ -91,7 +91,7 @@ def _load_admin_user_directory(*, client) -> tuple[dict[str, str], ...]:
     role_response = (
         client.table("portal_roles")
         .select("user_id,role,is_active,created_at")
-        .eq("role", "teacher")
+        .in_("role", ("teacher", "admin"))
         .execute()
     )
     profile_response = (
@@ -121,6 +121,7 @@ def _load_admin_user_directory(*, client) -> tuple[dict[str, str], ...]:
         result.append(
             {
                 "user_id": user_id,
+                "role": str(role_row.get("role", "") or "").strip().lower(),
                 "teacher_code": str((profile or {}).get("teacher_code", "") or ""),
                 "full_name": str((profile or {}).get("full_name", "") or ""),
                 "school_name": str((profile or {}).get("school_name", "") or ""),
@@ -356,11 +357,16 @@ def _render_users(st, *, client=None) -> None:
             st.session_state["admin_portal_navigation_target"] = ADMIN_PAGE_ASSIGNMENTS
             st.rerun()
 
-        toggle_label = "Ngừng" if item["is_active"] else "Kích hoạt"
+        is_protected_admin = item["role"] == "admin"
+        toggle_label = (
+            "Bảo vệ"
+            if is_protected_admin
+            else ("Ngừng" if item["is_active"] else "Kích hoạt")
+        )
         if action_columns[2].button(
             toggle_label,
             key=f"admin_user_toggle_{item['user_id']}",
-            disabled=not bool(item["full_name"]),
+            disabled=is_protected_admin or not bool(item["full_name"]),
             width="stretch",
         ):
             try:

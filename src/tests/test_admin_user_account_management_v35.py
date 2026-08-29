@@ -21,7 +21,9 @@ def test_user_page_has_account_actions_and_statuses():
     assert '"Ngừng hoạt động"' in text
     assert '"Chỉnh sửa"' in text
     assert '"Phân công"' in text
-    assert 'toggle_label = "Ngừng" if item["is_active"] else "Kích hoạt"' in text
+    assert 'is_protected_admin = item["role"] == "admin"' in text
+    assert '"Ngừng" if item["is_active"] else "Kích hoạt"' in text
+    assert 'disabled=is_protected_admin or not bool(item["full_name"])' in text
 
 
 def test_assignment_action_deep_links_selected_teacher():
