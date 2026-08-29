@@ -311,6 +311,72 @@ def resolve_authenticated_portal_role(
     return resolution.effective_role
 
 
+def complete_authenticated_portal_registration(
+    *,
+    client: Any,
+) -> bool:
+    """Create the pending portal request after email-confirmed sign-in.
+
+    Supabase returns no session from ``sign_up`` when email confirmation is
+    enabled. The authenticated RPC therefore has to run on the first later
+    sign-in. Only signup metadata is forwarded; role activation remains an
+    ADMIN-only operation in ``review_portal_user_registration``.
+    """
+    response = client.auth.get_user()
+    user = getattr(response, "user", None)
+    metadata = getattr(user, "user_metadata", None)
+    if not isinstance(metadata, Mapping):
+        return False
+
+    full_name = str(metadata.get("full_name", "") or "").strip()
+    if not full_name:
+        return False
+
+    client.rpc(
+        "create_or_refresh_own_portal_registration",
+        {
+            "p_full_name": full_name,
+            "p_school_name": (
+                str(metadata.get("school_name", "") or "").strip() or None
+            ),
+            "p_requested_teacher_code": (
+                str(metadata.get("requested_teacher_code", "") or "").strip()
+                or None
+            ),
+        },
+    ).execute()
+    return True
+
+
+def prepare_authenticated_portal_access(
+    *,
+    client: Any,
+    user_id: str,
+) -> str:
+    """Resolve active access or safely complete a missing pending request."""
+    source = SupabaseTrustedPortalRoleSource(client=client)
+    resolution = source.resolve_role(user_id=user_id)
+
+    if resolution.can_access_portal:
+        return resolution.effective_role
+
+    # A trusted row means the account exists but is inactive. Never turn a
+    # disabled account into a new registration request automatically.
+    if resolution.trusted:
+        raise PermissionError(
+            "Tài khoản đã ngừng hoạt động. Vui lòng liên hệ ADMIN."
+        )
+
+    if complete_authenticated_portal_registration(client=client):
+        raise PermissionError(
+            "Đăng ký đã được ghi nhận và đang chờ ADMIN phê duyệt."
+        )
+
+    raise PermissionError(
+        "Tài khoản chưa được kích hoạt. Vui lòng liên hệ ADMIN."
+    )
+
+
 def build_current_portal_authorization(session_state: Any):
     """Build UI authorization from authenticated session state."""
     return build_portal_authorization_context(
@@ -385,14 +451,13 @@ def render_login(st, settings: tuple[str, str] | None) -> None:
         try:
             client = create_supabase_client(*settings)
             user_id, returned_email = authenticate_portal(client, email, password)
+            portal_role = prepare_authenticated_portal_access(
+                client=client,
+                user_id=user_id,
+            )
             connect_feature_repositories(st.session_state, client, user_id)
             st.session_state["portal_user_email"] = returned_email
-            st.session_state["portal_user_role"] = (
-                resolve_authenticated_portal_role(
-                    client=client,
-                    user_id=user_id,
-                )
-            )
+            st.session_state["portal_user_role"] = portal_role
             st.session_state["portal_page"] = "Tổng quan"
             st.rerun()
         except Exception as error:
