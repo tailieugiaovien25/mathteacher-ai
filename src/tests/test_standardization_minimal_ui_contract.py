@@ -139,11 +139,8 @@ def test_one_way_week_flow_is_preserved():
 
 def test_active_week_authority_is_preserved():
     text = source()
-
-    assert (
-        "STANDARDIZATION_ACTIVE_WEEK_AUTHORITY_V2"
-        in text
-    )
+    assert "V57-F2C5G_CANONICAL_WEEK_AUTHORITY" in text
+    assert "SystemContext.week_number is the only business-context authority" in text
 
 
 def test_no_schema_change():

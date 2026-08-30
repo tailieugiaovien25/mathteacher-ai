@@ -28,10 +28,10 @@ def test_week_sync_is_bidirectional_without_overriding_direct_user_choice():
     text = _source(WEEKLY)
     reverse = _function(text, "_sync_lbg_week_from_loaded_data")
     assert "_ACTIVE_VIEW_KEY" in reverse
-    assert 'st.session_state["system_weekly_week_number"] = data_week' in reverse
-    assert 'st.session_state["lbg_user_week_number"] = data_week' in reverse
-    assert "_STANDARDIZATION_WEEK_KEY" in reverse
-    assert "_LBG_WEEK_USER_CHANGE_KEY" in reverse
+    assert "get_canonical_context(" in reverse
+    assert "_LBG_DATA_WEEK_CONTEXT_MISMATCH_KEY" in reverse
+    assert 'st.session_state["system_weekly_week_number"] = data_week' not in reverse
+    assert 'st.session_state["lbg_user_week_number"] = data_week' not in reverse
 
 
 def test_lbg_controls_use_modern_contrast_3d_style():

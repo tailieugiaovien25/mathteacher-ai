@@ -1,4 +1,4 @@
-"""Full-screen AI-assisted lesson-plan authoring page."""
+﻿"""Full-screen AI-assisted lesson-plan authoring page."""
 
 from __future__ import annotations
 
@@ -833,28 +833,21 @@ def _context_editor(
             disabled=linked, key=f"ai_tkb_{signature}",
         )
         row4 = st.columns(2)
-        if linked:
-            row4[0].text_input(
-                "Ngày dạy",
-                value=_value(
-                    context,
-                    "teaching_date_display",
-                    _value(context, "teaching_date", ""),
-                ),
-                disabled=True,
-                key=f"ai_date_{signature}",
-            )
-            teaching_date = context.get("teaching_date")
-        else:
-            teaching_date = row4[0].date_input(
-                "Ngày thực hiện",
-                value=(
-                    context.get("teaching_date")
-                    if isinstance(context.get("teaching_date"), date)
-                    else date.today()
-                ),
-                key=f"ai_date_{signature}",
-            )
+        teaching_date = context.get("teaching_date")
+        row4[0].text_input(
+            "Ngày dạy",
+            value=_value(
+                context,
+                "teaching_date_display",
+                _value(context, "teaching_date", ""),
+            ),
+            disabled=True,
+            key=f"ai_date_{signature}",
+            help=(
+                "Ngày dạy là dữ liệu chỉ đọc lấy từ ngữ cảnh bài dạy/"
+                "Thời khóa biểu. AI không được phép thay đổi trường này."
+            ),
+        )
         equipment = row4[1].text_input(
             "Thiết bị dạy học",
             value=", ".join(
@@ -880,7 +873,6 @@ def _context_editor(
             lesson_title=lesson_title,
             curriculum_period=curriculum_period,
             timetable_period=timetable_period,
-            teaching_date=teaching_date,
             teaching_equipment=tuple(
                 item.strip()
                 for item in equipment.split(",")

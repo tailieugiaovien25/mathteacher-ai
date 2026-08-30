@@ -50,11 +50,11 @@ def test_standardization_sends_complete_selected_context_to_ai():
 def test_open_ai_marks_context_as_read_only_standardization_data():
     text = WEEKLY_UI.read_text(encoding="utf-8-sig")
     function = _function_source(text, "_open_ai_authoring_page")
-
     assert 'context_origin="STANDARDIZATION"' in function
     assert "context_read_only=True" in function
     assert '"lesson_authoring_ai_context"' in function
-    assert '"portal_page"' in function
+    assert '"portal_navigation_request"' in function
+    assert '"portal_page"' not in function
 
 
 def test_ai_consumes_standardization_context_without_reselecting_it():

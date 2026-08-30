@@ -1,11 +1,77 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import csv
+
+# V58_C4C1_CONTEXT_PERFORMANCE_TRACE
+from time import perf_counter as _v58_perf_counter
+from pathlib import Path as _V58PerfPath
+import json as _v58_perf_json
+
+
+def _v58_perf_log(event: str, started_at: float, **fields) -> None:
+    try:
+        elapsed_ms = round(
+            (_v58_perf_counter() - started_at) * 1000.0,
+            3,
+        )
+        report_dir = _V58PerfPath("reports/system_context/v58_c4c1")
+        report_dir.mkdir(parents=True, exist_ok=True)
+        payload = {"event": event, "elapsed_ms": elapsed_ms, **fields}
+        with (report_dir / "CONTEXT_PERFORMANCE_TRACE.jsonl").open(
+            "a", encoding="utf-8"
+        ) as handle:
+            handle.write(
+                _v58_perf_json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    default=str,
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+
+
+def _v58_timed_class_catalog_get(*, client, class_id):
+    started_at = _v58_perf_counter()
+    outcome = "found"
+    try:
+        item = SupabaseClassCatalogRepository(client=client).get(
+            class_id=class_id
+        )
+        if item is None:
+            outcome = "missing"
+        return item
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        _v58_perf_log(
+            "class_catalog_grade_lookup",
+            started_at,
+            class_id=class_id,
+            outcome=outcome,
+        )
+
+
 from io import StringIO
 from html import escape
 from pathlib import Path
 
 import streamlit as st
+
+from lesson_planning_v2.services.lesson_plan_grouping_policy_source import (
+    LessonPlanGroupingPolicySource,
+)
+from lesson_planning_v2.models.lesson_plan_grouping import (
+    LessonPlanGroupingPolicy,
+)
+from lesson_planning_v2.services.lesson_plan_grouping_service import (
+    LessonPlanGroupingPolicyResolver,
+    LessonPlanGroupingService,
+)
 
 from portal_v2.ui.teacher_workspace_styles import (
     apply_lesson_authoring_workspace_styles,
@@ -64,6 +130,16 @@ from portal_v2.runtime.system_weekly_schedule_runtime import (
     SystemWeeklyScheduleRuntime,
     SystemWeeklyScheduleRuntimeRequest,
 )
+from portal_v2.context.legacy_session_context_adapter import (
+    project_system_context,
+)
+from portal_v2.context.session_scoped_context_holder import (
+    apply_canonical_year_week_change,
+    get_canonical_context,
+    publish_year_week_projection,
+)
+from portal_v2.context.runtime_context_bridge import apply_runtime_context_change
+from portal_v2.context.user_scoped_store import ContextIdentity
 from lesson_planning_v2.services.lesson_plan_lesson_selector_service import LessonPlanLessonSelectorService
 from lesson_planning_v2.services.lesson_plan_draft_workspace_service import (
     LessonPlanDraftWorkspaceService,
@@ -149,11 +225,30 @@ _LBG_CONTEXT_SNAPSHOT_KEY = "lbg_autosaved_filter_context"
 _LBG_NOTICE_KEY = "lbg_floating_notice"
 _LBG_DATA_WEEK_SIGNATURE_KEY = "lbg_data_week_signature"
 _LBG_WEEK_USER_CHANGE_KEY = "lbg_week_changed_by_user"
+_LBG_DATA_WEEK_CONTEXT_MISMATCH_KEY = "lbg_data_week_context_mismatch"
 _STANDARDIZATION_DRAFT_KEY = "standardization_autosaved_lesson_context"
 _STANDARDIZATION_NOTICE_KEY = "standardization_floating_notice"
 
 
-def _autosave_standardization_change(changed_field: str) -> None:
+def _emit_standardization_canonical_context_change(*, field: str, value, source_control: str) -> None:
+    user_id = str(st.session_state.get("portal_user_id", "") or "").strip()
+    if not user_id:
+        raise RuntimeError("CANONICAL_CONTEXT_USER_ID_REQUIRED")
+    current = get_canonical_context(st.session_state, user_id=user_id, source_page="weekly_schedule")
+    if getattr(current, field) == value:
+        return
+    outcome = apply_runtime_context_change(
+        current=current, field=field, value=value, source_page="weekly_schedule",
+        source_control=source_control, occurred_at=datetime.now(timezone.utc),
+    )
+    store = st.session_state.get("_v57_system_context_store")
+    context_id = st.session_state.get("_v57_system_context_id")
+    if store is None or not context_id:
+        raise RuntimeError("CANONICAL_CONTEXT_STORE_REQUIRED")
+    store.put(ContextIdentity(user_id=user_id, context_id=str(context_id)), outcome.context)
+
+
+def _autosave_standardization_change(changed_field: str, state_key: str | None = None) -> None:
     """Persist the standardization selector context before every rerun."""
     st.session_state[_STANDARDIZATION_DRAFT_KEY] = {
         "week_number": st.session_state.get(_STANDARDIZATION_WEEK_KEY),
@@ -179,8 +274,41 @@ def _autosave_standardization_change(changed_field: str) -> None:
             st.session_state.get(_WORKING_LESSON_CONTEXT_KEY, {}) or {}
         ),
     }
+    if changed_field == "Môn":
+        value = st.session_state.get("standardization_subject_filter")
+        if value:
+            _emit_standardization_canonical_context_change(field="subject_ref", value=str(value), source_control="standardization_subject_filter")
+    elif changed_field == "Phân môn":
+        value = st.session_state.get("standardization_component_filter")
+        if value is not None:
+            _emit_standardization_canonical_context_change(field="component_ref", value=str(value), source_control="standardization_component_filter")
+    elif changed_field == "Khối lớp":
+        grade_value = st.session_state.get(state_key) if state_key else None
+        _emit_standardization_canonical_context_change(
+            field="grade", value=grade_value,
+            source_control=state_key or "standardization_grade_filter",
+        )
+
     st.session_state[_STANDARDIZATION_NOTICE_KEY] = (
         f"Đã tự lưu thay đổi {changed_field} của bài đang chuẩn hóa."
+    )
+
+
+def _emit_canonical_week_change(
+    *,
+    selected_week: int,
+    source_control: str,
+) -> None:
+    user_id = str(st.session_state.get("portal_user_id", "") or "").strip()
+    if not user_id:
+        raise RuntimeError("CANONICAL_CONTEXT_USER_ID_REQUIRED")
+    apply_canonical_year_week_change(
+        st.session_state,
+        user_id=user_id,
+        field="week_number",
+        value=int(selected_week),
+        source_page="weekly_schedule",
+        source_control=source_control,
     )
 
 
@@ -197,8 +325,28 @@ def _autosave_lbg_filter_context(changed_field: str) -> None:
         st.session_state[_LBG_WEEK_USER_CHANGE_KEY] = True
         selected_week = st.session_state.get("system_weekly_week_number")
         if selected_week is not None:
-            st.session_state["lbg_user_week_number"] = int(selected_week)
-            st.session_state[_STANDARDIZATION_WEEK_KEY] = int(selected_week)
+            _emit_canonical_week_change(
+                selected_week=int(selected_week),
+                source_control="system_weekly_week_number",
+            )
+    elif changed_field == "Năm học":
+        selected_year = str(
+            st.session_state.get("system_weekly_academic_year", "") or ""
+        ).strip()
+        if selected_year:
+            user_id = str(
+                st.session_state.get("portal_user_id", "") or ""
+            ).strip()
+            if not user_id:
+                raise RuntimeError("CANONICAL_CONTEXT_USER_ID_REQUIRED")
+            apply_canonical_year_week_change(
+                st.session_state,
+                user_id=user_id,
+                field="academic_year",
+                value=selected_year,
+                source_page="weekly_schedule",
+                source_control="system_weekly_academic_year",
+            )
     st.session_state[_LBG_NOTICE_KEY] = (
         f"Đã tự lưu thay đổi: {changed_field}."
     )
@@ -232,28 +380,56 @@ def _sync_lbg_week_from_loaded_data() -> None:
     if st.session_state.get(_LBG_DATA_WEEK_SIGNATURE_KEY) == signature:
         return
     st.session_state[_LBG_DATA_WEEK_SIGNATURE_KEY] = signature
-    if st.session_state.get("system_weekly_week_number") != data_week:
-        st.session_state["system_weekly_week_number"] = data_week
-        st.session_state["lbg_user_week_number"] = data_week
-        st.session_state[_STANDARDIZATION_WEEK_KEY] = data_week
+
+    user_id = str(st.session_state.get("portal_user_id", "") or "").strip()
+    if not user_id:
+        return
+
+    canonical_context = get_canonical_context(
+        st.session_state,
+        user_id=user_id,
+        source_page="weekly_schedule",
+    )
+    canonical_week = canonical_context.week_number
+
+    if canonical_week is not None and int(canonical_week) != data_week:
+        st.session_state[_LBG_DATA_WEEK_CONTEXT_MISMATCH_KEY] = {
+            "canonical_week": int(canonical_week),
+            "data_week": data_week,
+            "schedule_id": str(
+                st.session_state.get(_ACTIVE_SCHEDULE_ID_KEY, "") or ""
+            ),
+        }
         st.session_state[_LBG_NOTICE_KEY] = (
-            f"Đã đồng bộ Tuần {data_week} từ dữ liệu lịch đang được mở."
+            f"Dữ liệu LBG đang mở thuộc Tuần {data_week}, "
+            f"khác Tuần {int(canonical_week)} của ngữ cảnh hệ thống. "
+            "Dữ liệu được đánh dấu cần kiểm tra và không được phép đổi Tuần hệ thống."
         )
+    else:
+        st.session_state.pop(_LBG_DATA_WEEK_CONTEXT_MISMATCH_KEY, None)
+
+
+def _sync_legacy_lbg_week_to_canonical() -> None:
+    """Emit the legacy LBG week selector into canonical SystemContext."""
+    selected_week = st.session_state.get("lbg_user_week_number")
+    if selected_week is None:
+        return
+    st.session_state[_LBG_WEEK_USER_CHANGE_KEY] = True
+    _emit_canonical_week_change(
+        selected_week=int(selected_week),
+        source_control="lbg_user_week_number",
+    )
 
 
 def _sync_standardization_week_to_lbg() -> None:
-    """Publish the dedicated authoring week to the LBG week selector."""
+    """Emit the authoring week into canonical SystemContext."""
     selected_week = int(
         st.session_state[_STANDARDIZATION_WEEK_KEY]
     )
-    # WEEK_SELECTOR_TWO_WAY_STANDARDIZATION_V1
-    # This is the only destination field explicitly allowed to update LBG.
-    st.session_state[
-        "system_weekly_week_number"
-    ] = selected_week
-    st.session_state[
-        "lbg_user_week_number"
-    ] = selected_week
+    _emit_canonical_week_change(
+        selected_week=selected_week,
+        source_control=_STANDARDIZATION_WEEK_KEY,
+    )
     _autosave_standardization_change("Tuần soạn")
 
 
@@ -279,12 +455,7 @@ def _open_ai_authoring_page(
     st.session_state[_LESSON_AUTHORING_NOTICE_KEY] = (
         "Đã tự lưu thông tin bài dạy và mở trang Soạn bài cùng AI."
     )
-    st.session_state[
-        "portal_page"
-    ] = "Soạn bài cùng AI"
-    st.session_state[
-        "portal_navigation"
-    ] = "Soạn bài cùng AI"
+    st.session_state["portal_navigation_request"] = "Soạn bài cùng AI"
 
 _LESSON_PLAN_PROFILE = (
     Path(__file__).resolve().parents[3]
@@ -634,12 +805,7 @@ def _activate_standardization_action(action: str) -> None:
     st.session_state[
         "lesson_plan_management_pending_action"
     ] = action
-    st.session_state["portal_page"] = (
-        "Chu\u1ea9n h\u00f3a gi\u00e1o \u00e1n"
-    )
-    st.session_state["portal_navigation"] = (
-        "Chu\u1ea9n h\u00f3a gi\u00e1o \u00e1n"
-    )
+    st.session_state["portal_navigation_request"] = "Chu\u1ea9n h\u00f3a gi\u00e1o \u00e1n"
 
 
 _STANDARDIZATION_OPTION_KEYS = {
@@ -1849,36 +2015,29 @@ def _rows_for_same_timetable_lesson(
     return tuple(matched_rows)
 
 
-def _rows_for_selected_lesson_unit(
-    filtered_schedule_rows,
-    *,
-    selected_unit,
-    schedule_rows,
-    selected_row,
-) -> tuple[object, ...]:
-    """Return all class/date rows represented by the selected UI unit.
-
-    A lesson or topic can span several PPCT periods and can be taught in more
-    than one class.  ``representative_index`` alone only describes its first
-    row, so class/date controls must expand every source row in the unit.
-    """
-
-    unit_rows = tuple(
+def _rows_for_selected_lesson_unit(filtered_schedule_rows, *, selected_unit, schedule_rows, selected_row) -> tuple[object, ...]:
+    # V58-C3D6F
+    # The selected lesson unit is already canonical for the active
+    # subject/component/grade/PPCT scope. Its row_indices therefore index
+    # filtered_schedule_rows, not the broader schedule_rows collection.
+    strict_rows = tuple(
         filtered_schedule_rows[index]
         for index in tuple(getattr(selected_unit, "row_indices", ()) or ())
-        if 0 <= int(index) < len(filtered_schedule_rows)
+        if 0 <= index < len(filtered_schedule_rows)
     )
 
-    matched = []
-    for unit_row in unit_rows or (selected_row,):
-        for row in _rows_for_same_timetable_lesson(
-            schedule_rows,
-            selected_row=unit_row,
-        ):
-            if row not in matched:
-                matched.append(row)
+    if strict_rows:
+        return strict_rows
 
-    return tuple(matched)
+    # Fail closed. Keep the representative row only when the canonical
+    # selection unit has no usable row index; never broaden back to the
+    # unfiltered weekly schedule.
+    if selected_row is not None:
+        return (selected_row,)
+
+    return ()
+
+
 
 
 def _class_ids_for_same_timetable_lesson(
@@ -3180,6 +3339,53 @@ def _latest_ai_standardization_transfer():
     return candidates[-1] if candidates else ("", None)
 
 
+
+def _standardization_grade_from_class_value(value) -> int | None:
+    import re
+
+    text = str(value or "").strip()
+    match = re.search(
+        r"(?<!\d)([6-9])(?=[A-Za-zÀ-ỹ0-9._\-\s]|$)",
+        text,
+    )
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+def _standardization_grade_for_row(row, *, client=None) -> int | None:
+    # V58-C3C: ACTIVE timetable owns class_id; Class Catalog owns grade_level.
+    # Never infer grade from digits embedded in class_id or display labels.
+    class_id = str(getattr(row, "class_id", "") or "").strip()
+    if not class_id or client is None:
+        return None
+
+    try:
+        class_item = _v58_timed_class_catalog_get(
+            client=client,
+            class_id=class_id,
+        )
+    except Exception:
+        # Fail closed: repository failure must not revive regex inference.
+        return None
+
+    if class_item is None:
+        return None
+
+    grade_level = str(
+        getattr(class_item, "grade_level", "") or ""
+    ).strip()
+    if not grade_level:
+        return None
+
+    try:
+        grade = int(grade_level)
+    except (TypeError, ValueError):
+        return None
+
+    return grade if 6 <= grade <= 9 else None
+
+
 def _normalized_sync_value(value) -> str:
     if value is None:
         return ""
@@ -3238,6 +3444,155 @@ def _render_synced_context_markdown(
 # Legacy lesson summary contract: "S\u1ed1 ti\u1ebft"
 # Legacy lesson summary contract: "**Ng\u00e0y d\u1ea1y**"
 # Legacy selection contract: "C\u00e1ch ch\u1ecdn n\u1ed9i dung "
+# STANDARDIZATION_PPCT_REVERSE_SYNC_V51
+def _standardization_ppct_reverse_sync(
+    *, unit_widget_key, lesson_units, filtered_schedule_rows,
+    grade_filter_key, client,
+):
+    try:
+        selected_index = int(st.session_state.get(unit_widget_key, 0))
+    except (TypeError, ValueError):
+        selected_index = 0
+    if not (0 <= selected_index < len(lesson_units)):
+        return
+    # V58_C5B2_SHADOW_LESSON_PLAN_GROUPS
+    # V58_C5B7D_RUNTIME_POLICY_INJECTION
+    # ADMIN policy is configuration only; grouping remains shadow projection.
+    try:
+        from lesson_planning_v2.adapters.supabase_lesson_plan_grouping_policy_repository import (
+            SupabaseLessonPlanGroupingPolicyRepository,
+        )
+        _v58_c5b7d_policy_configs = (
+            SupabaseLessonPlanGroupingPolicyRepository(client).list_configs()
+        )
+        _v58_c5b2_policy_resolver = LessonPlanGroupingPolicyResolver(
+            tuple(
+                LessonPlanGroupingPolicy(
+                    subject_ref=config.subject_ref,
+                    component_ref=config.component_ref,
+                    mode=config.mode,
+                )
+                for config in _v58_c5b7d_policy_configs
+            )
+        )
+        st.session_state.pop("_v58_c5b7d_policy_load_error", None)
+    except Exception as error:
+        _v58_c5b2_policy_resolver = LessonPlanGroupingPolicyResolver()
+        st.session_state["_v58_c5b7d_policy_load_error"] = str(error)
+
+    _v58_c5b2_grouping_service = LessonPlanGroupingService()
+    _v58_c5b2_lesson_plan_groups = _v58_c5b2_grouping_service.group(
+        tuple(filtered_schedule_rows),
+        policy_resolver=_v58_c5b2_policy_resolver,
+        grade_resolver=lambda row: (
+            int(getattr(row, "grade", getattr(row, "grade_level", 0)) or 0)
+            or None
+        ),
+    )
+    # Transitional runtime-comparison state only; never business authority.
+    st.session_state["_v58_c5b2_shadow_lesson_plan_groups"] = (
+        _v58_c5b2_lesson_plan_groups
+    )
+    st.session_state["_v58_c5b2_shadow_week_number"] = week_number
+
+    # V58_C5B5_SHADOW_RUNTIME_BROWSER
+    if st.session_state.get("_v58_c5b2_shadow_lesson_plan_groups"):
+        with st.expander(
+            "Tr?nh duy?t nh?m gi?o ?n (Shadow V58-C5B5)",
+            expanded=False,
+        ):
+            st.caption(
+                "Ch? ??c d? li?u grouping; ch?a thay selector hay authority hi?n h?nh."
+            )
+            _shadow_groups = tuple(
+                st.session_state["_v58_c5b2_shadow_lesson_plan_groups"]
+            )
+            _shadow_grades = sorted(
+                {
+                    int(group.grade)
+                    for group in _shadow_groups
+                    if group.grade is not None
+                }
+            )
+            st.write(
+                "Kh?i c? d? li?u: "
+                + (
+                    ", ".join(str(item) for item in _shadow_grades)
+                    if _shadow_grades
+                    else "-"
+                )
+            )
+            for _group in _shadow_groups:
+                _periods = ", ".join(
+                    str(item) for item in _group.curriculum_periods
+                )
+                _classes = ", ".join(str(item) for item in _group.class_ids)
+                _dates = ", ".join(
+                    f"{class_id}: {teaching_date}"
+                    for class_id, teaching_date in _group.teaching_dates_by_class
+                )
+                st.markdown(
+                    f"**Kh?i {_group.grade} ? {_group.grouping_mode.value}**  "
+                    f"PPCT: {_periods or '-'}  "
+                    f"L?p: {_classes or '-'}"
+                )
+                st.caption(
+                    f"Ng?y d?y theo l?p: {_dates or '-'} ? "
+                    f"Group ID: {_group.group_id}"
+                )
+
+    selected_unit = lesson_units[selected_index]
+    representative_index = int(selected_unit.representative_index)
+    if not (0 <= representative_index < len(filtered_schedule_rows)):
+        return
+    representative_row = filtered_schedule_rows[representative_index]
+    # V58-C3B: PPCT is downstream of canonical grade. Selecting a PPCT
+    # unit must never reverse-write grade into SystemContext or its widget
+    # projection. Keep the reverse-context snapshot observational only.
+    canonical_user_id = str(
+        st.session_state.get("portal_user_id", "") or ""
+    ).strip()
+    canonical_context = (
+        get_canonical_context(
+            st.session_state,
+            user_id=canonical_user_id,
+            source_page="weekly_schedule",
+        )
+        if canonical_user_id
+        else None
+    )
+    selected_grade = (
+        getattr(canonical_context, "grade", None)
+        if canonical_context is not None
+        else None
+    )
+    st.session_state["_standardization_ppct_reverse_context"] = {
+        "subject_ref": str(getattr(representative_row, "subject_ref", "") or ""),
+        "component_ref": str(getattr(representative_row, "component_ref", "") or ""),
+        "class_id": str(getattr(representative_row, "class_id", "") or ""),
+        "curriculum_period": getattr(representative_row, "curriculum_period", None),
+        "lesson_title": str(
+            getattr(representative_row, "lesson_title", "")
+            or selected_unit.title or ""
+        ),
+        "grade": selected_grade,
+    }
+    _autosave_standardization_change("Tiết PPCT / Bài dạy")
+
+
+# STANDARDIZATION_TIMETABLE_CONTEXT_SYNC_V52D
+def _standardization_keep_valid_option(key, options):
+    options = tuple(options)
+    if not options:
+        st.session_state.pop(key, None)
+        return None
+    current = st.session_state.get(key)
+    if current not in options:
+        current = options[0]
+        st.session_state[key] = current
+    return current
+
+
 def _render_lesson_plan_standardization_workspace(
     view,
     teacher_user_id="",
@@ -3277,6 +3632,8 @@ def _render_lesson_plan_standardization_workspace(
             unsafe_allow_html=True,
         )
 
+    # V52D canonical weekly timetable source.
+    # Every selector below must remain inside this selected week's rows.
     schedule_rows = tuple(
         view.rows
     )
@@ -3294,6 +3651,10 @@ def _render_lesson_plan_standardization_workspace(
         str(getattr(row, "subject_ref", "") or "")
         for row in schedule_rows
     ))
+    _standardization_keep_valid_option(
+        "standardization_subject_filter",
+        subject_refs,
+    )
     _, selector_transfer = _latest_ai_standardization_transfer()
     restore_requested = bool(st.session_state.get(_RESTORE_LESSON_CONTEXT_KEY))
     working_context = dict(
@@ -3343,11 +3704,21 @@ def _render_lesson_plan_standardization_workspace(
                 key="standardization_subject_filter",
             )
 
+    _emit_standardization_canonical_context_change(
+        field="subject_ref",
+        value=str(selected_subject_ref),
+        source_control="standardization_subject_filter_projection",
+    )
+
     component_refs = tuple(dict.fromkeys(
         str(getattr(row, "component_ref", "") or "")
         for row in schedule_rows
         if str(getattr(row, "subject_ref", "") or "") == selected_subject_ref
     ))
+    _standardization_keep_valid_option(
+        "standardization_component_filter",
+        component_refs,
+    )
     transferred_component = str(
         (selector_transfer or {}).get("component_ref", "") or ""
     )
@@ -3387,12 +3758,124 @@ def _render_lesson_plan_standardization_workspace(
                 key="standardization_component_filter",
             )
 
+    _emit_standardization_canonical_context_change(
+        field="component_ref",
+        value=str(selected_component_ref),
+        source_control="standardization_component_filter_projection",
+    )
+
     filtered_schedule_rows = tuple(
         row
         for row in schedule_rows
         if str(getattr(row, "subject_ref", "") or "") == selected_subject_ref
         and str(getattr(row, "component_ref", "") or "") == selected_component_ref
     )
+
+    # V57-F3E6D: temporary runtime diagnostic only.
+    # It is intentionally read-only and emits no context changes.
+    if st.session_state.get("_v57_f3e6d_runtime_diagnostic_enabled", True):
+        print("\n[V57-F3E6D] SUBJECT/COMPONENT ROWS")
+        for _diag_index, _diag_row in enumerate(filtered_schedule_rows):
+            _diag_class_id = str(getattr(_diag_row, "class_id", "") or "")
+            try:
+                _diag_display = _class_display_name(_diag_class_id, client=client)
+            except Exception as _diag_error:
+                _diag_display = "<display-error:" + repr(_diag_error) + ">"
+            try:
+                _diag_grade = _standardization_grade_for_row(_diag_row, client=client)
+            except Exception as _diag_error:
+                _diag_grade = "<grade-error:" + repr(_diag_error) + ">"
+            print(
+                "[V57-F3E6D] ROW",
+                _diag_index,
+                "class_id=", repr(_diag_class_id),
+                "display=", repr(_diag_display),
+                "grade=", repr(_diag_grade),
+                "subject=", repr(getattr(_diag_row, "subject_ref", None)),
+                "component=", repr(getattr(_diag_row, "component_ref", None)),
+                "ppct=", repr(getattr(_diag_row, "curriculum_period", None)),
+                "lesson=", repr(getattr(_diag_row, "lesson_title", None)),
+                "tkb_period=", repr(getattr(_diag_row, "timetable_period", None)),
+                "date=", repr(getattr(_diag_row, "teaching_date", None)),
+            )
+
+    # STANDARDIZATION_GRADE_FILTER_V46
+    # "Tất cả khối" preserves the exact previous behavior.
+    available_grades = tuple(
+        grade
+        for grade in range(6, 10)
+        if any(
+            _standardization_grade_for_row(
+                row,
+                client=client,
+            ) == grade
+            for row in filtered_schedule_rows
+        )
+    )
+
+    # STANDARDIZATION_GRADE_PPCT_CONTEXT_V50B
+    grade_filter_options = (None,) + available_grades
+    grade_filter_key = (
+        "standardization_grade_filter_"
+        + str(view.week_number)
+        + "_"
+        + selected_subject_ref
+        + "_"
+        + selected_component_ref
+    )
+
+    current_grade_filter = st.session_state.get(
+        grade_filter_key
+    )
+    if current_grade_filter not in grade_filter_options:
+        st.session_state[grade_filter_key] = None
+        current_grade_filter = None
+
+    if current_grade_filter is None and len(available_grades) == 1:
+        current_grade_filter = available_grades[0]
+        st.session_state[grade_filter_key] = current_grade_filter
+
+    try:
+        selected_grade = selector_columns[4].selectbox(
+            "Khối lớp",
+            options=grade_filter_options,
+            format_func=lambda grade: (
+                "Tất cả khối"
+                if grade is None
+                else f"Lớp {grade}"
+            ),
+            key=grade_filter_key,
+            on_change=_autosave_standardization_change,
+            args=("Khối lớp", grade_filter_key),
+        )
+    except AttributeError:
+        with selector_columns[4]:
+            selected_grade = st.selectbox(
+                "Khối lớp",
+                options=grade_filter_options,
+                format_func=lambda grade: (
+                    "Tất cả khối"
+                    if grade is None
+                    else f"Lớp {grade}"
+                ),
+                key=grade_filter_key,
+            )
+
+    if selected_grade is not None:
+        filtered_schedule_rows = tuple(
+            row
+            for row in filtered_schedule_rows
+            if _standardization_grade_for_row(
+                row,
+                client=client,
+            ) == selected_grade
+        )
+
+    if not filtered_schedule_rows:
+        st.warning(
+            "Không có bài dạy phù hợp với khối lớp đã chọn."
+        )
+        return
 
     transfer_key, incoming_transfer = (
         _latest_ai_standardization_transfer()
@@ -3401,7 +3884,7 @@ def _render_lesson_plan_standardization_workspace(
         incoming_transfer = working_context
         transfer_key = "working-lesson-context"
     matched_row_index = _match_transfer_schedule_row(
-        schedule_rows,
+        filtered_schedule_rows,
         incoming_transfer,
     )
     transfer_id = str(
@@ -3420,10 +3903,16 @@ def _render_lesson_plan_standardization_workspace(
         LessonPlanUnitSelectorService()
     )
 
+    _v58_available_modes_started = _v58_perf_counter()
     available_modes = (
         selector.available_modes(
             rows=filtered_schedule_rows
         )
+    )
+    _v58_perf_log(
+        "lesson_selector_available_modes",
+        _v58_available_modes_started,
+        row_count=len(filtered_schedule_rows),
     )
 
     available_modes = tuple(
@@ -3455,6 +3944,12 @@ def _render_lesson_plan_standardization_workspace(
         ),
     }
 
+    grade_context_token = (
+        "all"
+        if selected_grade is None
+        else str(selected_grade)
+    )
+
     mode_widget_key = (
         "lbg_lesson_plan_selection_mode_"
         + str(view.week_number)
@@ -3462,6 +3957,8 @@ def _render_lesson_plan_standardization_workspace(
         + selected_subject_ref
         + "_"
         + selected_component_ref
+        + "_grade_"
+        + grade_context_token
     )
     if should_apply_transfer and LessonPlanSelectionMode.LESSON in available_modes:
         st.session_state[mode_widget_key] = LessonPlanSelectionMode.LESSON
@@ -3494,6 +3991,7 @@ def _render_lesson_plan_standardization_workspace(
                     key=mode_widget_key,
                 )
 
+    _v58_build_units_started = _v58_perf_counter()
     lesson_units = (
         selector.build_units(
             # WEEK_SCOPED_PPCT_OPTIONS_V1
@@ -3503,6 +4001,27 @@ def _render_lesson_plan_standardization_workspace(
             mode=selection_mode,
         )
     )
+    _v58_perf_log(
+        "lesson_selector_build_units",
+        _v58_build_units_started,
+        row_count=len(filtered_schedule_rows),
+        mode=str(getattr(selection_mode, "value", selection_mode)),
+        unit_count=len(lesson_units),
+    )
+
+    # V58-C3D: deduplicate selector units only; keep timetable rows intact.
+    _deduplicated_lesson_units = []
+    _seen_lesson_unit_keys = set()
+    for _unit in lesson_units:
+        _unit_key = (
+            tuple(getattr(_unit, "curriculum_periods", ()) or ()),
+            str(getattr(_unit, "title", "") or "").strip().casefold(),
+        )
+        if _unit_key in _seen_lesson_unit_keys:
+            continue
+        _seen_lesson_unit_keys.add(_unit_key)
+        _deduplicated_lesson_units.append(_unit)
+    lesson_units = tuple(_deduplicated_lesson_units)
 
     if not lesson_units:
         if (
@@ -3548,9 +4067,17 @@ def _render_lesson_plan_standardization_workspace(
         + selected_subject_ref
         + "_"
         + selected_component_ref
+        + "_grade_"
+        + grade_context_token
+    )
+    _standardization_keep_valid_option(
+        unit_widget_key,
+        tuple(range(len(lesson_units))),
     )
     if should_apply_transfer and matched_row_index is not None:
-        matched_row = schedule_rows[int(matched_row_index)]
+        matched_row = filtered_schedule_rows[
+            int(matched_row_index)
+        ]
         for unit_index, unit in enumerate(lesson_units):
             representative_row = filtered_schedule_rows[
                 int(unit.representative_index)
@@ -3585,8 +4112,14 @@ def _render_lesson_plan_standardization_workspace(
                     ].selection_label
                 ),
                 key=unit_widget_key,
-                on_change=_autosave_standardization_change,
-                args=("Tiết PPCT / Bài dạy",),
+                on_change=_standardization_ppct_reverse_sync,
+                kwargs={
+                    "unit_widget_key": unit_widget_key,
+                    "lesson_units": lesson_units,
+                    "filtered_schedule_rows": filtered_schedule_rows,
+                    "grade_filter_key": grade_filter_key,
+                    "client": client,
+                },
             )
         except AttributeError:
             with selector_columns[3]:
@@ -3652,31 +4185,49 @@ def _render_lesson_plan_standardization_workspace(
         ]
     )
 
-    selected_timetable_rows = _rows_for_selected_lesson_unit(
-        filtered_schedule_rows,
-        selected_unit=selected_unit,
-        schedule_rows=schedule_rows,
-        selected_row=selected_row,
-    )
+    # V58_C4B2_STANDARDIZATION_READS_RESOLVED_LBG
+    # Legacy contract marker: selected_unit=selected_unit
+    # Kept only for source-contract compatibility. The live runtime path
+    # does not call _rows_for_selected_lesson_unit anymore.
+    # Consume the already-resolved LBG lesson unit directly.
+    selected_timetable_rows = tuple(
+        filtered_schedule_rows[index]
+        for index in tuple(
+            getattr(selected_unit, "row_indices", ()) or ()
+        )
+        if 0 <= index < len(filtered_schedule_rows)
+    ) or (selected_row,)
 
     _legacy_exact_multiclass_source_contract = """text_input(
         "Lớp dạy"
 text_input(
         "Ngày dạy"
 """
+    # V58-C3D6: the outer display must project the same canonical lesson-unit
+    # context already used by "Kiểm tra thông tin bài soạn".  Do not derive a
+    # second class scope from selected_timetable_rows.
     selected_class_ids = tuple(dict.fromkeys(
-        str(getattr(row, "class_id", "") or "")
-        for row in selected_timetable_rows
+        str(class_id or "").strip()
+        for class_id in tuple(selected_unit.class_ids or ())
+        if str(class_id or "").strip()
     )) or (
         str(getattr(selected_row, "class_id", "") or ""),
     )
+    representative_class_id = str(getattr(selected_row, "class_id", "") or "").strip()
+    if representative_class_id:
+        _emit_standardization_canonical_context_change(
+            field="class_id", value=representative_class_id,
+            source_control="standardization_selected_timetable_row",
+        )
+
     selected_teaching_date_pairs = tuple(dict.fromkeys(
         (
-            str(getattr(row, "class_id", "") or ""),
-            getattr(row, "teaching_date", None),
+            str(item.class_id or "").strip(),
+            item.teaching_date,
         )
-        for row in selected_timetable_rows
-        if getattr(row, "teaching_date", None) is not None
+        for item in tuple(selected_unit.teaching_dates or ())
+        if getattr(item, "teaching_date", None) is not None
+        and str(getattr(item, "class_id", "") or "").strip()
     ))
     class_display_value = _class_display_names(
         selected_class_ids,
@@ -4062,6 +4613,54 @@ text_input(
     st.session_state[_STANDARDIZATION_DRAFT_KEY] = {
         **dict(st.session_state.get(_STANDARDIZATION_DRAFT_KEY, {}) or {}),
         "selected_lesson": dict(selected_lesson),
+    }
+
+    # V58_C4B_RESOLVED_LESSON_CONTEXT
+    # One resolved LBG lesson projection for downstream consumers.
+    _v58_projection_started = _v58_perf_counter()
+    resolved_lbg_lesson_context = {
+        "source": "LBG_PBSDTB",
+        "academic_year": str(selected_lesson.get("academic_year", "") or ""),
+        "week_number": int(selected_lesson.get("week_number", view.week_number)),
+        "subject_ref": str(selected_lesson.get("subject_ref", "") or ""),
+        "component_ref": str(selected_lesson.get("component_ref", "") or ""),
+        "grade": selected_grade,
+        "class_ids": tuple(selected_lesson.get("classes", ()) or ()),
+        "class_id": str(selected_lesson.get("class_id", "") or ""),
+        "timetable_periods_by_class": tuple(
+            selected_lesson.get("timetable_periods_by_class", ()) or ()
+        ),
+        "teaching_dates_by_class": tuple(
+            selected_lesson.get("teaching_dates_by_class", ()) or ()
+        ),
+        "curriculum_period": selected_lesson.get("curriculum_period"),
+        "lesson_id": str(getattr(selected_row, "lesson_id", "") or ""),
+        "lesson_title": str(selected_lesson.get("lesson_title", "") or ""),
+        "teaching_equipment": tuple(
+            selected_lesson.get("teaching_equipment", ()) or ()
+        ),
+        "representative_timetable_period": selected_lesson.get("timetable_period"),
+        "representative_teaching_date": selected_lesson.get("teaching_date"),
+    }
+
+    # Projection envelope only; canonical scalar SystemContext remains authority.
+    # Multi-class consumers must read this envelope instead of re-expanding
+    # broader schedule_rows.
+    st.session_state["_v58_resolved_lbg_lesson_context"] = dict(
+        resolved_lbg_lesson_context
+    )
+    _v58_perf_log(
+        "resolved_lbg_lesson_projection",
+        _v58_projection_started,
+        class_count=len(resolved_lbg_lesson_context.get("class_ids", ()) or ()),
+        week_number=resolved_lbg_lesson_context.get("week_number"),
+        subject_ref=resolved_lbg_lesson_context.get("subject_ref"),
+        component_ref=resolved_lbg_lesson_context.get("component_ref"),
+        curriculum_period=resolved_lbg_lesson_context.get("curriculum_period"),
+    )
+    st.session_state[_STANDARDIZATION_DRAFT_KEY] = {
+        **dict(st.session_state.get(_STANDARDIZATION_DRAFT_KEY, {}) or {}),
+        "selected_lesson": dict(resolved_lbg_lesson_context),
     }
 
     if not hide_synced_context:
@@ -4670,6 +5269,10 @@ text_input(
                 ] = workflow_state
 
         except Exception as error:
+            import traceback
+            print('\n===== STANDARDIZATION_RUNTIME_TRACEBACK =====')
+            traceback.print_exc()
+            print('===== END_STANDARDIZATION_RUNTIME_TRACEBACK =====\n')
             st.error(
                 "Kh\u00f4ng th\u1ec3 "
                 "chu\u1ea9n h\u00f3a "
@@ -4846,7 +5449,13 @@ text_input(
         width="stretch",
     )
 
-    if save_standardized_clicked:
+    def _save_standardized_artifact_to_library(
+        *,
+        artifact_file_name: str,
+        artifact_content: bytes,
+    ) -> None:
+        output_name = artifact_file_name
+        output_bytes = artifact_content
         upload_service = (
             st.session_state.get(
                 "document_library_upload_service"
@@ -4996,6 +5605,13 @@ text_input(
                     + str(error)
                 )
 
+
+    if save_standardized_clicked:
+        _save_standardized_artifact_to_library(
+            artifact_file_name=output_name,
+            artifact_content=output_bytes,
+        )
+
     st.markdown(
         '<div id="download-standardized-lesson-plan"></div>',
         unsafe_allow_html=True,
@@ -5017,6 +5633,17 @@ text_input(
             + "_"
             + str(selected_index)
         ),
+    )
+
+    from portal_v2.ui.standardized_lesson_plan_management_streamlit import (
+        render_standardized_lesson_plan_management,
+    )
+
+    render_standardized_lesson_plan_management(
+        current_file_name=output_name,
+        current_content=output_bytes,
+        preview_html_builder=build_document_html,
+        save_handler=_save_standardized_artifact_to_library,
     )
 
 
@@ -5180,13 +5807,46 @@ def _render_weekly_schedule_technical_workspace(
             return
 
         with year_column:
+            _technical_user_id = str(
+                st.session_state.get("portal_user_id", "") or ""
+            ).strip()
+            if not _technical_user_id:
+                st.error("Không xác định được người dùng cho ngữ cảnh Năm học.")
+                return
+            _technical_context = get_canonical_context(
+                st.session_state,
+                user_id=_technical_user_id,
+                source_page="weekly_schedule",
+            )
+            if not _technical_context.academic_year:
+                _default_academic_year = str(
+                    st.session_state.get(
+                        "portal_academic_year",
+                        "2026-2027",
+                    )
+                    or ""
+                ).strip()
+                if _default_academic_year:
+                    apply_canonical_year_week_change(
+                        st.session_state,
+                        user_id=_technical_user_id,
+                        field="academic_year",
+                        value=_default_academic_year,
+                        source_page="weekly_schedule",
+                        source_control="portal_academic_year_default",
+                    )
+                    _technical_context = get_canonical_context(
+                        st.session_state,
+                        user_id=_technical_user_id,
+                        source_page="weekly_schedule",
+                    )
+            publish_year_week_projection(
+                st.session_state,
+                context=_technical_context,
+            )
             academic_year = st.text_input(
                 "\u004e\u0103\u006d "
                 "\u0068\u1ecdc",
-                value=st.session_state.get(
-                    "portal_academic_year",
-                    "2026-2027",
-                ),
                 key="system_weekly_academic_year",
                 on_change=_autosave_lbg_filter_context,
                 args=("Năm học",),
@@ -5198,19 +5858,8 @@ def _render_weekly_schedule_technical_workspace(
                 "_system_weekly_last_updated_week"
             )
 
-            if (
-                "system_weekly_week_number"
-                not in st.session_state
-                and _saved_week_key
-                in st.session_state
-            ):
-                st.session_state[
-                    "system_weekly_week_number"
-                ] = int(
-                    st.session_state[
-                        _saved_week_key
-                    ]
-                )
+            # V57-F2C5I: last-updated week is cache metadata only.
+            # It must never restore or replace canonical SystemContext.week_number.
 
             # GLOBAL_WEEKLY_CONTEXT_PERSISTENT_RESTORE_V1
             # Restore the most recently updated persisted schedule
@@ -5279,24 +5928,68 @@ def _render_weekly_schedule_technical_workspace(
                                 _latest_summary.schedule_id
                             )
 
-                            st.session_state[
-                                _ACTIVE_ACADEMIC_YEAR_KEY
-                            ] = str(
-                                _latest_summary.academic_year
-                            )
-
-                            st.session_state[
-                                _ACTIVE_WEEK_NUMBER_KEY
-                            ] = _bootstrap_week
-
+                            # V57-F2C5I: persisted schedule discovery may
+                            # restore cache/view metadata, but never canonical
+                            # academic-year/week context or selector values.
                             st.session_state[
                                 "_system_weekly_last_updated_week"
                             ] = _bootstrap_week
 
-                            # Restore BEFORE creating the selectbox.
-                            st.session_state[
-                                "system_weekly_week_number"
-                            ] = _bootstrap_week
+                            _bootstrap_user_id = str(
+                                st.session_state.get(
+                                    "portal_user_id",
+                                    "",
+                                )
+                                or ""
+                            ).strip()
+                            if _bootstrap_user_id:
+                                _bootstrap_context = get_canonical_context(
+                                    st.session_state,
+                                    user_id=_bootstrap_user_id,
+                                    source_page="weekly_schedule",
+                                )
+                                _bootstrap_context_week = (
+                                    _bootstrap_context.week_number
+                                )
+                                _bootstrap_context_year = (
+                                    _bootstrap_context.academic_year
+                                )
+                                if (
+                                    _bootstrap_context_week is not None
+                                    and int(_bootstrap_context_week)
+                                    != _bootstrap_week
+                                ):
+                                    st.session_state[
+                                        _LBG_DATA_WEEK_CONTEXT_MISMATCH_KEY
+                                    ] = {
+                                        "canonical_week": int(
+                                            _bootstrap_context_week
+                                        ),
+                                        "data_week": _bootstrap_week,
+                                        "schedule_id": str(
+                                            _latest_summary.schedule_id
+                                        ),
+                                        "source": "persisted_schedule_bootstrap",
+                                    }
+                                if (
+                                    _bootstrap_context_year is not None
+                                    and str(_bootstrap_context_year)
+                                    != str(_latest_summary.academic_year)
+                                ):
+                                    st.session_state[
+                                        "lbg_data_year_context_mismatch"
+                                    ] = {
+                                        "canonical_year": str(
+                                            _bootstrap_context_year
+                                        ),
+                                        "data_year": str(
+                                            _latest_summary.academic_year
+                                        ),
+                                        "schedule_id": str(
+                                            _latest_summary.schedule_id
+                                        ),
+                                        "source": "persisted_schedule_bootstrap",
+                                    }
 
                             _bootstrap_generation = (
                                 WeeklyScheduleGenerationResult(
@@ -5652,18 +6345,8 @@ def _render_weekly_schedule_technical_workspace(
                         _ACTIVE_SCHEDULE_ID_KEY
                     ] = _active_schedule_id
 
-                    st.session_state[
-                        _ACTIVE_ACADEMIC_YEAR_KEY
-                    ] = str(
-                        academic_year
-                    )
-
-                    st.session_state[
-                        _ACTIVE_WEEK_NUMBER_KEY
-                    ] = int(
-                        week_number
-                    )
-
+                    # V57-F2C5I: exact-week read updates view/cache only.
+                    # Canonical year/week were selected before this read.
                     st.session_state[
                         _ACTIVE_VIEW_KEY
                     ] = _active_view
@@ -5798,20 +6481,11 @@ def _render_weekly_schedule_technical_workspace(
                     "_system_weekly_last_updated_week"
                 ] = int(week_number)
 
-                # Publish the successfully persisted
-                # schedule as the ACTIVE WEEK used by
-                # authoring and standardization.
+                # V57-F2C5I: persistence publishes schedule/view metadata
+                # only. The save result must not become year/week authority.
                 st.session_state[
                     _ACTIVE_SCHEDULE_ID_KEY
                 ] = str(schedule_id)
-
-                st.session_state[
-                    _ACTIVE_ACADEMIC_YEAR_KEY
-                ] = str(academic_year)
-
-                st.session_state[
-                    _ACTIVE_WEEK_NUMBER_KEY
-                ] = int(week_number)
 
                 st.session_state[
                     _ACTIVE_VIEW_KEY
@@ -6293,6 +6967,62 @@ def render_weekly_schedule_and_equipment_workspace(
 
 
 
+
+# STANDARDIZATION_AUTHORITATIVE_TIMETABLE_V56
+def _build_standardization_authoritative_week_view(
+    *,
+    client,
+    user_id: str,
+    academic_year: str,
+    week_number: int,
+):
+    """Build standardization data from the ACTIVE teacher timetable.
+
+    Timetable owns class/subject/component/date/session/period identity.
+    PPCT is resolved by the existing SystemWeeklyScheduleRuntime.
+    This helper is read-only and does not persist/replace Lịch báo giảng.
+    """
+    schedule_id = (
+        "SYSTEM-"
+        + str(user_id)
+        + "-"
+        + str(academic_year)
+        + "-W"
+        + str(int(week_number))
+    )
+
+    schedule = (
+        SystemWeeklyScheduleRuntime(
+            client=client,
+            user_id=str(user_id),
+        ).generate(
+            request=SystemWeeklyScheduleRuntimeRequest(
+                schedule_id=schedule_id,
+                academic_year=str(academic_year),
+                week_number=int(week_number),
+                ppct_scope_rules=(),
+            )
+        )
+    )
+
+    generation = WeeklyScheduleGenerationResult(
+        request=WeeklyScheduleGenerationRequest(
+            schedule_id=schedule_id,
+            teacher_id=str(user_id),
+            academic_year=str(academic_year),
+            week_number=int(week_number),
+        ),
+        schedule=schedule,
+    )
+
+    output = WeeklyScheduleOutputService().export_excel(
+        generation=generation
+    )
+
+    return WeeklySchedulePortalPresenter().present(
+        output=output
+    )
+
 def render_lesson_plan_management_workspace(
     *,
     client=None,
@@ -6490,8 +7220,7 @@ def _open_management_catalogue_item(item_id: str) -> None:
     # ONE_WAY_LBG_DATA_FLOW_V1
     # A managed lesson can send its document to standardization, but it may
     # not select or mutate the authoritative LBG year/week.
-    st.session_state["portal_page"] = "Chuẩn hóa giáo án"
-    st.session_state["portal_navigation"] = "Chuẩn hóa giáo án"
+    st.session_state["portal_navigation_request"] = "Chuẩn hóa giáo án"
 
 
 def _request_catalogue_item_delete(item_id: str) -> None:
@@ -6793,9 +7522,34 @@ def render_weekly_schedule_workspace(
         except (TypeError, ValueError):
             restored_week = 0
         if restored_week in week_numbers:
-            st.session_state["system_weekly_week_number"] = restored_week
-            st.session_state["lbg_user_week_number"] = restored_week
-            st.session_state[_STANDARDIZATION_WEEK_KEY] = restored_week
+            _restore_user_id = str(
+                st.session_state.get("portal_user_id", "") or ""
+            ).strip()
+            if _restore_user_id:
+                _restore_canonical = get_canonical_context(
+                    st.session_state,
+                    user_id=_restore_user_id,
+                    source_page="weekly_schedule",
+                )
+                _restore_canonical_week = _restore_canonical.week_number
+                if (
+                    _restore_canonical_week is not None
+                    and int(_restore_canonical_week) != restored_week
+                ):
+                    st.session_state[
+                        _LBG_DATA_WEEK_CONTEXT_MISMATCH_KEY
+                    ] = {
+                        "canonical_week": int(_restore_canonical_week),
+                        "data_week": restored_week,
+                        "schedule_id": str(
+                            st.session_state.get(
+                                _ACTIVE_SCHEDULE_ID_KEY,
+                                "",
+                            )
+                            or ""
+                        ),
+                        "source": "standardization_restore_snapshot",
+                    }
 
     navigation_notice = st.session_state.pop(_LESSON_AUTHORING_NOTICE_KEY, "")
     if navigation_notice:
@@ -6805,62 +7559,50 @@ def render_weekly_schedule_workspace(
     # FILTER BAR
     # -----------------------------------------------------
 
-    # STANDARDIZATION_ACTIVE_WEEK_AUTHORITY_V2
-    #
-    # LBG is authoritative for operational metadata:
-    # week / class / PPCT / lesson / teaching date.
-    #
-    # AI transfer carries source/revised document data only.  It must never
-    # choose or replace the authoritative LBG week.
-    active_week = st.session_state.get(
-        _ACTIVE_WEEK_NUMBER_KEY
+    # V57-F2C5G_CANONICAL_WEEK_AUTHORITY
+    # SystemContext.week_number is the only business-context authority here.
+    # Session-state week keys are compatibility projections for widgets.
+    _canonical_user_id = str(
+        st.session_state.get("portal_user_id", "") or ""
+    ).strip()
+    if not _canonical_user_id:
+        st.error("Không xác định được người dùng cho ngữ cảnh Tuần hệ thống.")
+        return
+
+    _canonical_context = get_canonical_context(
+        st.session_state,
+        user_id=_canonical_user_id,
+        source_page="weekly_schedule",
     )
-    lbg_selector_week = st.session_state.get(
-        "system_weekly_week_number"
-    )
+    _canonical_week = _canonical_context.week_number
 
     if (
-        lbg_selector_week is not None
-        and int(lbg_selector_week) in week_numbers
+        _canonical_week is None
+        or int(_canonical_week) not in week_numbers
     ):
-        week_number = int(lbg_selector_week)
-
-    elif (
-        active_week is not None
-        and int(active_week) in week_numbers
-    ):
-        week_number = int(active_week)
-
-    else:
-        week_number = int(
-            st.session_state.get(
-                "lbg_user_week_number",
-                week_numbers[0],
-            )
+        _emit_canonical_week_change(
+            selected_week=int(week_numbers[0]),
+            source_control="academic_week_default",
+        )
+        _canonical_context = get_canonical_context(
+            st.session_state,
+            user_id=_canonical_user_id,
+            source_page="weekly_schedule",
         )
 
-        if week_number not in week_numbers:
-            week_number = int(
-                week_numbers[0]
-            )
+    week_number = int(_canonical_context.week_number)
+    publish_year_week_projection(
+        st.session_state,
+        context=_canonical_context,
+    )
 
     hide_standardization_context_ui = (
         page_title == "Chuẩn hóa giáo án"
     )
 
     if hide_standardization_context_ui:
-        # WEEK_SELECTOR_TWO_WAY_STANDARDIZATION_V1
-        # LBG -> standardization: initialize/refresh from the exact source
-        # selector. Standardization -> LBG: callback publishes only the week.
-        if (
-            st.session_state.get(
-                _STANDARDIZATION_WEEK_KEY
-            )
-            != int(week_number)
-        ):
-            st.session_state[
-                _STANDARDIZATION_WEEK_KEY
-            ] = int(week_number)
+        # V57-F2C5G: widget value is already projected from canonical
+        # SystemContext before widget creation. No competing writer here.
 
         st.markdown(
             """
@@ -6929,10 +7671,8 @@ def render_weekly_schedule_workspace(
             )
         )
     else:
-        # Local mirror used by the legacy authoring workspace only.
-        st.session_state[
-            "lbg_user_week_number"
-        ] = int(week_number)
+        # V57-F2C5L: legacy LBG selector is a canonical projection/subscriber.
+        # No direct mirror writer is allowed here.
         controls = st.columns(
             [1.25, 1.1, 1.1, 1.1, 0.9],
             gap="medium",
@@ -6954,6 +7694,7 @@ def render_weekly_schedule_workspace(
                     f"Tu\u1ea7n {value}"
                 ),
                 key="lbg_user_week_number",
+                on_change=_sync_legacy_lbg_week_to_canonical,
             )
 
     selected_academic_week = (
@@ -7022,6 +7763,41 @@ def render_weekly_schedule_workspace(
         )
     ):
         view = None
+
+
+    # STANDARDIZATION_AUTHORITATIVE_TIMETABLE_V56
+    # ACTIVE teacher timetable is authoritative for the selected week.
+    # PPCT remains the curriculum-content source.
+    # V57C_PHASE2_CANONICAL_CONTEXT_PROJECTION
+    # Compatibility-only projection; it never writes widget/session state.
+    canonical_context = project_system_context(
+        st.session_state,
+        source_page="weekly_schedule",
+        source_control="standardization_authoritative_view",
+    )
+    # V57C_PHASE2B_SHADOW_ONLY
+    # The projected SystemContext is observational in this phase.
+    # Existing local selected year/week continue to drive the V56 authoritative
+    # timetable runtime so compatibility work cannot change business behavior.
+    _canonical_projection_snapshot = (
+        canonical_context.academic_year,
+        canonical_context.week_number,
+    )
+
+    try:
+        view = _build_standardization_authoritative_week_view(
+            client=client,
+            user_id=str(user_id),
+            academic_year=academic_year,
+            week_number=int(week_number),
+        )
+    except Exception as error:
+        st.error(
+            "Không thể đồng bộ dữ liệu Chuẩn hóa giáo án "
+            "với Thời khóa biểu đang hiệu lực của tuần này: "
+            + str(error)
+        )
+        return
 
     if view is None:
         try:

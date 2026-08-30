@@ -22,6 +22,12 @@ from portal_v2.ui.admin_assignment_workspace_streamlit import (
 from portal_v2.ui.admin_academic_year_configuration_streamlit import (
     render_admin_academic_year_configuration,
 )
+from portal_v2.ui.admin_canonical_code_catalog_streamlit import (
+    render_admin_canonical_code_catalog,
+)
+from portal_v2.ui.admin_context_control_center_streamlit import (
+    render_admin_context_control_center,
+)
 from portal_v2.ui.admin_assessment_runtime_readiness_streamlit import (
     render_admin_assessment_runtime_readiness,
 )
@@ -34,6 +40,8 @@ from portal_v2.ui.admin_assessment_setting_review_streamlit import (
 
 from portal_v2.ui.admin_navigation import (
     ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION,
+    ADMIN_PAGE_CANONICAL_CODE_CATALOG,
+    ADMIN_PAGE_CONTEXT_CONTROL_CENTER,
     ADMIN_PAGE_ASSESSMENT_TEMPLATES,
     ADMIN_PAGE_ASSESSMENT_REVIEWS,
     ADMIN_PAGE_USER_REGISTRATIONS,
@@ -492,6 +500,18 @@ def render_admin_page(
     ):
         render_admin_academic_year_configuration(
             st,
+            client=client,
+        )
+        return
+
+    if page.page_id == ADMIN_PAGE_CANONICAL_CODE_CATALOG:
+        render_admin_canonical_code_catalog(st, client=client)
+        return
+
+    if page.page_id == ADMIN_PAGE_CONTEXT_CONTROL_CENTER:
+        render_admin_context_control_center(
+            st,
+            authorization=authorization,
             client=client,
         )
         return

@@ -59,32 +59,12 @@ def test_schedule_and_equipment_tables_resolve_ids_to_display_names():
 
 def test_weekly_controls_use_one_compact_navy_row():
     text = source()
-
-    assert "source_column," in text
-    assert "year_column," in text
-    assert "week_column," in text
-    assert "assignment_column," in text
-    assert "ppct_column," in text
-    assert "with source_column:" in text
-    assert "with year_column:" in text
-    assert "with week_column:" in text
-    assert "with assignment_column:" in text
-    assert "with ppct_column:" in text
-    assert "background:#071a33" in text
-    assert "font-size:15px" in text
-    assert "min-height:76px" in text
-    assert "padding:6px 10px" in text
-    assert '"portal_academic_year",\n                    "2026-2027",' in text
-    assert "range(1, 41)" in text
-    assert "index=0" in text
-    assert 'f"Tu\\u1ea7n {value}"' in text
-    assert "SupabaseTeacherTimetableRepository(" in text
-    assert "TeacherTimetableSlotStatus.ACTIVE" in text
-    assert '"Lớp / Môn dạy"' in text
-    assert '"Tự động · Tất cả môn"' in text
-    assert "background:#fff" in text
-    assert "color:#111" in text
-    assert "font-weight:700" in text
+    for token in ("source_column,", "year_column,", "week_column,", "assignment_column,", "ppct_column,", "with source_column:", "with year_column:", "with week_column:", "with assignment_column:", "with ppct_column:"):
+        assert token in text
+    for token in ("background:#071a33", "font-size:15px", "min-height:76px", "padding:6px 10px", "range(1, 41)", 'f"Tu\u1ea7n {value}"', "SupabaseTeacherTimetableRepository(", "TeacherTimetableSlotStatus.ACTIVE", '"Lớp / Môn dạy"', '"Tự động · Tất cả môn"', "background:#fff", "color:#111", "font-weight:700"):
+        assert token in text
+    assert '"system_weekly_academic_year"' in text
+    assert "get_canonical_context(" in text
 
 
 def test_auto_ppct_uses_assignment_timetable_intersection():

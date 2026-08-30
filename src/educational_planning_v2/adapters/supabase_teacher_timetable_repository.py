@@ -1,7 +1,25 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from typing import Any
+import time
+
+# V57E1_TRANSIENT_READ_RETRY
+_TRANSIENT_READ_ERROR_NAMES = frozenset({
+    "ConnectionTerminated", "ConnectionResetError", "ConnectError",
+    "ReadError", "ReadTimeout", "RemoteProtocolError",
+})
+
+def _is_transient_read_error(error: BaseException) -> bool:
+    current = error
+    seen = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if type(current).__name__ in _TRANSIENT_READ_ERROR_NAMES:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
 
 from educational_planning_v2.models.teacher_timetable import (
     TeacherTimetableSlot,
@@ -182,8 +200,18 @@ class SupabaseTeacherTimetableRepository(
                 status.value,
             )
 
+        # V57E1_TRANSIENT_READ_RETRY
+        # Retry once only for transport-level read failures.
+        try:
+            response = query.execute()
+        except Exception as error:
+            if not _is_transient_read_error(error):
+                raise
+            time.sleep(0.15)
+            response = query.execute()
+
         rows = self._response_rows(
-            query.execute()
+            response
         )
 
         return tuple(

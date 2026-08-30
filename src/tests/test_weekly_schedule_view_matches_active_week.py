@@ -103,11 +103,10 @@ def test_stale_view_is_removed_when_week_not_saved():
 
 def test_exact_week_republishes_global_context():
     text = consistency_block()
-
     assert "_ACTIVE_SCHEDULE_ID_KEY" in text
-    assert "_ACTIVE_ACADEMIC_YEAR_KEY" in text
-    assert "_ACTIVE_WEEK_NUMBER_KEY" in text
     assert "_ACTIVE_VIEW_KEY" in text
+    assert "week_number is the UI/global source of truth" in text
+    assert "_ACTIVE_ACADEMIC_YEAR_KEY" not in text
 
 
 def test_existing_update_save_pipeline_preserved():

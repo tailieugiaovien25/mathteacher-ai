@@ -27,27 +27,19 @@ def test_ai_to_standardization_does_not_write_lbg_selection():
 
 def test_management_to_standardization_does_not_write_lbg_selection():
     text = WEEKLY_UI.read_text(encoding="utf-8-sig")
-    function = _function_source(
-        text,
-        "_open_management_catalogue_item",
-    )
-
+    function = _function_source(text, "_open_management_catalogue_item")
     assert 'st.session_state["lbg_user_academic_year"]' not in function
     assert 'st.session_state["lbg_user_week_number"]' not in function
-    assert '"portal_page"' in function
+    assert '"portal_navigation_request"' in function
     assert '"_standardization_transfer"' in function
 
 
 def test_standardization_never_uses_ai_transfer_as_week_authority():
     text = WEEKLY_UI.read_text(encoding="utf-8-sig")
-    function = _function_source(
-        text,
-        "render_weekly_schedule_workspace",
-    )
-
+    function = _function_source(text, "render_weekly_schedule_workspace")
     assert "transferred_week" not in function
-    assert "STANDARDIZATION_ACTIVE_WEEK_AUTHORITY_V2" in function
-    assert "_ACTIVE_WEEK_NUMBER_KEY" in function
+    assert "SystemContext.week_number is the only business-context authority" in function
+    assert "get_canonical_context(" in function
 
 
 def test_destination_reads_persisted_lbg_without_regenerating_it():

@@ -238,21 +238,20 @@ class LessonPlanUnitSelectorService:
                 or ""
             ).strip()
 
-            lesson_id = str(getattr(row, "lesson_id", "") or "").strip()
             subject_ref = self._subject_ref(row)
             component_ref = str(
                 getattr(row, "component_ref", "") or ""
             ).strip()
-            # The same PPCT period taught in several classes is one authoring
-            # option.  Subject/component remain part of the identity so rows
-            # from another curriculum scope can never be merged.
+            # V58-C3D3: PERIOD identity is the canonical PPCT occurrence
+            # inside the already-resolved subject/component/grade scope.
+            # Runtime lesson_id may be class-specific/generated, so it must
+            # not split one PPCT period into duplicate selector options.
             identity = ":".join(
                 (
                     "period",
                     subject_ref,
                     component_ref,
                     str(period),
-                    lesson_id or "title=" + title.casefold(),
                 )
             )
             self._append(

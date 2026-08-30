@@ -94,14 +94,13 @@ def test_transfer_to_standardization_upserts_management_catalogue():
 
 def test_management_page_lists_and_reopens_catalogued_lessons():
     weekly = WEEKLY.read_text(encoding="utf-8-sig")
-
     assert 'st.subheader("Danh mục giáo án")' in weekly
     assert '"lesson_plan_management_catalog"' in weekly
     assert "def _open_management_catalogue_item(" in weekly
     assert '"Chuyển vào Chuẩn hóa giáo án"' in weekly
     assert '"lesson_authoring_standardization_document"' in weekly
     assert '"lesson_authoring_ai_source_bytes"' in weekly
-    assert 'st.session_state["portal_page"] = "Chuẩn hóa giáo án"' in weekly
+    assert 'st.session_state["portal_navigation_request"] = "Chuẩn hóa giáo án"' in weekly
 
 
 def test_each_catalogue_item_has_safe_transfer_and_delete_actions():

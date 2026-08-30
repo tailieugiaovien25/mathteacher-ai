@@ -1,4 +1,4 @@
-"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
+﻿"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
 
 from __future__ import annotations
 
@@ -263,14 +263,34 @@ def select_portal_page(session_state: Any, page: str) -> None:
     valid_pages = (*PORTAL_PAGES, "Công cụ soạn bài")
     if page not in valid_pages:
         raise ValueError("Trang cổng giáo viên không hợp lệ.")
-    session_state["portal_page"] = page
-    session_state["portal_navigation"] = page
+    session_state["portal_navigation_request"] = page
+
+
+def _resolve_portal_navigation_request(session_state: Any) -> str:
+    current_page = str(
+        session_state.get("portal_page", "Tổng quan") or "Tổng quan"
+    )
+    requested = session_state.pop("portal_navigation_request", None)
+    if requested is None:
+        return current_page
+
+    valid_pages = (*PORTAL_PAGES, "Công cụ soạn bài")
+    if requested not in valid_pages:
+        raise ValueError("Trang cổng giáo viên không hợp lệ.")
+
+    session_state["portal_page"] = requested
+    return str(requested)
 
 
 def _autosave_before_portal_navigation(session_state: Any) -> None:
     """Keep working contexts intact and queue a floating page-change notice."""
     previous_page = str(session_state.get("portal_page", "Tổng quan") or "")
     next_page = str(session_state.get("portal_navigation", previous_page) or "")
+
+    # V57-D3B: preserve the widget's requested destination across the rerun.
+    if next_page and next_page != previous_page:
+        session_state["portal_navigation_request"] = next_page
+
     session_state["portal_navigation_autosave"] = {
         "previous_page": previous_page,
         "next_page": next_page,
@@ -1042,16 +1062,17 @@ def main() -> None:
             client=client,
         )
         return
-    current_page = st.session_state.get("portal_page", "Tổng quan")
+    current_page = _resolve_portal_navigation_request(st.session_state)
     hidden_legacy_page = current_page == "Công cụ soạn bài"
     if current_page not in PORTAL_PAGES and not hidden_legacy_page:
         current_page = "Tổng quan"
     if hidden_legacy_page:
         selected = current_page
     else:
+        if st.session_state.get("portal_navigation") != current_page:
+            st.session_state["portal_navigation"] = current_page
         selected = st.sidebar.radio(
             "Công cụ", PORTAL_PAGES,
-            index=PORTAL_PAGES.index(current_page),
             key="portal_navigation",
             label_visibility="collapsed",
             on_change=_autosave_before_portal_navigation,

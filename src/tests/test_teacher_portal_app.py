@@ -62,10 +62,7 @@ def test_portal_logout_clears_shared_and_feature_sessions():
 def test_dashboard_navigation_updates_page_and_sidebar_choice():
     state = {}
     select_portal_page(state, "Kho tài liệu")
-    assert state == {
-        "portal_page": "Kho tài liệu",
-        "portal_navigation": "Kho tài liệu",
-    }
+    assert state == {"portal_navigation_request": "Kho tài liệu"}
 
 
 def test_portal_builds_normalized_teacher_profile():

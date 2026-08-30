@@ -522,6 +522,12 @@ def test_teacher_workflow_happy_path_reaches_download(
 
     monkeypatch.setattr(
         module,
+        "_emit_standardization_canonical_context_change",
+        lambda **kwargs: None,
+    )
+
+    monkeypatch.setattr(
+        module,
         "LessonPlanPreviewUploadService",
         FakePreviewService,
     )
@@ -755,6 +761,12 @@ def test_teacher_override_reaches_processing_row(
 
     monkeypatch.setattr(
         module,
+        "_emit_standardization_canonical_context_change",
+        lambda **kwargs: None,
+    )
+
+    monkeypatch.setattr(
+        module,
         "LessonPlanPreviewUploadService",
         FakePreviewService,
     )
@@ -929,6 +941,12 @@ def test_legacy_rejected_review_does_not_block_direct_canonical_processing(
         module,
         "st",
         st,
+    )
+
+    monkeypatch.setattr(
+        module,
+        "_emit_standardization_canonical_context_change",
+        lambda **kwargs: None,
     )
 
     monkeypatch.setattr(
@@ -1124,6 +1142,12 @@ def test_rerun_preserves_result_without_reprocessing(
         module,
         "st",
         st,
+    )
+
+    monkeypatch.setattr(
+        module,
+        "_emit_standardization_canonical_context_change",
+        lambda **kwargs: None,
     )
 
     monkeypatch.setattr(

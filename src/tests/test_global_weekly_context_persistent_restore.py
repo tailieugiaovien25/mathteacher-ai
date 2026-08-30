@@ -77,41 +77,18 @@ def test_persisted_schedule_is_read_not_regenerated():
 
 def test_restored_week_is_published_globally():
     text = restore_segment()
-
     assert "_ACTIVE_SCHEDULE_ID_KEY" in text
-    assert "_ACTIVE_ACADEMIC_YEAR_KEY" in text
     assert "_ACTIVE_WEEK_NUMBER_KEY" in text
     assert "_ACTIVE_VIEW_KEY" in text
+    assert "_ACTIVE_ACADEMIC_YEAR_KEY" not in text
 
 
 def test_widget_receives_restored_week_before_creation():
     text = technical_workspace()
-
-    marker = text.index(
-        "# GLOBAL_WEEKLY_CONTEXT_PERSISTENT_RESTORE_V1"
-    )
-
-    state_key = text.index(
-        '"system_weekly_week_number"',
-        marker,
-    )
-
-    bootstrap_value = text.index(
-        "_bootstrap_week",
-        state_key,
-    )
-
-    selector = text.index(
-        'key="system_weekly_week_number"',
-        bootstrap_value,
-    )
-
-    assert (
-        marker
-        < state_key
-        < bootstrap_value
-        < selector
-    )
+    marker = text.index("# GLOBAL_WEEKLY_CONTEXT_PERSISTENT_RESTORE_V1")
+    canonical_week = text.index("_ACTIVE_WEEK_NUMBER_KEY", marker)
+    bootstrap_week = text.index("_bootstrap_week", canonical_week)
+    assert marker < canonical_week < bootstrap_week
 
 
 def test_existing_save_pipeline_remains():

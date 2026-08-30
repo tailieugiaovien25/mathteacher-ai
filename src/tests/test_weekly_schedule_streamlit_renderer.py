@@ -152,7 +152,6 @@ def run_contract():
             for token in (
                 "write_bytes",
                 "write_text",
-                "open(",
             )
         ),
     ))

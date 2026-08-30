@@ -61,12 +61,10 @@ def test_actions_keep_original_keys_and_targets():
 
 def test_action_callback_preserves_context_and_navigates():
     ui = UI.read_text(encoding="utf-8")
-
     assert "def _activate_standardization_action(action: str)" in ui
     assert "lesson_plan_standardization_action" in ui
     assert "lesson_plan_management_pending_action" in ui
-    assert 'st.session_state["portal_page"]' in ui
-    assert 'st.session_state["portal_navigation"]' in ui
+    assert 'st.session_state["portal_navigation_request"]' in ui
     assert "on_click=_activate_standardization_action" in ui
     assert "args=(action,)" in ui
 

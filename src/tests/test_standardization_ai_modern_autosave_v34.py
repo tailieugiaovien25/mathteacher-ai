@@ -20,8 +20,9 @@ def test_standardization_all_primary_selectors_autosave_and_notify():
     callback = _function(text, "_autosave_standardization_change")
     assert "_STANDARDIZATION_DRAFT_KEY" in callback
     assert "_STANDARDIZATION_NOTICE_KEY" in callback
-    for label in ("Môn", "Phân môn", "Cách thực hiện", "Tiết PPCT / Bài dạy"):
+    for label in ("Môn", "Phân môn", "Cách thực hiện"):
         assert f'args=("{label}",' in text
+    assert '_autosave_standardization_change("Tiết PPCT / Bài dạy")' in text
     assert 'st.toast(str(standardization_notice), icon="💾")' in text
     assert '"selected_lesson": dict(selected_lesson)' in text
 
@@ -29,9 +30,10 @@ def test_standardization_all_primary_selectors_autosave_and_notify():
 def test_standardization_week_change_autosaves_and_remains_two_way():
     text = _source(WEEKLY)
     callback = _function(text, "_sync_standardization_week_to_lbg")
-    assert '"system_weekly_week_number"' in callback
-    assert '"lbg_user_week_number"' in callback
+    assert "_emit_canonical_week_change(" in callback
+    assert "source_control=_STANDARDIZATION_WEEK_KEY" in callback
     assert '_autosave_standardization_change("Tuần soạn")' in callback
+    assert '"system_weekly_week_number"' not in callback
 
 
 def test_standardization_controls_and_ai_button_have_contrast_3d_style():

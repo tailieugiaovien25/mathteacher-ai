@@ -1,4 +1,4 @@
-"""Supabase implementation of the weekly-schedule repository port."""
+﻿"""Supabase implementation of the weekly-schedule repository port."""
 
 from __future__ import annotations
 
@@ -39,22 +39,48 @@ class SupabaseWeeklyScheduleRepository:
         saved_at = self._parse_datetime(rows[0].get("updated_at")) if rows else now
         return self._summary(schedule, saved_at)
 
+    @staticmethod
+    def _is_transient_read_error(error: Exception) -> bool:
+        name = type(error).__name__.lower()
+        message = str(error).lower()
+        tokens = (
+            "connectionterminated", "connection terminated",
+            "connectionreseterror", "connection reset",
+            "forcibly closed", "remote host", "server disconnected",
+        )
+        return "connectionterminated" in name or "connectionreset" in name or any(
+            token in message for token in tokens
+        )
+
+    def _execute_read_with_transient_retry(self, operation):
+        try:
+            return operation()
+        except Exception as error:
+            if not self._is_transient_read_error(error):
+                raise
+            return operation()
+
     def get(self, schedule_id: str) -> WeeklyTeachingSchedule | None:
         normalized = self._required_text(schedule_id, "schedule_id")
-        response = (
-            self._client.table(self._table_name).select("schedule_data")
-            .eq("user_id", self._user_id).eq("schedule_id", normalized).limit(1).execute()
+        response = self._execute_read_with_transient_retry(
+            lambda: (
+                self._client.table(self._table_name).select("schedule_data")
+                .eq("user_id", self._user_id).eq("schedule_id", normalized)
+                .limit(1).execute()
+            )
         )
         rows = self._response_rows(response)
         return schedule_from_dict(rows[0]["schedule_data"]) if rows else None
 
     def list_for_teacher(self, teacher_id: str) -> tuple[SavedWeeklyScheduleSummary, ...]:
         normalized = self._required_text(teacher_id, "teacher_id")
-        response = (
-            self._client.table(self._table_name)
-            .select("schedule_id,teacher_id,academic_year,week_number,entry_count,updated_at")
-            .eq("user_id", self._user_id).eq("teacher_id", normalized)
-            .order("updated_at", desc=True).execute()
+        response = self._execute_read_with_transient_retry(
+            lambda: (
+                self._client.table(self._table_name)
+                .select("schedule_id,teacher_id,academic_year,week_number,entry_count,updated_at")
+                .eq("user_id", self._user_id).eq("teacher_id", normalized)
+                .order("updated_at", desc=True).execute()
+            )
         )
         return tuple(SavedWeeklyScheduleSummary(
             schedule_id=row["schedule_id"], teacher_id=row["teacher_id"],
