@@ -1,4 +1,4 @@
-﻿"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
+"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
 
 from __future__ import annotations
 
@@ -852,11 +852,10 @@ def render_teacher_settings(
         )
         return
 
-    information_tab, assignment_tab, lesson_plan_tab = st.tabs(
+    information_tab, assignment_tab = st.tabs(
         (
-            "1. Thông tin giáo viên",
-            "2. Phân công và nhiệm vụ",
-            "3. Thiết đặt giáo án (Mẫu giáo án)",
+            "1. Th\u00f4ng tin gi\u00e1o vi\u00ean",
+            "2. Ph\u00e2n c\u00f4ng v\u00e0 nhi\u1ec7m v\u1ee5",
         )
     )
 
@@ -875,17 +874,6 @@ def render_teacher_settings(
             academic_year,
         )
 
-    with lesson_plan_tab:
-        from portal_v2.ui.lesson_plan_template_setup_streamlit import (
-            render_lesson_plan_template_setup,
-        )
-
-        render_lesson_plan_template_setup(
-            client=client,
-            teacher_id=str(user_id),
-            academic_year=academic_year,
-            embedded=True,
-        )
 
 
 def render_profile(st, client: Any, user_id: str) -> None:

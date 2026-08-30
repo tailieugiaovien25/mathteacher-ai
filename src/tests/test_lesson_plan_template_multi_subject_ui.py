@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 UI = Path(
@@ -163,17 +163,16 @@ def test_save_is_not_global_session_profile():
     )
 
 
-def test_portal_passes_authenticated_context():
-    text = app_source()
 
-    assert (
-        "render_lesson_plan_template_setup("
-        in text
-    )
+def test_multi_subject_template_module_remains_available_outside_teacher_portal():
+    setup = Path(
+        "src/portal_v2/ui/lesson_plan_template_setup_streamlit.py"
+    ).read_text(encoding="utf-8-sig")
+    teacher = Path(
+        "scripts/teacher_portal/app.py"
+    ).read_text(encoding="utf-8-sig")
 
-    assert "client=client" in text
-
-    assert (
-        "teacher_id=str(user_id)"
-        in text
-    )
+    assert "def render_lesson_plan_template_setup(" in setup
+    assert "teacher_id" in setup
+    assert "academic_year" in setup
+    assert "render_lesson_plan_template_setup(" not in teacher

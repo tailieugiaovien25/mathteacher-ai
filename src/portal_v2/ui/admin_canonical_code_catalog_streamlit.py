@@ -123,3 +123,7 @@ def render_admin_canonical_code_catalog(st, *, client) -> None:
     )
     if client is not None:
         _render_admin_lesson_plan_grouping_policy(st, client=client)
+
+
+def render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
+    _render_admin_lesson_plan_grouping_policy(st, client=client)

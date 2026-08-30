@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
@@ -47,11 +47,16 @@ class LessonPlanDocumentProcessingService:
         self,
         *,
         profile_path: Path,
+        profile: dict[str, object] | None = None,
     ) -> None:
         self._profile_path = Path(
             profile_path
         )
-
+        self._profile = (
+            dict(profile)
+            if isinstance(profile, dict)
+            else None
+        )
     @staticmethod
     def apply_modification_plan(
         *,
@@ -278,14 +283,19 @@ class LessonPlanDocumentProcessingService:
                         "tối đa được áp dụng trên bản làm việc hiện có.",
                     )
 
+            standardizer = (
+                LessonPlanWordStandardizer(
+                    self._profile
+                )
+                if self._profile is not None
+                else LessonPlanWordStandardizer.from_json(
+                    self._profile_path
+                )
+            )
+
             pipeline = (
                 LessonPlanDocumentPipeline(
-                    standardizer=(
-                        LessonPlanWordStandardizer
-                        .from_json(
-                            self._profile_path
-                        )
-                    )
+                    standardizer=standardizer
                 )
             )
 

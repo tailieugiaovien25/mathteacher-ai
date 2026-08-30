@@ -1668,11 +1668,28 @@ def _process_lesson_plan_upload(
     bytes,
     tuple[str, ...],
 ]:
+    runtime_profile = None
+    admin_template_profile = st.session_state.get(
+        "lesson_plan_admin_template_profile"
+    )
+    if isinstance(admin_template_profile, dict) and admin_template_profile:
+        try:
+            from lesson_planning_v2.services.lesson_plan_standardizer_profile_adapter import (
+                build_runtime_standardizer_profile,
+            )
+            runtime_profile = build_runtime_standardizer_profile(
+                legacy_profile_path=_LESSON_PLAN_PROFILE,
+                admin_template_profile=admin_template_profile,
+            )
+        except Exception:
+            runtime_profile = None
+
     service = (
         LessonPlanDocumentProcessingService(
             profile_path=(
                 _LESSON_PLAN_PROFILE
-            )
+            ),
+            profile=runtime_profile,
         )
     )
 
@@ -1689,7 +1706,6 @@ def _process_lesson_plan_upload(
         result.output_bytes,
         result.unresolved_fields,
     )
-
 
 
 def _lesson_plan_lesson_options_from_rows(
@@ -3678,6 +3694,18 @@ def _render_lesson_plan_standardization_workspace(
 
     if st.session_state.get("standardization_subject_filter") not in subject_refs:
         st.session_state["standardization_subject_filter"] = subject_refs[0]
+
+    try:
+        from lesson_planning_v2.services.lesson_plan_configuration_runtime_bridge import (
+            apply_active_admin_lesson_plan_configuration,
+        )
+
+        apply_active_admin_lesson_plan_configuration(
+            client=client,
+            session_state=st.session_state,
+        )
+    except Exception:
+        pass
 
     def _subject_filter_label(subject_ref):
         return _subject_component_display_names(

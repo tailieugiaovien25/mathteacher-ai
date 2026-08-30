@@ -38,10 +38,15 @@ from portal_v2.ui.admin_assessment_setting_review_streamlit import (
     render_admin_assessment_setting_review,
 )
 
+from portal_v2.ui.admin_lesson_plan_coordination_center_streamlit import (
+    render_admin_lesson_plan_coordination_center,
+)
+
 from portal_v2.ui.admin_navigation import (
     ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION,
     ADMIN_PAGE_CANONICAL_CODE_CATALOG,
     ADMIN_PAGE_CONTEXT_CONTROL_CENTER,
+    ADMIN_PAGE_LESSON_PLAN_COORDINATION_CENTER,
     ADMIN_PAGE_ASSESSMENT_TEMPLATES,
     ADMIN_PAGE_ASSESSMENT_REVIEWS,
     ADMIN_PAGE_USER_REGISTRATIONS,
@@ -506,6 +511,13 @@ def render_admin_page(
 
     if page.page_id == ADMIN_PAGE_CANONICAL_CODE_CATALOG:
         render_admin_canonical_code_catalog(st, client=client)
+        return
+
+    if page.page_id == ADMIN_PAGE_LESSON_PLAN_COORDINATION_CENTER:
+        render_admin_lesson_plan_coordination_center(
+            st,
+            client=client,
+        )
         return
 
     if page.page_id == ADMIN_PAGE_CONTEXT_CONTROL_CENTER:

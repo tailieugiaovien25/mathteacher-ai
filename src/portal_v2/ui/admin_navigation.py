@@ -24,6 +24,7 @@ ADMIN_PAGE_ASSIGNMENTS = "assignments"
 ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION = "academic_year_configuration"
 ADMIN_PAGE_CANONICAL_CODE_CATALOG = "canonical_code_catalog"
 ADMIN_PAGE_CONTEXT_CONTROL_CENTER = "context_control_center"
+ADMIN_PAGE_LESSON_PLAN_COORDINATION_CENTER = "lesson_plan_coordination_center"
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,10 @@ ADMIN_PORTAL_PAGES = (
     AdminPortalPage(
         ADMIN_PAGE_CONTEXT_CONTROL_CENTER,
         "Dữ liệu & Đồng bộ ngữ cảnh hệ thống",
+    ),
+    AdminPortalPage(
+        ADMIN_PAGE_LESSON_PLAN_COORDINATION_CENTER,
+        "Trung tâm điều phối giáo án",
     ),
 
 )
