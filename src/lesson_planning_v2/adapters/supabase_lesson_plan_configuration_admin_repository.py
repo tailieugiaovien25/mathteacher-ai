@@ -49,6 +49,16 @@ class SupabaseLessonPlanConfigurationAdminRepository:
             )
         return rows[0]
 
+
+    def list_profiles(self) -> list[dict[str, Any]]:
+        response = (
+            self._client.table(self.PROFILE_TABLE)
+            .select("*")
+            .order("profile_name")
+            .execute()
+        )
+        return self._rows(response)
+
     def get_profile(self, *, profile_id: str) -> dict[str, Any] | None:
         response = (
             self._client.table(self.PROFILE_TABLE)
