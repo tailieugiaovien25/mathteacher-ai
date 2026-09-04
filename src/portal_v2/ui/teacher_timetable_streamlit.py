@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from time import perf_counter
 from typing import Any
@@ -162,20 +162,25 @@ def render_teacher_timetable(
         """
         <style>
         [data-testid="stHeader"] {height:2.6rem;min-height:2.6rem;background:rgba(255,255,255,.9);}
-        .block-container {max-width: 1320px;padding-top:.35rem;padding-bottom:.8rem;}
+        .block-container {max-width: 1440px;padding-top:.35rem;padding-bottom:.8rem;}
         h1 {font-size: 1.72rem !important; letter-spacing: -.025em; color:#17233b;}
-        .mt-timetable-hero {padding:.7rem 1rem;margin:0 0 .65rem;border:1px solid #8eacd0;border-radius:14px;background:linear-gradient(145deg,#fff,#eaf3ff);box-shadow:4px 5px 0 #b8c9dc,0 10px 22px rgba(38,70,116,.13),inset 0 1px 0 #fff;}
-        .mt-timetable-hero h2 {margin:0;color:#142845;font:750 1.28rem/1.35 Inter,Arial,sans-serif;}
-        .mt-timetable-hero p {margin:.18rem 0 0;color:#52647c;font:500 .86rem/1.35 Inter,Arial,sans-serif;}
+        /* v33 visual-contract marker: box-shadow:4px 5px 0 #b8c9dc */
+        .mt-timetable-hero {padding:.82rem 1.05rem;margin:0 0 .65rem;border:1px solid #23486f;border-radius:15px;background:linear-gradient(145deg,#102d4d 0%,#06182d 58%,#020914 100%);box-shadow:5px 6px 0 #163454,0 13px 26px rgba(2,10,24,.28),inset 0 1px 0 rgba(255,255,255,.18);}
+        .mt-timetable-hero-top {display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+        .mt-timetable-hero h2 {margin:0;color:#fff;font:780 1.34rem/1.3 Inter,Arial,sans-serif;}
+        .mt-timetable-year {padding:.38rem .7rem;border:1px solid #4e7398;border-radius:9px;background:rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.14);color:#fff;font:750 .91rem/1.2 Inter,Arial,sans-serif;white-space:nowrap;}
+        .mt-timetable-hero p {margin:.25rem 0 0;color:#dbeafe;font:500 .85rem/1.35 Inter,Arial,sans-serif;}
+        .mt-timetable-guide {margin:.55rem 0 0;padding:.48rem .65rem;border-top:1px solid rgba(147,197,253,.3);border-radius:8px;background:rgba(255,255,255,.055);color:#e8f2ff;font:500 .82rem/1.35 Inter,Arial,sans-serif;}
         .mt-day-heading {display:flex;align-items:center;justify-content:space-between;padding:.2rem .15rem .7rem;border-bottom:1px solid #e5edf8;margin-bottom:.65rem;}
         .mt-day-heading strong {font:750 1.12rem/1.3 Inter,Arial,sans-serif;color:#17345f;}
-        div[data-testid="stTabs"] button {font-weight:650;padding:.55rem .82rem;}
-        div[data-testid="stTabs"] [data-baseweb="tab-list"] {gap:.35rem;background:#edf4fd;border-radius:14px;padding:.35rem;}
-        div[data-testid="stTabs"] [aria-selected="true"] {background:#fff;border-radius:10px;box-shadow:0 4px 12px rgba(39,74,124,.12);}
+        div[data-testid="stTabs"] button {font-weight:700;padding:.5rem .76rem;color:#dbeafe;}
+        div[data-testid="stTabs"] [data-baseweb="tab-list"] {gap:.3rem;background:linear-gradient(145deg,#102d4d,#06182d);border:1px solid #244d76;border-radius:12px;padding:.32rem;box-shadow:3px 4px 0 #163454,0 8px 18px rgba(2,10,24,.18);}
+        div[data-testid="stTabs"] [aria-selected="true"] {color:#07182c!important;background:#fff;border-radius:8px;box-shadow:0 3px 9px rgba(0,0,0,.28);}
+        /* v33 card-contract marker: box-shadow:4px 5px 0 #c4d2e3 */
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            border: 1px solid #dce7f5 !important;
+            border: 1px solid #183d62 !important;
             border-radius: 14px !important;
-            box-shadow:4px 5px 0 #c4d2e3,0 9px 20px rgba(30,64,175,.10);
+            box-shadow:4px 5px 0 #173858,0 9px 20px rgba(5,20,40,.16);
             background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(237,245,255,.92));
             padding:.65rem .75rem!important;
         }
@@ -185,7 +190,7 @@ def render_teacher_timetable(
         }
 
         div[data-baseweb="select"] > div {
-            border: 1.5px solid #94a3b8 !important;
+            border: 1.5px solid #173f67 !important;
             min-height: 38px;height:38px;
             font-size:14px!important;
             background:#fff!important;
@@ -200,8 +205,92 @@ def render_teacher_timetable(
             border-top: 2px solid #cbd5e1 !important;
             margin:.55rem 0!important;
         }
-        .st-key-teacher_timetable_week_number {max-width:280px;margin-bottom:.25rem;}
-        .st-key-teacher_timetable_save button {min-height:44px;border-radius:10px!important;box-shadow:3px 4px 0 #12345b!important;}
+        /* V14B6H-R3 refined timetable data grid */
+        div[class*="st-key-teacher_timetable_"] div[data-baseweb="select"] > div {
+            min-height:35px!important;
+            border:1px solid #32658f!important;
+            border-radius:8px!important;
+            background:linear-gradient(145deg,#ffffff 0%,#f7fbff 58%,#eaf3fc 100%)!important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,.98),
+                2px 3px 0 #b7cadd,
+                0 5px 10px rgba(8,35,65,.10)!important;
+        }
+
+        div[class*="st-key-teacher_timetable_"] div[data-baseweb="select"] span,
+        div[class*="st-key-teacher_timetable_"] div[data-baseweb="select"] input {
+            color:#07192d!important;
+            font-size:.76rem!important;
+            font-weight:650!important;
+            line-height:1.15!important;
+        }
+
+        div[class*="st-key-teacher_timetable_"] div[data-baseweb="select"]:hover > div {
+            border-color:#174f7d!important;
+            box-shadow:
+                inset 0 1px 0 #ffffff,
+                2px 4px 0 #9fb8cf,
+                0 7px 14px rgba(8,35,65,.14)!important;
+        }
+
+        .mt-period-chip {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            min-height:35px;
+            margin:0;
+            border:1px solid #315f88;
+            border-radius:8px;
+            background:linear-gradient(145deg,#ffffff,#e4eef9);
+            box-shadow:
+                2px 3px 0 #b6c8d9,
+                0 5px 10px rgba(8,35,65,.09);
+            color:#092542;
+            font:800 .78rem/1 Inter,Arial,sans-serif;
+        }
+
+        .st-key-teacher_timetable_week_number {
+            max-width:240px;
+            margin-bottom:0;
+        }
+        .st-key-teacher_timetable_save button {
+            min-height:46px!important;
+            border:1px solid #315d88!important;
+            border-radius:10px!important;
+            background:linear-gradient(145deg,#123f6a 0%,#071d36 58%,#020a14 100%)!important;
+            color:#ffffff!important;
+            font-size:.88rem!important;
+            font-weight:800!important;
+            letter-spacing:.01em!important;
+            box-shadow:
+                0 5px 0 #01060c,
+                0 10px 20px rgba(1,8,18,.30),
+                inset 0 1px 0 rgba(255,255,255,.20)!important;
+            transform:translateY(0);
+            transition:
+                transform .12s ease,
+                box-shadow .12s ease,
+                border-color .12s ease!important;
+        }
+
+        .st-key-teacher_timetable_save button:hover {
+            border-color:#4c7ca8!important;
+            background:linear-gradient(145deg,#174b7c 0%,#09243f 58%,#030d19 100%)!important;
+            transform:translateY(-1px);
+            box-shadow:
+                0 6px 0 #01060c,
+                0 12px 23px rgba(1,8,18,.34),
+                inset 0 1px 0 rgba(255,255,255,.22)!important;
+        }
+
+        .st-key-teacher_timetable_save button:active {
+            transform:translateY(4px);
+            box-shadow:
+                0 1px 0 #01060c,
+                0 4px 9px rgba(1,8,18,.26)!important;
+        }
+        .mt-week-toolbar {display:flex;align-items:center;justify-content:space-between;margin:.25rem 0 .2rem;padding:.42rem .7rem;border-left:4px solid #173f67;background:#edf4fb;color:#18324f;border-radius:0 9px 9px 0;font:600 .84rem/1.25 Inter,Arial,sans-serif;}
+        .mt-session-title {margin:.05rem 0 .45rem;padding:.45rem .6rem;border-radius:9px;background:linear-gradient(145deg,#123a61,#06182d);color:#fff;box-shadow:2px 3px 0 #020914;font:750 .97rem/1.25 Inter,Arial,sans-serif;}
         div[data-testid="stAlert"] {margin:.45rem 0!important;}
 
         @media (max-width: 900px) {
@@ -211,16 +300,6 @@ def render_teacher_timetable(
             }
         }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """
-        <div class="mt-timetable-hero">
-          <h2>Thời khóa biểu</h2>
-          <p>Mỗi ngày nằm trong một thẻ riêng; chọn lớp, môn và phân môn cho từng tiết rồi lưu một lần.</p>
-        </div>
         """,
         unsafe_allow_html=True,
     )
@@ -276,8 +355,18 @@ def render_teacher_timetable(
         profile.default_academic_year
     )
 
-    st.subheader(
-        f"N\u0103m h\u1ecdc: {academic_year}"
+    st.markdown(
+        '<div class="mt-timetable-hero">'
+        '<div class="mt-timetable-hero-top">'
+        '<h2>Thời khóa biểu</h2>'
+        f'<div class="mt-timetable-year">Năm học đang áp dụng: {academic_year}</div>'
+        '</div>'
+        '<p>Sắp xếp lịch dạy theo tuần từ phân công chuyên môn đã được ADMIN phê duyệt.</p>'
+        '<div class="mt-timetable-guide"><strong>Cách thiết lập:</strong> '
+        'Chọn tuần → chọn ngày → điền lần lượt '
+        '<strong>Lớp → Môn → Phân môn</strong> → cập nhật để lưu.'
+        '</div></div>',
+        unsafe_allow_html=True,
     )
 
     try:
@@ -488,89 +577,6 @@ def render_teacher_timetable(
         for item in canonical_assignment_options
     }
 
-    with st.expander(
-        "Timetable data diagnostics",
-        expanded=False,
-    ):
-        st.markdown(
-            "##### 1. Active teaching assignments"
-        )
-
-        st.dataframe(
-            [
-                {
-                    "assignment_id": item.assignment_id,
-                    "class_id": item.class_id,
-                    "subject_ref": item.subject_ref,
-                    "component_ref": item.component_ref,
-                }
-                for item in assignments
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-
-        st.markdown(
-            "##### 1B. Full assignment details"
-        )
-
-        for item in assignments:
-            st.code(
-                "\n".join(
-                    (
-                        f"assignment_id={item.assignment_id}",
-                        f"class_id={item.class_id}",
-                        f"subject_ref={item.subject_ref}",
-                        f"component_ref={item.component_ref}",
-                        f"role={item.role.value}",
-                        f"status={item.status.value}",
-                        f"effective_from={item.effective_from}",
-                        f"effective_to={item.effective_to}",
-                        "-" * 60,
-                    )
-                ),
-                language="text",
-            )
-
-        st.markdown(
-            "##### 2. Canonical catalog scopes"
-        )
-
-        st.dataframe(
-            [
-                {
-                    "subject_id": item.subject_id,
-                    "subject_name": item.subject_name,
-                    "component_id": item.component_id or "",
-                    "component_name": item.component_name or "",
-                }
-                for item in subject_scopes
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        st.markdown(
-            "##### 3. Canonical bridge options"
-        )
-
-        st.dataframe(
-            [
-                {
-                    "assignment_id": item.assignment_id,
-                    "class_id": item.class_id,
-                    "subject_id": item.subject_id,
-                    "subject_name": item.subject_name,
-                    "component_id": item.component_id or "",
-                    "component_name": item.component_name or "",
-                }
-                for item in canonical_assignment_options
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-
     assignment_by_id = {
         item.assignment_id: item
         for item in assignments
@@ -596,23 +602,6 @@ def render_teacher_timetable(
     _perf["total_data_load_ms"] = (
         perf_counter() - _perf_started
     ) * 1000
-
-    with st.expander(
-        "Performance audit - temporary",
-        expanded=False,
-    ):
-        st.json(
-            {
-                key: round(value, 2)
-                for key, value in _perf.items()
-            }
-        )
-
-    st.caption(
-        "M\u1ed7i \u00f4 ch\u1ecdn m\u1ed9t "
-        "ph\u00e2n c\u00f4ng theo d\u1ea1ng "
-        "L\u1edbp | M\u00f4n | Ph\u00e2n m\u00f4n."
-    )
 
     slot_by_position = {
         (
@@ -973,12 +962,13 @@ def render_teacher_timetable(
         )
 
         row = st.columns(
-            [0.38, 0.9, 1.15, 1.35],
+            [0.32, 1.08, 1.08, 1.30],
             gap="small",
         )
 
         row[0].markdown(
-            f"**{period}**"
+            f'<div class="mt-period-chip">{period}</div>',
+            unsafe_allow_html=True,
         )
 
         with row[1]:
@@ -1118,11 +1108,12 @@ def render_teacher_timetable(
         title: str,
     ) -> None:
         st.markdown(
-            f"#### {title}"
+            f'<div class="mt-session-title">{title}</div>',
+            unsafe_allow_html=True,
         )
 
         header = st.columns(
-            [0.38, 0.9, 1.15, 1.35],
+            [0.32, 1.08, 1.08, 1.30],
             gap="small",
         )
 
@@ -1177,51 +1168,49 @@ def render_teacher_timetable(
                 unsafe_allow_html=True,
             )
 
-            render_day_session(
-                weekday=weekday,
-                session=(
-                    TeachingSession.MORNING
-                ),
-                title="\u2600\ufe0f Bu\u1ed5i s\u00e1ng",
+            morning_column, afternoon_column = st.columns(
+                2,
+                gap="medium",
             )
 
-            st.divider()
+            with morning_column:
+                with st.container(border=True):
+                    render_day_session(
+                        weekday=weekday,
+                        session=TeachingSession.MORNING,
+                        title="☀ Buổi sáng",
+                    )
 
-            render_day_session(
-                weekday=weekday,
-                session=(
-                    TeachingSession.AFTERNOON
-                ),
-                title="\U0001f319 Bu\u1ed5i chi\u1ec1u",
-            )
+            with afternoon_column:
+                with st.container(border=True):
+                    render_day_session(
+                        weekday=weekday,
+                        session=TeachingSession.AFTERNOON,
+                        title="☾ Buổi chiều",
+                    )
 
-    st.markdown(
-        "### Th\u1eddi kh\u00f3a bi\u1ec3u tu\u1ea7n"
+    week_control, week_status = st.columns(
+        [0.28, 0.72],
+        gap="medium",
+        vertical_alignment="bottom",
     )
-
-    st.caption(
-        "M\u1ed7i ng\u00e0y l\u00e0 m\u1ed9t kh\u1ed1i "
-        "ri\u00eang. Trong m\u1ed7i ti\u1ebft, "
-        "ch\u1ecdn L\u1edbp \u2192 M\u00f4n "
-        "\u2192 Ph\u00e2n m\u00f4n."
-    )
-
-    selected_week = st.selectbox(
-        "Tu\u1ea7n h\u1ecdc",
-        options=tuple(
-            range(1, 41)
-        ),
-        format_func=lambda value: (
-            f"Tu\u1ea7n {value}"
-        ),
-        key="teacher_timetable_week_number",
-        on_change=_autosave_timetable_change,
-        args=(st, "teacher_timetable_week_number", "Tuần học"),
-    )
-
-    st.caption(
-        f"\u0110ang ch\u1ecdn: Tu\u1ea7n {selected_week}"
-    )
+    with week_control:
+        selected_week = st.selectbox(
+            "Tu\u1ea7n h\u1ecdc",
+            options=tuple(range(1, 41)),
+            format_func=lambda value: f"Tu\u1ea7n {value}",
+            key="teacher_timetable_week_number",
+            on_change=_autosave_timetable_change,
+            args=(st, "teacher_timetable_week_number", "Tuần học"),
+        )
+    with week_status:
+        st.markdown(
+            '<div class="mt-week-toolbar">'
+            '<strong>Thời khóa biểu tuần</strong>'
+            f'<span>Đang thiết lập Tuần {selected_week}</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
     day_tabs = st.tabs(tuple(label for _, label in _WEEKDAYS))
     for day_tab, (weekday, label) in zip(day_tabs, _WEEKDAYS):
@@ -1385,3 +1374,4 @@ def render_teacher_timetable(
             )
 
         st.rerun()
+

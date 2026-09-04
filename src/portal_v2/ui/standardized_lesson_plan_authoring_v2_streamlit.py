@@ -169,40 +169,49 @@ def _render_admin_configuration_diagnostic(state):
     if not isinstance(evidence, Mapping) or not evidence:
         return
     status = str(evidence.get("status") or "UNVERIFIED").upper()
+    status_display = {
+        "PASS": "ĐẠT",
+        "FAIL": "KHÔNG ĐẠT",
+        "BLOCKED": "BỊ CHẶN",
+        "WARNING": "CẢNH BÁO",
+        "REVIEW": "CẦN KIỂM TRA",
+        "UNVERIFIED": "CHƯA XÁC MINH",
+    }.get(status, status)
     expected = evidence.get("expected")
     actual = evidence.get("actual")
-    with st.expander(
-        "Chi tiết nhiệm vụ 1: Cấu hình ADMIN — " + status,
-        expanded=status != "PASS",
-    ):
-        st.markdown("**Yêu cầu bắt buộc:** " + str(expected or "Snapshot cấu hình ACTIVE bất biến"))
-        if isinstance(actual, Mapping):
-            st.write({
-                "Mã cấu hình toàn hệ thống": actual.get("global_profile_id"),
-                "Mã phiên bản ACTIVE": actual.get("global_version_id"),
-                "Môn áp dụng": actual.get("subject_ref"),
-                "Phân môn áp dụng": actual.get("component_ref"),
-                "Mã kiểm tra cấu hình": actual.get("configuration_hash"),
-                "Các trường bị khóa": actual.get("locked_paths"),
-            })
-        else:
-            st.code("ACTIVE_CONFIGURATION_SNAPSHOT = MISSING", language="text")
-        if status == "PASS":
-            st.success("Pipeline đã nhận và khóa đúng cấu hình ADMIN đang có hiệu lực cho lần chuẩn hóa này.")
-        else:
-            missing = []
-            if not isinstance(actual, Mapping):
-                missing.append("snapshot cấu hình")
+    with st.container(key="g1b_report_card_1"):
+        with st.expander(
+            "Chi tiết nhiệm vụ 1: Cấu hình ADMIN — " + status_display,
+            expanded=status != "PASS",
+        ):
+            st.markdown("**Yêu cầu bắt buộc:** " + str(expected or "Bản chụp cấu hình ACTIVE bất biến"))
+            if isinstance(actual, Mapping):
+                st.write({
+                    "Mã cấu hình toàn hệ thống": actual.get("global_profile_id"),
+                    "Mã phiên bản ACTIVE": actual.get("global_version_id"),
+                    "Môn áp dụng": actual.get("subject_ref"),
+                    "Phân môn áp dụng": actual.get("component_ref"),
+                    "Mã kiểm tra cấu hình": actual.get("configuration_hash"),
+                    "Các trường bị khóa": actual.get("locked_paths"),
+                })
             else:
-                if not actual.get("global_version_id"):
-                    missing.append("global_version_id của phiên bản ACTIVE")
-                if not actual.get("configuration_hash"):
-                    missing.append("configuration_hash")
-            st.error("Nguyên nhân: thiếu " + ", ".join(missing or ["bằng chứng cấu hình hợp lệ"]) + ".")
-            st.info(
-                "Giải pháp: ADMIN phải Publish/Activate cấu hình toàn hệ thống; "
-                "sau đó mở lại trang Chuẩn hóa để runtime nạp lại cấu hình trước khi chạy."
-            )
+                st.code("ACTIVE_CONFIGURATION_SNAPSHOT = MISSING", language="text")
+            if status == "PASS":
+                st.success("Pipeline đã nhận và khóa đúng cấu hình ADMIN đang có hiệu lực cho lần chuẩn hóa này.")
+            else:
+                missing = []
+                if not isinstance(actual, Mapping):
+                    missing.append("snapshot cấu hình")
+                else:
+                    if not actual.get("global_version_id"):
+                        missing.append("global_version_id của phiên bản ACTIVE")
+                    if not actual.get("configuration_hash"):
+                        missing.append("configuration_hash")
+                st.error("Nguyên nhân: thiếu " + ", ".join(missing or ["bằng chứng cấu hình hợp lệ"]) + ".")
+                st.info(
+                    "Giải pháp: ADMIN phải Publish/Activate cấu hình toàn hệ thống; "
+                    "sau đó mở lại trang Chuẩn hóa để runtime nạp lại cấu hình trước khi chạy."
+                )
 
 
 def _text(value: Any, fallback: str = "—") -> str:
@@ -570,6 +579,104 @@ def render_standardized_lesson_plan_authoring_v2(
             )
 
     _apply_styles()
+
+    # V14B6I_RC3B_REPORT_CARDS_ONLY
+    st.markdown(
+        """
+<style>
+.st-key-g1b_report_card_1 div[data-testid="stExpander"] details,
+.st-key-g1b_report_card_2 div[data-testid="stExpander"] details,
+.st-key-g1b_report_card_3 div[data-testid="stExpander"] details,
+.st-key-g1b_report_card_4 div[data-testid="stExpander"] details,
+.st-key-g1b_report_card_5 div[data-testid="stExpander"] details,
+.st-key-g1b_report_card_6 div[data-testid="stExpander"] details {
+    border-radius: 12px !important;
+    border: 1px solid rgba(29, 73, 112, .55) !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+    box-shadow:
+        0 4px 0 rgba(7, 22, 39, .28),
+        0 9px 18px rgba(4, 25, 48, .14) !important;
+    margin: .18rem 0 .48rem 0 !important;
+}
+
+.st-key-g1b_report_card_1 div[data-testid="stExpander"] summary,
+.st-key-g1b_report_card_2 div[data-testid="stExpander"] summary,
+.st-key-g1b_report_card_3 div[data-testid="stExpander"] summary,
+.st-key-g1b_report_card_4 div[data-testid="stExpander"] summary,
+.st-key-g1b_report_card_5 div[data-testid="stExpander"] summary,
+.st-key-g1b_report_card_6 div[data-testid="stExpander"] summary {
+    min-height: 45px !important;
+    border-radius: 10px !important;
+    padding: .48rem .78rem !important;
+    color: #ffffff !important;
+    font-weight: 760 !important;
+    letter-spacing: .003em !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.16),
+        inset 0 -1px 0 rgba(0,0,0,.22) !important;
+    transition:
+        transform .14s ease,
+        filter .14s ease,
+        box-shadow .14s ease !important;
+}
+
+.st-key-g1b_report_card_1 div[data-testid="stExpander"] summary {
+    background: linear-gradient(145deg,#050b12 0%,#0a1726 58%,#10243a 100%) !important;
+}
+
+.st-key-g1b_report_card_2 div[data-testid="stExpander"] summary {
+    background: linear-gradient(145deg,#081829 0%,#102d4d 58%,#17456e 100%) !important;
+}
+
+.st-key-g1b_report_card_3 div[data-testid="stExpander"] summary {
+    background: linear-gradient(145deg,#0c2742 0%,#17466c 58%,#1f5a86 100%) !important;
+}
+
+.st-key-g1b_report_card_4 div[data-testid="stExpander"] summary {
+    background: linear-gradient(145deg,#123b5d 0%,#1d5a84 58%,#2874a4 100%) !important;
+}
+
+.st-key-g1b_report_card_5 div[data-testid="stExpander"] summary {
+    background: linear-gradient(145deg,#1b5278 0%,#2877a6 58%,#3b91bd 100%) !important;
+}
+
+.st-key-g1b_report_card_6 div[data-testid="stExpander"] summary {
+    background: linear-gradient(145deg,#317da5 0%,#4b9fc5 58%,#69b9d8 100%) !important;
+}
+
+.st-key-g1b_report_card_1 div[data-testid="stExpander"] summary *,
+.st-key-g1b_report_card_2 div[data-testid="stExpander"] summary *,
+.st-key-g1b_report_card_3 div[data-testid="stExpander"] summary *,
+.st-key-g1b_report_card_4 div[data-testid="stExpander"] summary *,
+.st-key-g1b_report_card_5 div[data-testid="stExpander"] summary *,
+.st-key-g1b_report_card_6 div[data-testid="stExpander"] summary * {
+    color: #ffffff !important;
+}
+
+.st-key-g1b_report_card_1 div[data-testid="stExpander"] summary:hover,
+.st-key-g1b_report_card_2 div[data-testid="stExpander"] summary:hover,
+.st-key-g1b_report_card_3 div[data-testid="stExpander"] summary:hover,
+.st-key-g1b_report_card_4 div[data-testid="stExpander"] summary:hover,
+.st-key-g1b_report_card_5 div[data-testid="stExpander"] summary:hover,
+.st-key-g1b_report_card_6 div[data-testid="stExpander"] summary:hover {
+    filter: brightness(1.07);
+    transform: translateY(-1px);
+}
+
+.st-key-g1b_report_card_1 div[data-testid="stExpander"] details[open],
+.st-key-g1b_report_card_2 div[data-testid="stExpander"] details[open],
+.st-key-g1b_report_card_3 div[data-testid="stExpander"] details[open],
+.st-key-g1b_report_card_4 div[data-testid="stExpander"] details[open],
+.st-key-g1b_report_card_5 div[data-testid="stExpander"] details[open],
+.st-key-g1b_report_card_6 div[data-testid="stExpander"] details[open] {
+    background: linear-gradient(180deg,#ffffff 0%,#f7fbff 100%) !important;
+}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     context = selected_group_context(st.session_state)
     if context is None:
         st.warning(
@@ -653,18 +760,19 @@ def render_standardized_lesson_plan_authoring_v2(
                     for item in tuple(drive_files or ())
                     if str(getattr(item, 'file_name', '') or '').lower().endswith('.docx')
                 )
-                with st.expander('Chẩn đoán Smart Up PPCT (tạm thời)', expanded=True):
-                    st.write('preferred_file_name:', preferred_file_name or '—')
-                    st.write('expected_file_name:', expected_file_name or '—')
-                    st.write('curriculum_periods:', tuple(context.get('curriculum_periods', ()) or ()))
-                    st.write('ppct_preferred_file_names:', ppct_preferred_file_names or ('—',))
-                    st.write('drive_folder_id:', drive_folder_id or '—')
-                    st.write('drive_file_count:', len(tuple(drive_files or ())))
-                    st.write('drive_docx_count:', len(drive_docx_names))
-                    st.write(
-                        'drive_KHBD_candidates:',
-                        tuple(name for name in drive_docx_names if name.upper().startswith('KHBD.'))[:100],
-                    )
+                with st.container(key="g1b_report_card_2"):
+                    with st.expander('Chẩn đoán Smart Up PPCT (tạm thời)', expanded=True):
+                        st.write('Tên tệp ưu tiên:', preferred_file_name or '—')
+                        st.write('Tên tệp dự kiến:', expected_file_name or '—')
+                        st.write('Tiết PPCT của nhóm:', tuple(context.get('curriculum_periods', ()) or ()))
+                        st.write('Các tên tệp ưu tiên theo PPCT:', ppct_preferred_file_names or ('—',))
+                        st.write('Mã thư mục Google Drive:', drive_folder_id or '—')
+                        st.write('Tổng số tệp trong Google Drive:', len(tuple(drive_files or ())))
+                        st.write('Số tệp giáo án DOCX:', len(drive_docx_names))
+                        st.write(
+                            'Các tệp KHBD phù hợp:',
+                            tuple(name for name in drive_docx_names if name.upper().startswith('KHBD.'))[:100],
+                        )
                 drive_matches = _matching_drive_files(
                     tuple(drive_files or ()),
                     preferred_file_name=preferred_file_name,
@@ -1259,29 +1367,90 @@ def render_standardized_lesson_plan_authoring_v2(
         runtime_compliance_status = str(
             runtime_compliance.get("status") or "UNVERIFIED"
         ).upper()
-        with st.expander(
-            "\u0043h\u1ea9n \u0111o\u00e1n t\u1ea1m th\u1eddi: ADMIN Compliance Runtime",
-            expanded=True,
-        ):
-            st.caption(
-                "\u0043h\u1ec9 \u0111\u1ecdc b\u1eb1ng ch\u1ee9ng runtime c\u1ee7a l\u1ea7n chu\u1ea9n h\u00f3a hi\u1ec7n t\u1ea1i. "
-                "Kh\u1ed1i n\u00e0y kh\u00f4ng thay \u0111\u1ed5i PASS/FAIL hay quy\u1ec1n L\u01b0u/T\u1ea3i/G\u1ed9p."
-            )
-            st.write("Compliance:", runtime_compliance_status)
-            runtime_checks = tuple(runtime_compliance.get("checks") or ())
-            if runtime_checks:
-                for runtime_check in runtime_checks:
-                    if not isinstance(runtime_check, Mapping):
-                        continue
-                    runtime_code = str(runtime_check.get("code") or "UNKNOWN")
-                    runtime_status = str(
-                        runtime_check.get("status") or "UNVERIFIED"
-                    ).upper()
-                    st.markdown(f"**{runtime_code} ? {runtime_status}**")
-                    st.write("Expected:", runtime_check.get("expected"))
-                    st.write("Actual:", runtime_check.get("actual"))
-            else:
-                st.info("Compliance kh\u00f4ng c\u00f3 danh s\u00e1ch checks.")
+        with st.container(key="g1b_report_card_3"):
+            with st.expander(
+                "\u0043h\u1ea9n \u0111o\u00e1n t\u1ea1m th\u1eddi: Kiểm tra tuân thủ cấu hình ADMIN khi vận hành",
+                expanded=True,
+            ):
+                st.caption(
+                    "\u0043h\u1ec9 \u0111\u1ecdc b\u1eb1ng ch\u1ee9ng runtime c\u1ee7a l\u1ea7n chu\u1ea9n h\u00f3a hi\u1ec7n t\u1ea1i. "
+                    "Kh\u1ed1i n\u00e0y kh\u00f4ng thay \u0111\u1ed5i PASS/FAIL hay quy\u1ec1n L\u01b0u/T\u1ea3i/G\u1ed9p."
+                )
+                runtime_compliance_status_display = {
+                    "PASS": "ĐẠT",
+                    "FAIL": "KHÔNG ĐẠT",
+                    "BLOCKED": "BỊ CHẶN",
+                    "WARNING": "CẢNH BÁO",
+                    "REVIEW": "CẦN KIỂM TRA",
+                    "UNVERIFIED": "CHƯA XÁC MINH",
+                }.get(runtime_compliance_status, runtime_compliance_status)
+                st.write(
+                    "**Kết quả kiểm tra tuân thủ:**",
+                    runtime_compliance_status_display,
+                )
+                runtime_checks = tuple(runtime_compliance.get("checks") or ())
+                if runtime_checks:
+                    for runtime_check in runtime_checks:
+                        if not isinstance(runtime_check, Mapping):
+                            continue
+                        runtime_code = str(runtime_check.get("code") or "UNKNOWN")
+                        runtime_status = str(
+                            runtime_check.get("status") or "UNVERIFIED"
+                        ).upper()
+                        runtime_status_display = {
+                            "PASS": "ĐẠT",
+                            "FAIL": "KHÔNG ĐẠT",
+                            "BLOCKED": "BỊ CHẶN",
+                            "WARNING": "CẢNH BÁO",
+                            "REVIEW": "CẦN KIỂM TRA",
+                            "UNVERIFIED": "CHƯA XÁC MINH",
+                        }.get(runtime_status, runtime_status)
+
+                        runtime_code_display = {
+                            "ACTIVE_CONFIGURATION_SNAPSHOT":
+                                "Ảnh chụp cấu hình ADMIN đang có hiệu lực",
+                        }.get(runtime_code, runtime_code)
+
+                        st.markdown(
+                            f"**{runtime_code_display} — {runtime_status_display}**"
+                        )
+                        runtime_expected = runtime_check.get("expected")
+                        runtime_expected_display = {
+                            "immutable ACTIVE snapshot":
+                                "Bản chụp cấu hình ACTIVE bất biến",
+                        }.get(runtime_expected, runtime_expected)
+                        st.write(
+                            "**Yêu cầu:**",
+                            runtime_expected_display,
+                        )
+                        runtime_actual = runtime_check.get("actual")
+                        if isinstance(runtime_actual, Mapping):
+                            st.write("**Dữ liệu thực tế:**")
+                            st.write({
+                                "Mã cấu hình toàn hệ thống":
+                                    runtime_actual.get("global_profile_id"),
+                                "Mã phiên bản ACTIVE":
+                                    runtime_actual.get("global_version_id"),
+                                "Mã hồ sơ cấu hình môn học":
+                                    runtime_actual.get("subject_profile_id"),
+                                "Mã phiên bản cấu hình môn học":
+                                    runtime_actual.get("subject_version_id"),
+                                "Môn áp dụng":
+                                    runtime_actual.get("subject_ref"),
+                                "Phân môn áp dụng":
+                                    runtime_actual.get("component_ref"),
+                                "Mã kiểm tra cấu hình":
+                                    runtime_actual.get("configuration_hash"),
+                                "Các trường bị khóa":
+                                    runtime_actual.get("locked_paths"),
+                            })
+                        else:
+                            st.write(
+                                "**Dữ liệu thực tế:**",
+                                runtime_actual,
+                            )
+                else:
+                    st.info("Chưa có danh sách tiêu chí kiểm tra tuân thủ cấu hình ADMIN.")
 
     # G1B_ENGLISH_PILOT01_A5H_AUDIT_STATUS_UI
     audit_blocks_save = False
@@ -1407,88 +1576,89 @@ def render_standardized_lesson_plan_authoring_v2(
                 "conflict": "XUNG \u0110\u1ed8T",
                 "unverified": "CH\u01afA X\u00c1C MINH",
             }
-            with st.expander(
-                "\u0110\u1ed1i chi\u1ebfu 5 tr\u01b0\u1eddng d\u1eef li\u1ec7u canonical",
-                expanded=(not canonical_pass_100),
-            ):
-                st.caption(
-                    "M\u1ed7i tr\u01b0\u1eddng ch\u1ec9 \u0111\u01b0\u1ee3c ch\u1ea5p nh\u1eadn khi gi\u00e1 tr\u1ecb "
-                    "t\u00ecm th\u1ea5y trong DOCX kh\u1edbp v\u1edbi gi\u00e1 tr\u1ecb h\u1ec7 th\u1ed1ng "
-                    "y\u00eau c\u1ea7u. CH\u01afA X\u00c1C MINH kh\u00f4ng \u0111\u01b0\u1ee3c t\u00ednh l\u00e0 PASS."
-                )
-                for field_key in (
-                    "class_name",
-                    "curriculum_period",
-                    "lesson_title",
-                    "drafting_date",
-                    "teaching_date",
+            with st.container(key="g1b_report_card_4"):
+                with st.expander(
+                    "\u0110\u1ed1i chi\u1ebfu 5 tr\u01b0\u1eddng d\u1eef li\u1ec7u canonical",
+                    expanded=(not canonical_pass_100),
                 ):
-                    row = canonical_field_rows.get(field_key, {})
-                    if not isinstance(row, Mapping):
-                        row = {}
-                    expected = row.get("expected")
-                    found = row.get("found")
-                    row_status = str(
-                        row.get("status") or "unverified"
-                    ).lower()
-                    expected_text = (
-                        str(expected)
-                        if expected not in (None, "")
-                        else "Ch\u01b0a c\u00f3 gi\u00e1 tr\u1ecb canonical"
+                    st.caption(
+                        "M\u1ed7i tr\u01b0\u1eddng ch\u1ec9 \u0111\u01b0\u1ee3c ch\u1ea5p nh\u1eadn khi gi\u00e1 tr\u1ecb "
+                        "t\u00ecm th\u1ea5y trong DOCX kh\u1edbp v\u1edbi gi\u00e1 tr\u1ecb h\u1ec7 th\u1ed1ng "
+                        "y\u00eau c\u1ea7u. CH\u01afA X\u00c1C MINH kh\u00f4ng \u0111\u01b0\u1ee3c t\u00ednh l\u00e0 PASS."
                     )
-                    found_text = (
-                        str(found)
-                        if found not in (None, "")
-                        else "Ch\u01b0a t\u00ecm th\u1ea5y \u0111\u1ee7 b\u1eb1ng ch\u1ee9ng trong DOCX"
-                    )
-                    effective_status = effective_field_status.get(field_key, row_status)
-                    verified_record = teacher_verification.get(field_key, {})
-                    teacher_value = (
-                        str(verified_record.get("teacher_value") or "")
-                        if isinstance(verified_record, Mapping)
-                        else ""
-                    )
-                    effective_label = (
-                        "\u0110\u00c3 X\u00c1C MINH B\u1edeI GI\u00c1O VI\u00caN"
-                        if effective_status == "teacher_verified"
-                        else ("\u0110\u00c3 X\u00c1C MINH T\u1ef0 \u0110\u1ed8NG" if row_status == "accepted" else status_labels.get(row_status, "CH\u01afA X\u00c1C MINH"))
-                    )
-                    st.markdown(
-                        "**" + field_labels[field_key] + "**  \n"
-                        + "- Gi\u00e1 tr\u1ecb h\u1ec7 th\u1ed1ng y\u00eau c\u1ea7u: `" + expected_text + "`  \n"
-                        + "- Gi\u00e1 tr\u1ecb t\u00ecm th\u1ea5y trong DOCX: `" + found_text + "`  \n"
-                        + "- Tr\u1ea1ng th\u00e1i: **" + effective_label + "**"
-                    )
-                    if effective_status == "teacher_verified" and teacher_value:
-                        st.caption("Gi\u00e1 tr\u1ecb gi\u00e1o vi\u00ean x\u00e1c nh\u1eadn: " + teacher_value)
-                    if row_status in ("conflict", "unverified"):
-                        st.caption("Y\u00eau c\u1ea7u gi\u00e1o vi\u00ean x\u00e1c minh tr\u01b0\u1eddng n\u00e0y.")
-                        input_key = f"g1b_v2_teacher_value_{group_id}_{field_key}"
-                        proposed_teacher_value = st.text_input(
-                            "Gi\u00e1 tr\u1ecb gi\u00e1o vi\u00ean x\u00e1c nh\u1eadn",
-                            value=(teacher_value or expected_text),
-                            key=input_key,
+                    for field_key in (
+                        "class_name",
+                        "curriculum_period",
+                        "lesson_title",
+                        "drafting_date",
+                        "teaching_date",
+                    ):
+                        row = canonical_field_rows.get(field_key, {})
+                        if not isinstance(row, Mapping):
+                            row = {}
+                        expected = row.get("expected")
+                        found = row.get("found")
+                        row_status = str(
+                            row.get("status") or "unverified"
+                        ).lower()
+                        expected_text = (
+                            str(expected)
+                            if expected not in (None, "")
+                            else "Ch\u01b0a c\u00f3 gi\u00e1 tr\u1ecb canonical"
                         )
-                        if st.button(
-                            "X\u00e1c nh\u1eadn l\u00e0 \u0111\u00fang",
-                            key=f"g1b_v2_teacher_confirm_{group_id}_{field_key}",
-                            disabled=not str(proposed_teacher_value or "").strip(),
-                        ):
-                            updated = dict(teacher_verification)
-                            updated[field_key] = {
-                                "confirmed": True,
-                                "teacher_value": str(proposed_teacher_value).strip(),
-                                "expected_snapshot": expected,
-                                "found_snapshot": found,
-                                "group_id": verification_scope["group_id"],
-                                "output_sha256": verification_scope["output_sha256"],
-                                "verified_by": str(user_id or ""),
-                                "verified_at": datetime.now(timezone.utc).isoformat(),
-                            }
-                            st.session_state[TEACHER_VERIFICATION_KEY] = updated
-                            st.rerun()
-                        # V14B6F_A8_R2_TEACHER_CONFIRMATION_IS_FINAL
-                        # No revoke control: teacher confirmation is final business verification.
+                        found_text = (
+                            str(found)
+                            if found not in (None, "")
+                            else "Ch\u01b0a t\u00ecm th\u1ea5y \u0111\u1ee7 b\u1eb1ng ch\u1ee9ng trong DOCX"
+                        )
+                        effective_status = effective_field_status.get(field_key, row_status)
+                        verified_record = teacher_verification.get(field_key, {})
+                        teacher_value = (
+                            str(verified_record.get("teacher_value") or "")
+                            if isinstance(verified_record, Mapping)
+                            else ""
+                        )
+                        effective_label = (
+                            "\u0110\u00c3 X\u00c1C MINH B\u1edeI GI\u00c1O VI\u00caN"
+                            if effective_status == "teacher_verified"
+                            else ("\u0110\u00c3 X\u00c1C MINH T\u1ef0 \u0110\u1ed8NG" if row_status == "accepted" else status_labels.get(row_status, "CH\u01afA X\u00c1C MINH"))
+                        )
+                        st.markdown(
+                            "**" + field_labels[field_key] + "**  \n"
+                            + "- Gi\u00e1 tr\u1ecb h\u1ec7 th\u1ed1ng y\u00eau c\u1ea7u: `" + expected_text + "`  \n"
+                            + "- Gi\u00e1 tr\u1ecb t\u00ecm th\u1ea5y trong DOCX: `" + found_text + "`  \n"
+                            + "- Tr\u1ea1ng th\u00e1i: **" + effective_label + "**"
+                        )
+                        if effective_status == "teacher_verified" and teacher_value:
+                            st.caption("Gi\u00e1 tr\u1ecb gi\u00e1o vi\u00ean x\u00e1c nh\u1eadn: " + teacher_value)
+                        if row_status in ("conflict", "unverified"):
+                            st.caption("Y\u00eau c\u1ea7u gi\u00e1o vi\u00ean x\u00e1c minh tr\u01b0\u1eddng n\u00e0y.")
+                            input_key = f"g1b_v2_teacher_value_{group_id}_{field_key}"
+                            proposed_teacher_value = st.text_input(
+                                "Gi\u00e1 tr\u1ecb gi\u00e1o vi\u00ean x\u00e1c nh\u1eadn",
+                                value=(teacher_value or expected_text),
+                                key=input_key,
+                            )
+                            if st.button(
+                                "X\u00e1c nh\u1eadn l\u00e0 \u0111\u00fang",
+                                key=f"g1b_v2_teacher_confirm_{group_id}_{field_key}",
+                                disabled=not str(proposed_teacher_value or "").strip(),
+                            ):
+                                updated = dict(teacher_verification)
+                                updated[field_key] = {
+                                    "confirmed": True,
+                                    "teacher_value": str(proposed_teacher_value).strip(),
+                                    "expected_snapshot": expected,
+                                    "found_snapshot": found,
+                                    "group_id": verification_scope["group_id"],
+                                    "output_sha256": verification_scope["output_sha256"],
+                                    "verified_by": str(user_id or ""),
+                                    "verified_at": datetime.now(timezone.utc).isoformat(),
+                                }
+                                st.session_state[TEACHER_VERIFICATION_KEY] = updated
+                                st.rerun()
+                            # V14B6F_A8_R2_TEACHER_CONFIRMATION_IS_FINAL
+                            # No revoke control: teacher confirmation is final business verification.
 
         # G1B_ENGLISH_PILOT01_A5J2A_AUDIT_EXPLAINABILITY
         audit_evidence = getattr(audit_result, "evidence", ())
@@ -1497,58 +1667,59 @@ def render_standardized_lesson_plan_authoring_v2(
         audit_evidence = tuple(audit_evidence or ())
 
         if audit_evidence:
-            with st.expander("B\u1eb1ng ch\u1ee9ng k\u1ef9 thu\u1eadt", expanded=False):
-                st.caption(
-                    "B\u1ea3ng n\u00e0y ghi l\u1ea1i b\u1eb1ng ch\u1ee9ng \u0111\u1ed9c l\u1eadp "
-                    "\u0111\u00e3 d\u00f9ng \u0111\u1ec3 k\u1ebft lu\u1eadn. FAIL/XUNG \u0110\u1ed8T "
-                    "l\u00e0 l\u1ed7i c\u1ea7n x\u1eed l\u00fd; CH\u01afA X\u00c1C MINH l\u00e0 "
-                    "ch\u01b0a \u0111\u1ee7 b\u1eb1ng ch\u1ee9ng."
-                )
-                for item in audit_evidence:
-                    item_code = getattr(item, "code", "")
-                    item_status_raw = getattr(item, "status", None)
-                    item_status = getattr(item_status_raw, "value", item_status_raw)
-                    item_message = getattr(item, "message", "")
-                    item_values = getattr(item, "evidence", ())
-                    if isinstance(item, Mapping):
-                        item_code = item.get("code", item_code)
-                        item_status = item.get("status", item_status)
-                        item_message = item.get("message", item_message)
-                        item_values = item.get("evidence", item_values)
+            with st.container(key="g1b_report_card_5"):
+                with st.expander("B\u1eb1ng ch\u1ee9ng k\u1ef9 thu\u1eadt", expanded=False):
+                    st.caption(
+                        "B\u1ea3ng n\u00e0y ghi l\u1ea1i b\u1eb1ng ch\u1ee9ng \u0111\u1ed9c l\u1eadp "
+                        "\u0111\u00e3 d\u00f9ng \u0111\u1ec3 k\u1ebft lu\u1eadn. FAIL/XUNG \u0110\u1ed8T "
+                        "l\u00e0 l\u1ed7i c\u1ea7n x\u1eed l\u00fd; CH\u01afA X\u00c1C MINH l\u00e0 "
+                        "ch\u01b0a \u0111\u1ee7 b\u1eb1ng ch\u1ee9ng."
+                    )
+                    for item in audit_evidence:
+                        item_code = getattr(item, "code", "")
+                        item_status_raw = getattr(item, "status", None)
+                        item_status = getattr(item_status_raw, "value", item_status_raw)
+                        item_message = getattr(item, "message", "")
+                        item_values = getattr(item, "evidence", ())
+                        if isinstance(item, Mapping):
+                            item_code = item.get("code", item_code)
+                            item_status = item.get("status", item_status)
+                            item_message = item.get("message", item_message)
+                            item_values = item.get("evidence", item_values)
 
-                    item_status_text = str(item_status or "unverified").upper()
-                    item_code_text = str(item_code or "AUDIT_EVIDENCE")
-                    technical_messages = {
-                        "SOURCE_DOCX_READABLE": "\u0110\u1ecdc \u0111\u01b0\u1ee3c gi\u00e1o \u00e1n g\u1ed1c \u0111\u1ed9c l\u1eadp.",
-                        "OUTPUT_DOCX_READABLE": "\u0110\u1ecdc \u0111\u01b0\u1ee3c gi\u00e1o \u00e1n sau chu\u1ea9n h\u00f3a \u0111\u1ed9c l\u1eadp.",
-                        "ARTIFACT_HASH_EVIDENCE": "\u0110\u00e3 ghi nh\u1eadn m\u00e3 b\u0103m c\u1ee7a t\u1ec7p g\u1ed1c v\u00e0 t\u1ec7p k\u1ebft qu\u1ea3.",
-                        "CANONICAL_EVIDENCE_NOT_WIRED": "Ch\u01b0a nh\u1eadn \u0111\u1ee7 b\u1eb1ng ch\u1ee9ng canonical t\u1eeb pipeline.",
-                    }
-                    technical_message = technical_messages.get(
-                        item_code_text,
-                        "B\u1eb1ng ch\u1ee9ng k\u1ef9 thu\u1eadt cho ti\u00eau ch\u00ed "
-                        + item_code_text
-                        + ".",
-                    )
-                    technical_status_labels = {
-                        "PASS": "\u0110\u1ea0T",
-                        "WARNING": "C\u1ea2NH B\u00c1O",
-                        "FAIL": "KH\u00d4NG \u0110\u1ea0T",
-                        "UNVERIFIED": "CH\u01afA X\u00c1C MINH",
-                    }
-                    st.markdown(
-                        "**"
-                        + technical_status_labels.get(
-                            item_status_text,
-                            item_status_text,
+                        item_status_text = str(item_status or "unverified").upper()
+                        item_code_text = str(item_code or "AUDIT_EVIDENCE")
+                        technical_messages = {
+                            "SOURCE_DOCX_READABLE": "\u0110\u1ecdc \u0111\u01b0\u1ee3c gi\u00e1o \u00e1n g\u1ed1c \u0111\u1ed9c l\u1eadp.",
+                            "OUTPUT_DOCX_READABLE": "\u0110\u1ecdc \u0111\u01b0\u1ee3c gi\u00e1o \u00e1n sau chu\u1ea9n h\u00f3a \u0111\u1ed9c l\u1eadp.",
+                            "ARTIFACT_HASH_EVIDENCE": "\u0110\u00e3 ghi nh\u1eadn m\u00e3 b\u0103m c\u1ee7a t\u1ec7p g\u1ed1c v\u00e0 t\u1ec7p k\u1ebft qu\u1ea3.",
+                            "CANONICAL_EVIDENCE_NOT_WIRED": "Ch\u01b0a nh\u1eadn \u0111\u1ee7 b\u1eb1ng ch\u1ee9ng canonical t\u1eeb pipeline.",
+                        }
+                        technical_message = technical_messages.get(
+                            item_code_text,
+                            "B\u1eb1ng ch\u1ee9ng k\u1ef9 thu\u1eadt cho ti\u00eau ch\u00ed "
+                            + item_code_text
+                            + ".",
                         )
-                        + " | "
-                        + item_code_text
-                        + "** - "
-                        + technical_message
-                    )
-                    for value in tuple(item_values or ()):
-                        st.caption(str(value))
+                        technical_status_labels = {
+                            "PASS": "\u0110\u1ea0T",
+                            "WARNING": "C\u1ea2NH B\u00c1O",
+                            "FAIL": "KH\u00d4NG \u0110\u1ea0T",
+                            "UNVERIFIED": "CH\u01afA X\u00c1C MINH",
+                        }
+                        st.markdown(
+                            "**"
+                            + technical_status_labels.get(
+                                item_status_text,
+                                item_status_text,
+                            )
+                            + " | "
+                            + item_code_text
+                            + "** - "
+                            + technical_message
+                        )
+                        for value in tuple(item_values or ()):
+                            st.caption(str(value))
         else:
             st.caption(
                 "Chi tiet kiem duyet: chua co bang chung theo tung tieu chi "
@@ -1623,16 +1794,17 @@ def render_standardized_lesson_plan_authoring_v2(
                 st.info("Quá trình tạo bản xem: " + trace_message)
             trace_checks = dict(trace_state.get("checks") or {})
             if trace_checks:
-                with st.expander("Xem nhật ký các công đoạn đã tác động đến giáo án", expanded=False):
-                    for task_code, task_label in _AI_TASKS:
-                        task_status = str(trace_checks.get(task_code) or "queued")
-                        st.caption(task_label + ": " + {
-                            "pass": "Đạt",
-                            "running": "Đang thực hiện",
-                            "blocked": "Không đạt",
-                            "review": "Cần kiểm tra",
-                            "unverified": "Chưa xác minh",
-                        }.get(task_status, "Chờ xử lý"))
+                with st.container(key="g1b_report_card_6"):
+                    with st.expander("Xem nhật ký các công đoạn đã tác động đến giáo án", expanded=False):
+                        for task_code, task_label in _AI_TASKS:
+                            task_status = str(trace_checks.get(task_code) or "queued")
+                            st.caption(task_label + ": " + {
+                                "pass": "Đạt",
+                                "running": "Đang thực hiện",
+                                "blocked": "Không đạt",
+                                "review": "Cần kiểm tra",
+                                "unverified": "Chưa xác minh",
+                            }.get(task_status, "Chờ xử lý"))
         _render_document(
             content=standardized_content,
             preview_html_builder=preview_html_builder,
