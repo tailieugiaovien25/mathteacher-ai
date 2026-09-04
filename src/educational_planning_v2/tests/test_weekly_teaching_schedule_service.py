@@ -219,6 +219,9 @@ def test_same_period_morning_and_afternoon_are_distinct_and_ordered():
             _curriculum(1),
             _curriculum(2),
         ),
+        execution_records=(
+            _completed(1, status="CANCELLED"),
+        ),
     )
 
     assert len(schedule.entries) == 2

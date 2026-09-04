@@ -17,7 +17,7 @@ def test_abandoned_compact_feature_is_not_enabled_by_pages():
     ui_text = UI_PATH.read_text(encoding="utf-8")
 
     app_route_start = app_text.index(
-        "elif selected == 'Chu\\u1ea9n h\\xf3a gi\\xe1o \\xe1n':"
+        "elif selected == 'Soạn bài cùng chuẩn giáo án':"
     )
     app_route_end = app_text.index(
         "elif selected == 'So\\u1ea1n b\\xe0i c\\xf9ng AI':",

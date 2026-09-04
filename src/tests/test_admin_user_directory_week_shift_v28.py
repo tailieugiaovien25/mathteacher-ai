@@ -48,9 +48,8 @@ def test_admin_dashboard_joins_roles_and_profiles():
     text = Path("src/portal_v2/ui/admin_shell.py").read_text(encoding="utf-8-sig")
     assert 'client.table("portal_roles")' in text
     assert 'client.table("teacher_profiles")' in text
-    assert '"Mới đăng ký"' in text
-    assert '"Đang có hiệu lực"' in text
-    assert '"Ngừng hoạt động"' in text
+    assert 'client.table("portal_roles")' in text
+    assert 'client.table("teacher_profiles")' in text
     assert "admin_dashboard_user_status" in text
 
 

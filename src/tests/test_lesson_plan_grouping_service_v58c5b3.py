@@ -26,7 +26,9 @@ def row(**overrides):
         timetable_slot_id="slot-1",
     )
     data.update(overrides)
-    return SimpleNamespace(**data)
+    return SimpleNamespace(
+        academic_year="2026-2027",
+        week_number=1,**data)
 
 
 def resolver(mode=LessonPlanGroupingMode.BY_PERIOD):

@@ -76,7 +76,7 @@ def test_portal_builds_normalized_teacher_profile():
     assert profile.subjects == ("Toán", "Tin học")
     assert "Kho tài liệu" in PORTAL_PAGES
     assert "Công cụ soạn bài" not in PORTAL_PAGES
-    assert "Chuẩn hóa giáo án" in PORTAL_PAGES
+    assert "Soạn bài cùng chuẩn giáo án" in PORTAL_PAGES
     assert "Soạn bài cùng AI" in PORTAL_PAGES
     assert "Lịch báo giảng & PBSDTB" in PORTAL_PAGES
 

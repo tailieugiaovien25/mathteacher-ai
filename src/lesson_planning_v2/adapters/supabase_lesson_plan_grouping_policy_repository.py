@@ -14,10 +14,14 @@ class SupabaseLessonPlanGroupingPolicyRepository:
 
     @staticmethod
     def _from_row(row) -> LessonPlanGroupingPolicyConfig:
+        raw_mode = str(row.get("grouping_mode", "BY_PERIOD") or "BY_PERIOD")
+        # Runtime bridge for rows created before grade became a mandatory partition.
+        if raw_mode == "BY_GRADE":
+            raw_mode = "BY_WEEK"
         return LessonPlanGroupingPolicyConfig(
             subject_ref=str(row.get("subject_ref", "") or ""),
             component_ref=str(row.get("component_ref", "") or ""),
-            mode=LessonPlanGroupingMode(str(row.get("grouping_mode", "BY_PERIOD"))),
+            mode=LessonPlanGroupingMode(raw_mode),
             active=str(row.get("status", "ACTIVE")).upper() == "ACTIVE",
             source="ADMIN_CANONICAL_CONFIG",
             version=int(row.get("rule_version", 1) or 1),

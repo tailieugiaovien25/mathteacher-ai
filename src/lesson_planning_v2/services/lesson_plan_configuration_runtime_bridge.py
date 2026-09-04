@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Any, Mapping, MutableMapping
 
 from lesson_planning_v2.adapters.supabase_lesson_plan_configuration_repository import (
@@ -14,6 +16,8 @@ from lesson_planning_v2.services.lesson_plan_configuration_service import (
 ADMIN_RUNTIME_PAYLOAD_KEY = "lesson_plan_admin_runtime_configuration_payload"
 ADMIN_RUNTIME_SOURCE_KEY = "lesson_plan_admin_runtime_configuration_source"
 ADMIN_RUNTIME_ERROR_KEY = "lesson_plan_admin_runtime_configuration_error"
+STANDARDIZER_TOOL_RUNTIME_PAYLOAD_KEY = "standardizer_tool_admin_runtime_configuration"
+STANDARDIZER_TOOL_RUNTIME_SOURCE_KEY = "standardizer_tool_admin_runtime_source"
 
 _DATE_POLICY_KEY_MAP = {
     "drafting_before_monday_enabled":
@@ -38,6 +42,10 @@ _APPROVAL_POLICY_KEY_MAP = {
     "alignment": "lesson_plan_admin_approval_alignment",
     "approval_offset_days": "standardization_approval_before_monday_days",
 }
+
+ADMIN_LESSON_PLAN_DRIVE_FOLDER_ID_KEY = (
+    "admin_lesson_plan_google_drive_folder_id"
+)
 
 
 def _project_template_profile(
@@ -107,6 +115,24 @@ def project_admin_payload_to_standardization_state(
     session_state: MutableMapping[str, Any],
 ) -> None:
     normalized = dict(payload or {})
+    # G1B_H4D3_PROJECT_DOCUMENT_REPOSITORY
+    document_repository = normalized.get("document_repository")
+    if isinstance(document_repository, Mapping):
+        folder_id = str(
+            document_repository.get(
+                "google_drive_lesson_plan_folder_id",
+                "",
+            )
+            or ""
+        ).strip()
+        if folder_id:
+            session_state[ADMIN_LESSON_PLAN_DRIVE_FOLDER_ID_KEY] = folder_id
+        else:
+            session_state.pop(
+                ADMIN_LESSON_PLAN_DRIVE_FOLDER_ID_KEY,
+                None,
+            )
+
     session_state[ADMIN_RUNTIME_PAYLOAD_KEY] = normalized
 
     date_policy = normalized.get("date_policy")
@@ -134,6 +160,28 @@ def project_admin_payload_to_standardization_state(
         )
 
 
+def _project_active_standardizer_tool_configuration(*, client, subject_ref, session_state):
+    """Resolve the independent common -> subject tool tree."""
+    from lesson_planning_v2.adapters.supabase_lesson_plan_configuration_admin_repository import (
+        SupabaseLessonPlanConfigurationAdminRepository,
+    )
+    from lesson_planning_v2.services.standardizer_tool_configuration_service import (
+        StandardizerToolConfigurationService,
+    )
+
+    repository = SupabaseLessonPlanConfigurationAdminRepository(client)
+    resolved = StandardizerToolConfigurationService(repository).resolve(
+        subject_ref=subject_ref
+    )
+    session_state[STANDARDIZER_TOOL_RUNTIME_PAYLOAD_KEY] = dict(
+        resolved.effective_payload
+    )
+    session_state[STANDARDIZER_TOOL_RUNTIME_SOURCE_KEY] = (
+        "admin_standardizer_tool" if resolved.common_profile or resolved.subject_profile
+        else "existing_tool_default"
+    )
+
+
 def apply_active_admin_lesson_plan_configuration(
     *,
     client: Any,
@@ -148,6 +196,15 @@ def apply_active_admin_lesson_plan_configuration(
             applied=False,
             source="existing_runtime_default",
             payload={},
+        )
+
+    try:
+        _project_active_standardizer_tool_configuration(
+            client=client, subject_ref=subject_ref, session_state=session_state
+        )
+    except Exception as error:
+        session_state[STANDARDIZER_TOOL_RUNTIME_SOURCE_KEY] = (
+            "existing_tool_default:" + type(error).__name__
         )
 
     try:
@@ -176,6 +233,32 @@ def apply_active_admin_lesson_plan_configuration(
         )
 
     payload = dict(resolved.configuration_payload)
+    canonical_payload = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    snapshot = {
+        "global_profile_id": str(
+            getattr(resolved.global_snapshot, "profile_id", "") or ""
+        ),
+        "global_version_id": str(
+            getattr(resolved.global_snapshot, "configuration_version_id", "") or ""
+        ),
+        "subject_profile_id": str(
+            getattr(resolved.subject_snapshot, "profile_id", "") or ""
+        ),
+        "subject_version_id": str(
+            getattr(resolved.subject_snapshot, "configuration_version_id", "") or ""
+        ),
+        "subject_ref": subject_ref,
+        "component_ref": component_ref,
+        "configuration_hash": hashlib.sha256(canonical_payload).hexdigest(),
+        "locked_paths": list(getattr(resolved, "locked_paths", ()) or ()),
+    }
+    template_profile = payload.get("template_profile")
+    if isinstance(template_profile, Mapping):
+        template_profile = dict(template_profile)
+        template_profile["_admin_configuration_snapshot"] = snapshot
+        payload["template_profile"] = template_profile
     project_admin_payload_to_standardization_state(
         payload=payload,
         session_state=session_state,

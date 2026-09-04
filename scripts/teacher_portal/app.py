@@ -26,8 +26,10 @@ from portal_v2.ui.modern_3d_design_system import (
 
 PORTAL_PAGES = (
     'T\u1ed5ng quan',
-    'Chu\u1ea9n h\xf3a gi\xe1o \xe1n',
+    'Soạn bài cùng chuẩn giáo án',
     'Qu\u1ea3n l\xfd gi\xe1o \xe1n',
+    'Thư viện Prompt & AI',
+    'Soạn bài theo tuần',
     'So\u1ea1n b\xe0i c\xf9ng AI',
     'L\u1ecbch b\xe1o gi\u1ea3ng & PBSDTB',
     'Th\u1eddi kh\xf3a bi\u1ec3u',
@@ -260,7 +262,11 @@ def has_complete_portal_session(
 
 
 def select_portal_page(session_state: Any, page: str) -> None:
-    valid_pages = (*PORTAL_PAGES, "Công cụ soạn bài")
+    valid_pages = (
+        *PORTAL_PAGES,
+        "Công cụ soạn bài",
+        "Soạn bài cùng chuẩn giáo án V2",
+    )
     if page not in valid_pages:
         raise ValueError("Trang cổng giáo viên không hợp lệ.")
     session_state["portal_navigation_request"] = page
@@ -274,7 +280,11 @@ def _resolve_portal_navigation_request(session_state: Any) -> str:
     if requested is None:
         return current_page
 
-    valid_pages = (*PORTAL_PAGES, "Công cụ soạn bài")
+    valid_pages = (
+        *PORTAL_PAGES,
+        "Công cụ soạn bài",
+        "Soạn bài cùng chuẩn giáo án V2",
+    )
     if requested not in valid_pages:
         raise ValueError("Trang cổng giáo viên không hợp lệ.")
 
@@ -916,6 +926,11 @@ def main() -> None:
     # Load the modern layer last so legacy page-specific rules cannot
     # override the shared visual contract.
     apply_modern_3d_design_system(st)
+    from portal_v2.ui.modern_3d_design_system import (
+        apply_g1b_shared_navy_3d_foundation,
+    )
+    apply_g1b_shared_navy_3d_foundation(st)
+    # G1B_UI_P1B_SHARED_NAVY_3D_FOUNDATION
     settings = supabase_settings()
     client = st.session_state.get("portal_supabase_client")
     user_id = st.session_state.get("portal_user_id")
@@ -1051,10 +1066,13 @@ def main() -> None:
         )
         return
     current_page = _resolve_portal_navigation_request(st.session_state)
-    hidden_legacy_page = current_page == "Công cụ soạn bài"
-    if current_page not in PORTAL_PAGES and not hidden_legacy_page:
+    hidden_route = current_page in (
+        "Công cụ soạn bài",
+        "Soạn bài cùng chuẩn giáo án V2",
+    )
+    if current_page not in PORTAL_PAGES and not hidden_route:
         current_page = "Tổng quan"
-    if hidden_legacy_page:
+    if hidden_route:
         selected = current_page
     else:
         if st.session_state.get("portal_navigation") != current_page:
@@ -1090,7 +1108,237 @@ def main() -> None:
             user_id=str(user_id),
         )
 
-    elif selected == 'Chu\u1ea9n h\xf3a gi\xe1o \xe1n':
+    elif selected == 'Soạn bài cùng chuẩn giáo án V2':
+        from portal_v2.ui.standardized_lesson_plan_authoring_v2_streamlit import (
+            render_standardized_lesson_plan_authoring_v2,
+        )
+        from scripts.teacher_portal.lesson_plan_visual_viewer import (
+            build_document_html,
+        )
+        from portal_v2.ui.weekly_schedule_streamlit import (
+            standardize_lesson_plan_v2_document,
+        )
+        from lesson_planning_v2.services.lesson_plan_configuration_runtime_bridge import (
+            apply_active_admin_lesson_plan_configuration,
+        )
+
+        # G1B_13H1R4B4N_V2_RUNTIME_SAVE
+        def _g1b_v2_save_standardized_artifact(
+            *,
+            artifact_file_name: str,
+            artifact_content: bytes,
+        ) -> None:
+            upload_service = st.session_state.get(
+                "document_library_upload_service"
+            )
+            if upload_service is None:
+                # G1B_13H1R4B5C_EXACT_LIBRARY_RUNTIME_CAUSE
+                has_catalog = st.session_state.get("document_library_catalog") is not None
+                has_credentials = bool(st.session_state.get("google_drive_credentials"))
+                st.warning(
+                    "Kho gi\u00e1o \u00e1n ch\u01b0a s\u1eb5n s\u00e0ng. "
+                    "B\u1ea1n v\u1eabn c\u00f3 th\u1ec3 t\u1ea3i file v\u1ec1 m\u00e1y. "
+                    + "[diagnostic: catalog=" + str(has_catalog)
+                    + ", drive_credentials=" + str(has_credentials) + "]"
+                )
+                return
+
+            from teacher_document_library_v2 import (
+                DocumentCategory,
+                DocumentUploadMetadata,
+            )
+            from portal_v2.ui.standardized_lesson_plan_authoring_v2_streamlit import (
+                selected_group_context,
+            )
+
+            categories = tuple(DocumentCategory)
+            category = next(
+                (
+                    item
+                    for item in categories
+                    if (
+                        "lesson" in item.value.casefold()
+                        or "giao" in item.value.casefold()
+                    )
+                ),
+                categories[0],
+            )
+            context = selected_group_context(st.session_state) or {}
+            class_name = str(
+                context.get("class_name")
+                or context.get("class_ref")
+                or ""
+            ).strip()
+            academic_year = str(
+                context.get("academic_year") or "N/A"
+            ).strip()
+            subject = str(
+                context.get("subject")
+                or context.get("subject_name")
+                or context.get("subject_ref")
+                or "N/A"
+            ).strip()
+            grade_level = str(
+                context.get("grade_level")
+                or context.get("grade")
+                or "N/A"
+            ).strip()
+            lesson_title = str(
+                context.get("lesson_title")
+                or artifact_file_name
+            ).strip()
+
+            metadata = DocumentUploadMetadata(
+                title=lesson_title,
+                category=category,
+                academic_year=academic_year or "N/A",
+                subject=subject,
+                grade_level=grade_level,
+                class_name=(
+                    class_name
+                    if class_name and class_name != "-"
+                    else None
+                ),
+                description=(
+                    "Gi\u00e1o \u00e1n \u0111\u00e3 \u0111\u01b0\u1ee3c b\u1ed5 sung "
+                    "th\u00f4ng tin t\u1eeb L\u1ecbch b\u00e1o gi\u1ea3ng "
+                    "v\u00e0 chu\u1ea9n h\u00f3a tr\u00ean h\u1ec7 th\u1ed1ng."
+                ),
+                tags=("lesson-plan", "standardized"),
+            )
+            try:
+                saved_document = upload_service.upload(
+                    content=artifact_content,
+                    file_name=artifact_file_name,
+                    mime_type=(
+                        "application/vnd.openxmlformats-"
+                        "officedocument.wordprocessingml.document"
+                    ),
+                    metadata=metadata,
+                )
+                st.success(
+                    "\u0110\u00e3 l\u01b0u gi\u00e1o \u00e1n chu\u1ea9n h\u00f3a "
+                    "v\u00e0o Kho gi\u00e1o \u00e1n."
+                )
+                link = getattr(saved_document, "web_view_link", None)
+                if link:
+                    st.link_button(
+                        "M\u1edf gi\u00e1o \u00e1n \u0111\u00e3 l\u01b0u",
+                        link,
+                    )
+            except Exception as error:
+                st.error(
+                    "Kh\u00f4ng th\u1ec3 l\u01b0u gi\u00e1o \u00e1n "
+                    "\u0111\u00e3 chu\u1ea9n h\u00f3a: " + str(error)
+                )
+
+        def _g1b_v2_back_to_weekly_schedule() -> None:
+            st.session_state["portal_navigation_request"] = 'Soạn bài theo tuần'
+
+        # G1B_P6A_V2_FRESH_ADMIN_BRIDGE
+        def _g1b_v2_standardize_with_fresh_admin_config(
+            *,
+            file_name: str,
+            content: bytes,
+            group_context,
+        ):
+            context = dict(group_context or {})
+            subject_ref = str(
+                context.get("subject_ref")
+                or context.get("subject")
+                or context.get("subject_name")
+                or ""
+            ).strip()
+            component_ref = str(
+                context.get("component_ref")
+                or context.get("component")
+                or context.get("component_name")
+                or ""
+            ).strip()
+
+            missing = object()
+            prior_subject = st.session_state.get(
+                "standardization_subject_filter",
+                missing,
+            )
+            prior_component = st.session_state.get(
+                "standardization_component_filter",
+                missing,
+            )
+
+            if subject_ref:
+                st.session_state["standardization_subject_filter"] = subject_ref
+            else:
+                st.session_state.pop("standardization_subject_filter", None)
+
+            if component_ref:
+                st.session_state["standardization_component_filter"] = component_ref
+            else:
+                st.session_state.pop("standardization_component_filter", None)
+
+            for state_key in (
+                "lesson_plan_admin_runtime_configuration_payload",
+                "lesson_plan_admin_runtime_configuration_source",
+                "lesson_plan_admin_template_profile",
+                "lesson_plan_template_profile",
+                "subject_lesson_plan_profile",
+                "lesson_plan_admin_approval_policy",
+                "lesson_plan_admin_approval_label",
+                "lesson_plan_admin_approval_alignment",
+                "standardization_drafting_before_monday_enabled",
+                "standardization_drafting_before_monday_days",
+                "standardization_approval_before_monday_days",
+            ):
+                st.session_state.pop(state_key, None)
+
+            try:
+                apply_active_admin_lesson_plan_configuration(
+                    client=client,
+                    session_state=st.session_state,
+                )
+
+                st.session_state[
+                    "standardization_approval_before_monday_enabled"
+                ] = bool(
+                    st.session_state.get(
+                        "g1b_v2_include_approval_block",
+                        True,
+                    )
+                )
+
+                return standardize_lesson_plan_v2_document(
+                    file_name=file_name,
+                    content=content,
+                    group_context=group_context,
+                )
+            finally:
+                if prior_subject is missing:
+                    st.session_state.pop("standardization_subject_filter", None)
+                else:
+                    st.session_state["standardization_subject_filter"] = prior_subject
+
+                if prior_component is missing:
+                    st.session_state.pop("standardization_component_filter", None)
+                else:
+                    st.session_state["standardization_component_filter"] = prior_component
+
+        from portal_v2.ui.lesson_authoring_ai_streamlit import (
+            _resolve_ai_handler as _resolve_g1b_v2_ai_handler,
+        )
+        _g1b_v2_ai_handler, _g1b_v2_ai_status = _resolve_g1b_v2_ai_handler()
+
+        render_standardized_lesson_plan_authoring_v2(
+            client=client,
+            user_id=str(user_id),
+            preview_html_builder=build_document_html,
+            standardize_handler=_g1b_v2_standardize_with_fresh_admin_config,
+            ai_handler=_g1b_v2_ai_handler,
+            ai_status=_g1b_v2_ai_status,
+            save_handler=_g1b_v2_save_standardized_artifact,
+            back_handler=_g1b_v2_back_to_weekly_schedule,
+        )
+
+    elif selected == 'Soạn bài cùng chuẩn giáo án':
         from portal_v2.ui.weekly_schedule_streamlit import (
             render_weekly_schedule_workspace,
         )
@@ -1110,6 +1358,24 @@ def main() -> None:
         render_lesson_plan_management_workspace(
             client=client,
             user_id=str(user_id),
+        )
+
+    elif selected == 'Thư viện Prompt & AI':
+        from portal_v2.ui.prompt_library_ai_streamlit import (
+            render_prompt_library_ai_page,
+        )
+
+        render_prompt_library_ai_page(
+            client=client,
+            user_id=str(user_id),
+        )
+
+    elif selected == 'Soạn bài theo tuần':
+        from portal_v2.ui.weekly_lesson_authoring_streamlit import (
+            render_weekly_lesson_authoring_page,
+        )
+        render_weekly_lesson_authoring_page(
+            client=client, user_id=str(user_id),
         )
 
     elif selected == 'So\u1ea1n b\xe0i c\xf9ng AI':

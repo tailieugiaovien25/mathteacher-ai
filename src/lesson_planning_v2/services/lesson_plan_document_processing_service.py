@@ -5,6 +5,8 @@ from datetime import date
 from pathlib import Path
 from dataclasses import replace
 from datetime import datetime
+from inspect import Parameter, signature
+from typing import Any, Callable
 
 from document_intelligence.contracts import (
     DocumentField,
@@ -24,13 +26,15 @@ from lesson_planning_v2.services.scheduled_lesson_context_service import (
     ScheduledLessonContextService,
 )
 
-
 @dataclass(frozen=True)
 class LessonPlanDocumentProcessingResult:
     output_name: str
     output_bytes: bytes
     unresolved_fields: tuple[str, ...]
     review_warnings: tuple[str, ...] = ()
+    # G1B_A5E_PIPELINE_EVIDENCE_FIELDS
+    context_result: object | None = None
+    standardization_report: object | None = None
 
 
 class LessonPlanDocumentProcessingService:
@@ -177,6 +181,7 @@ class LessonPlanDocumentProcessingService:
         options: LessonPlanStandardizationOptions | None = None,
         original_content: bytes | None = None,
         ai_revised_text: str = "",
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> LessonPlanDocumentProcessingResult:
         safe_name = Path(
             original_name
@@ -202,6 +207,8 @@ class LessonPlanDocumentProcessingService:
                 drafting_date=drafting_date,
             )
         )
+        # G1B_13H1R4B5M_PROCESSING_CONTEXT_TRACE
+        stashed_context_type = type(context)
 
         if modification_plan is not None:
             context = self.apply_modification_plan(
@@ -305,6 +312,15 @@ class LessonPlanDocumentProcessingService:
                 "report_path": report_path,
                 "context": context,
             }
+            # Preserve compatibility with injected/legacy pipelines that do
+            # not yet expose the optional monitoring callback.
+            process_parameters = signature(pipeline.process).parameters
+            accepts_extra_keywords = any(
+                item.kind is Parameter.VAR_KEYWORD
+                for item in process_parameters.values()
+            )
+            if "progress_callback" in process_parameters or accepts_extra_keywords:
+                pipeline_arguments["progress_callback"] = progress_callback
             if options is not None:
                 pipeline_arguments["options"] = resolved_options
 
@@ -324,6 +340,9 @@ class LessonPlanDocumentProcessingService:
                     .unresolved_fields
                 ),
                 review_warnings=review_warnings,
+                # G1B_A5E_PIPELINE_EVIDENCE_RETURN
+                context_result=result.context_result,
+                standardization_report=getattr(result, "standardization_report", None),
             )
         )
 

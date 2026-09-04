@@ -1,4 +1,5 @@
-from __future__ import annotations
+﻿from __future__ import annotations
+from portal_v2.ui.admin_subject_coordination_workspace_streamlit import render_admin_subject_coordination_workspace
 
 from typing import Any
 
@@ -141,12 +142,12 @@ def _load_admin_user_directory(*, client) -> tuple[dict[str, str], ...]:
                 "registered_at": str(role_row.get("created_at", "") or ""),
                 "is_active": role_row.get("is_active", True) is True,
                 "status": (
-                    "Mới đăng ký"
+                    "Má»›i Ä‘Äƒng kÃ½"
                     if profile is None
                     else (
-                        "Đang có hiệu lực"
+                        "Äang cÃ³ hiá»‡u lá»±c"
                         if role_row.get("is_active", True) is True
-                        else "Ngừng hoạt động"
+                        else "Ngá»«ng hoáº¡t Ä‘á»™ng"
                     )
                 ),
             }
@@ -157,9 +158,9 @@ def _load_admin_user_directory(*, client) -> tuple[dict[str, str], ...]:
             result,
             key=lambda item: (
                 {
-                    "Mới đăng ký": 0,
-                    "Đang có hiệu lực": 1,
-                    "Ngừng hoạt động": 2,
+                    "Má»›i Ä‘Äƒng kÃ½": 0,
+                    "Äang cÃ³ hiá»‡u lá»±c": 1,
+                    "Ngá»«ng hoáº¡t Ä‘á»™ng": 2,
                 }.get(item["status"], 3),
                 item["full_name"].casefold(),
                 item["registered_at"],
@@ -171,59 +172,59 @@ def _load_admin_user_directory(*, client) -> tuple[dict[str, str], ...]:
 def _render_admin_dashboard(st, *, client=None) -> None:
     st.title("ADMIN Dashboard")
     st.caption(
-        "Tổng quan vận hành và quản trị dữ liệu tin cậy của MathTeacher-AI."
+        "Tá»•ng quan váº­n hÃ nh vÃ  quáº£n trá»‹ dá»¯ liá»‡u tin cáº­y cá»§a MathTeacher-AI."
     )
 
     if client is None:
-        st.warning("Chưa có kết nối dữ liệu để tải danh sách USER.")
+        st.warning("ChÆ°a cÃ³ káº¿t ná»‘i dá»¯ liá»‡u Ä‘á»ƒ táº£i danh sÃ¡ch USER.")
         return
 
     try:
         user_rows = _load_admin_user_directory(client=client)
     except Exception as error:
-        st.error(f"Không thể tải danh sách USER: {error}")
+        st.error(f"KhÃ´ng thá»ƒ táº£i danh sÃ¡ch USER: {error}")
         return
 
     new_count = sum(
-        item["status"] == "Mới đăng ký"
+        item["status"] == "Má»›i Ä‘Äƒng kÃ½"
         for item in user_rows
     )
     active_count = sum(
-        item["status"] == "Đang có hiệu lực"
+        item["status"] == "Äang cÃ³ hiá»‡u lá»±c"
         for item in user_rows
     )
 
     metric_columns = st.columns(3)
-    metric_columns[0].metric("Tổng USER", len(user_rows))
-    metric_columns[1].metric("Mới đăng ký", new_count)
-    metric_columns[2].metric("Đang có hiệu lực", active_count)
+    metric_columns[0].metric("Tá»•ng USER", len(user_rows))
+    metric_columns[1].metric("Má»›i Ä‘Äƒng kÃ½", new_count)
+    metric_columns[2].metric("Äang cÃ³ hiá»‡u lá»±c", active_count)
 
     status_filter = st.segmented_control(
-        "Trạng thái USER",
+        "Tráº¡ng thÃ¡i USER",
         options=(
-            "Tất cả",
-            "Mới đăng ký",
-            "Đang có hiệu lực",
-            "Ngừng hoạt động",
+            "Táº¥t cáº£",
+            "Má»›i Ä‘Äƒng kÃ½",
+            "Äang cÃ³ hiá»‡u lá»±c",
+            "Ngá»«ng hoáº¡t Ä‘á»™ng",
         ),
-        default="Tất cả",
+        default="Táº¥t cáº£",
         key="admin_dashboard_user_status",
     )
     visible_rows = tuple(
         item
         for item in user_rows
-        if status_filter in (None, "Tất cả")
+        if status_filter in (None, "Táº¥t cáº£")
         or item["status"] == status_filter
     )
 
     st.dataframe(
         [
             {
-                "Trạng thái": item["status"],
-                "Họ và tên": item["full_name"] or "— Chưa khai hồ sơ —",
-                "Mã giáo viên": item["teacher_code"] or "—",
-                "Trường": item["school_name"] or "—",
-                "Ngày đăng ký": item["registered_at"][:10] or "—",
+                "Tráº¡ng thÃ¡i": item["status"],
+                "Há» vÃ  tÃªn": item["full_name"] or "â€” ChÆ°a khai há»“ sÆ¡ â€”",
+                "MÃ£ giÃ¡o viÃªn": item["teacher_code"] or "â€”",
+                "TrÆ°á»ng": item["school_name"] or "â€”",
+                "NgÃ y Ä‘Äƒng kÃ½": item["registered_at"][:10] or "â€”",
                 "USER ID": item["user_id"],
             }
             for item in visible_rows
@@ -236,27 +237,27 @@ def _render_admin_dashboard(st, *, client=None) -> None:
 def _render_trusted_data(st) -> None:
     st.title("Trusted Data")
     st.caption(
-        "Quản trị dữ liệu theo vòng đời Draft → Pending → Verified → Published."
+        "Quáº£n trá»‹ dá»¯ liá»‡u theo vÃ²ng Ä‘á»i Draft â†’ Pending â†’ Verified â†’ Published."
     )
-    st.info("Danh sách và workflow dữ liệu thật sẽ được nối ở bước tiếp theo.")
+    st.info("Danh sÃ¡ch vÃ  workflow dá»¯ liá»‡u tháº­t sáº½ Ä‘Æ°á»£c ná»‘i á»Ÿ bÆ°á»›c tiáº¿p theo.")
 
 
 def _render_time_allocation(st) -> None:
     st.title("Time Allocation")
     st.caption(
-        "Quản trị phân bổ thời lượng theo curriculum, subject và grade."
+        "Quáº£n trá»‹ phÃ¢n bá»• thá»i lÆ°á»£ng theo curriculum, subject vÃ  grade."
     )
     st.info(
-        "Không hard-code số tiết trong UI. Giá trị sẽ đến từ dữ liệu quản trị."
+        "KhÃ´ng hard-code sá»‘ tiáº¿t trong UI. GiÃ¡ trá»‹ sáº½ Ä‘áº¿n tá»« dá»¯ liá»‡u quáº£n trá»‹."
     )
 
 
 def _render_sources(st) -> None:
     st.title("Sources & Provenance")
     st.caption(
-        "Quản trị nguồn, phiên bản nguồn và truy vết provenance."
+        "Quáº£n trá»‹ nguá»“n, phiÃªn báº£n nguá»“n vÃ  truy váº¿t provenance."
     )
-    st.info("Nguồn dữ liệu thật sẽ được nối qua service boundary.")
+    st.info("Nguá»“n dá»¯ liá»‡u tháº­t sáº½ Ä‘Æ°á»£c ná»‘i qua service boundary.")
 
 
 def _update_user_active_status(*, client, user_id: str, active: bool) -> None:
@@ -269,7 +270,7 @@ def _update_user_active_status(*, client, user_id: str, active: bool) -> None:
     )
     rows = getattr(response, "data", None)
     if isinstance(rows, list) and not rows:
-        raise ValueError("Không tìm thấy tài khoản giáo viên cần cập nhật.")
+        raise ValueError("KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n giÃ¡o viÃªn cáº§n cáº­p nháº­t.")
 
 
 def _update_teacher_profile(
@@ -286,7 +287,7 @@ def _update_teacher_profile(
         "school_name": school_name.strip(),
     }
     if not all(values.values()):
-        raise ValueError("Mã giáo viên, họ tên và trường không được để trống.")
+        raise ValueError("MÃ£ giÃ¡o viÃªn, há» tÃªn vÃ  trÆ°á»ng khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.")
     (
         client.table("teacher_profiles")
         .update(values)
@@ -296,63 +297,63 @@ def _update_teacher_profile(
 
 
 def _render_users(st, *, client=None) -> None:
-    st.title("Người dùng & Quyền hạn")
+    st.title("NgÆ°á»i dÃ¹ng & Quyá»n háº¡n")
     st.caption(
-        "Quản lý hồ sơ, trạng thái tài khoản và mở nhanh phân công chuyên môn."
+        "Quáº£n lÃ½ há»“ sÆ¡, tráº¡ng thÃ¡i tÃ i khoáº£n vÃ  má»Ÿ nhanh phÃ¢n cÃ´ng chuyÃªn mÃ´n."
     )
 
     if client is None:
-        st.warning("Chưa có kết nối dữ liệu để tải danh sách người dùng.")
+        st.warning("ChÆ°a cÃ³ káº¿t ná»‘i dá»¯ liá»‡u Ä‘á»ƒ táº£i danh sÃ¡ch ngÆ°á»i dÃ¹ng.")
         return
 
     try:
         user_rows = _load_admin_user_directory(client=client)
     except Exception as error:
-        st.error(f"Không thể tải danh sách người dùng: {error}")
+        st.error(f"KhÃ´ng thá»ƒ táº£i danh sÃ¡ch ngÆ°á»i dÃ¹ng: {error}")
         return
 
-    active_count = sum(item["status"] == "Đang có hiệu lực" for item in user_rows)
-    stopped_count = sum(item["status"] == "Ngừng hoạt động" for item in user_rows)
-    new_count = sum(item["status"] == "Mới đăng ký" for item in user_rows)
+    active_count = sum(item["status"] == "Äang cÃ³ hiá»‡u lá»±c" for item in user_rows)
+    stopped_count = sum(item["status"] == "Ngá»«ng hoáº¡t Ä‘á»™ng" for item in user_rows)
+    new_count = sum(item["status"] == "Má»›i Ä‘Äƒng kÃ½" for item in user_rows)
 
     metrics = st.columns(4)
-    metrics[0].metric("Tổng USER", len(user_rows))
-    metrics[1].metric("Mới đăng ký", new_count)
-    metrics[2].metric("Đang có hiệu lực", active_count)
-    metrics[3].metric("Ngừng hoạt động", stopped_count)
+    metrics[0].metric("Tá»•ng USER", len(user_rows))
+    metrics[1].metric("Má»›i Ä‘Äƒng kÃ½", new_count)
+    metrics[2].metric("Äang cÃ³ hiá»‡u lá»±c", active_count)
+    metrics[3].metric("Ngá»«ng hoáº¡t Ä‘á»™ng", stopped_count)
 
     status_filter = st.segmented_control(
-        "Trạng thái USER",
-        options=("Tất cả", "Mới đăng ký", "Đang có hiệu lực", "Ngừng hoạt động"),
-        default="Tất cả",
+        "Tráº¡ng thÃ¡i USER",
+        options=("Táº¥t cáº£", "Má»›i Ä‘Äƒng kÃ½", "Äang cÃ³ hiá»‡u lá»±c", "Ngá»«ng hoáº¡t Ä‘á»™ng"),
+        default="Táº¥t cáº£",
         key="admin_users_status_filter",
     )
     visible_rows = tuple(
         item for item in user_rows
-        if status_filter in (None, "Tất cả") or item["status"] == status_filter
+        if status_filter in (None, "Táº¥t cáº£") or item["status"] == status_filter
     )
 
     headers = st.columns([1.35, 1.8, 1.0, 2.2, 1.1, 2.6])
     for column, label in zip(
         headers,
-        ("Trạng thái", "Họ và tên", "Mã GV", "Trường", "Ngày đăng ký", "Thao tác"),
+        ("Tráº¡ng thÃ¡i", "Há» vÃ  tÃªn", "MÃ£ GV", "TrÆ°á»ng", "NgÃ y Ä‘Äƒng kÃ½", "Thao tÃ¡c"),
     ):
         column.markdown(f"**{label}**")
 
     if not visible_rows:
-        st.info("Không có người dùng phù hợp với bộ lọc.")
+        st.info("KhÃ´ng cÃ³ ngÆ°á»i dÃ¹ng phÃ¹ há»£p vá»›i bá»™ lá»c.")
 
     for item in visible_rows:
         columns = st.columns([1.35, 1.8, 1.0, 2.2, 1.1, 2.6])
         columns[0].write(item["status"])
-        columns[1].write(item["full_name"] or "— Chưa khai hồ sơ —")
-        columns[2].write(item["teacher_code"] or "—")
-        columns[3].write(item["school_name"] or "—")
-        columns[4].write(item["registered_at"][:10] or "—")
+        columns[1].write(item["full_name"] or "â€” ChÆ°a khai há»“ sÆ¡ â€”")
+        columns[2].write(item["teacher_code"] or "â€”")
+        columns[3].write(item["school_name"] or "â€”")
+        columns[4].write(item["registered_at"][:10] or "â€”")
 
         action_columns = columns[5].columns(3)
         if action_columns[0].button(
-            "Chỉnh sửa",
+            "Chá»‰nh sá»­a",
             key=f"admin_user_edit_{item['user_id']}",
             disabled=not bool(item["full_name"]),
             width="stretch",
@@ -361,9 +362,9 @@ def _render_users(st, *, client=None) -> None:
             st.rerun()
 
         if action_columns[1].button(
-            "Phân công",
+            "PhÃ¢n cÃ´ng",
             key=f"admin_user_assign_{item['user_id']}",
-            disabled=item["status"] != "Đang có hiệu lực",
+            disabled=item["status"] != "Äang cÃ³ hiá»‡u lá»±c",
             width="stretch",
         ):
             st.session_state["admin_assignment_target_teacher_id"] = item["user_id"]
@@ -372,9 +373,9 @@ def _render_users(st, *, client=None) -> None:
 
         is_protected_admin = item["role"] == "admin"
         toggle_label = (
-            "Bảo vệ"
+            "Báº£o vá»‡"
             if is_protected_admin
-            else ("Ngừng" if item["is_active"] else "Kích hoạt")
+            else ("Ngá»«ng" if item["is_active"] else "KÃ­ch hoáº¡t")
         )
         if action_columns[2].button(
             toggle_label,
@@ -389,26 +390,26 @@ def _render_users(st, *, client=None) -> None:
                     active=not item["is_active"],
                 )
             except Exception as error:
-                st.error(f"Không thể cập nhật trạng thái tài khoản: {error}")
+                st.error(f"KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i tÃ i khoáº£n: {error}")
             else:
-                st.success("Đã cập nhật trạng thái tài khoản.")
+                st.success("ÄÃ£ cáº­p nháº­t tráº¡ng thÃ¡i tÃ i khoáº£n.")
                 st.rerun()
 
     edit_id = st.session_state.get("admin_user_edit_id")
     edit_item = next((item for item in user_rows if item["user_id"] == edit_id), None)
     if edit_item is not None:
         st.divider()
-        st.subheader("Chỉnh sửa hồ sơ giáo viên")
+        st.subheader("Chá»‰nh sá»­a há»“ sÆ¡ giÃ¡o viÃªn")
         with st.form("admin_user_edit_form"):
-            full_name = st.text_input("Họ và tên", value=edit_item["full_name"])
-            teacher_code = st.text_input("Mã giáo viên", value=edit_item["teacher_code"])
-            school_name = st.text_input("Trường", value=edit_item["school_name"])
+            full_name = st.text_input("Há» vÃ  tÃªn", value=edit_item["full_name"])
+            teacher_code = st.text_input("MÃ£ giÃ¡o viÃªn", value=edit_item["teacher_code"])
+            school_name = st.text_input("TrÆ°á»ng", value=edit_item["school_name"])
             form_columns = st.columns(2)
             save_edit = form_columns[0].form_submit_button(
-                "Lưu thay đổi", type="primary", width="stretch"
+                "LÆ°u thay Ä‘á»•i", type="primary", width="stretch"
             )
             cancel_edit = form_columns[1].form_submit_button(
-                "Hủy", width="stretch"
+                "Há»§y", width="stretch"
             )
 
         if cancel_edit:
@@ -424,10 +425,10 @@ def _render_users(st, *, client=None) -> None:
                     school_name=school_name,
                 )
             except Exception as error:
-                st.error(f"Không thể cập nhật hồ sơ: {error}")
+                st.error(f"KhÃ´ng thá»ƒ cáº­p nháº­t há»“ sÆ¡: {error}")
             else:
                 st.session_state.pop("admin_user_edit_id", None)
-                st.success("Đã cập nhật hồ sơ giáo viên.")
+                st.success("ÄÃ£ cáº­p nháº­t há»“ sÆ¡ giÃ¡o viÃªn.")
                 st.rerun()
 
 
@@ -616,7 +617,7 @@ def render_admin_shell(
     labels = admin_portal_page_labels()
 
     selected_label = st.sidebar.radio(
-        "Quản trị",
+        "Quáº£n trá»‹",
         labels,
         index=labels.index(current_label),
         key="admin_portal_navigation",
@@ -637,4 +638,9 @@ def render_admin_shell(
         authorization=authorization,
         client=client,
     )
+
+
+# G1B_P1A_ADMIN_NAVIGATION
+def render_admin_subject_coordination_read_only(*, client):
+    return render_admin_subject_coordination_workspace(client=client)
 

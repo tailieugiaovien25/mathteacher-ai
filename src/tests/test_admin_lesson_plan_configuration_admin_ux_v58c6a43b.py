@@ -35,9 +35,9 @@ def test_structured_payload_preserves_runtime_sections():
 
 def test_json_is_advanced_only():
     text = _text()
-    assert "Nâng cao: xem/chỉnh JSON" in text
+    assert "Cấu hình nâng cao (JSON)" in text
     assert "JSON nâng cao" in text
-    assert "Cấu hình nâng cao (JSON)" not in text
+    assert "Nâng cao: xem/chỉnh JSON" not in text
 
 
 def test_create_new_version_and_update_use_structured_editor():

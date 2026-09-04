@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections import Counter
 from datetime import date, timedelta
@@ -62,14 +62,19 @@ class WeeklyTeachingScheduleService:
         baseline_source = "EXECUTION_RECORDS"
 
         if not execution_records:
-            completed_counts = (
-                self._scheduled_counts_before_week(
-                    timetable_slots=timetable_slots,
-                    teacher_id=normalized_teacher_id,
-                    academic_week=academic_week,
+            # G1B-12G4: configured week 1 is the PPCT baseline.
+            if academic_week.week_number == 1:
+                completed_counts = Counter()
+                baseline_source = "ACADEMIC_YEAR_WEEK1"
+            else:
+                completed_counts = (
+                    self._scheduled_counts_before_week(
+                        timetable_slots=timetable_slots,
+                        teacher_id=normalized_teacher_id,
+                        academic_week=academic_week,
+                    )
                 )
-            )
-            baseline_source = "TIMETABLE_FALLBACK"
+                baseline_source = "TIMETABLE_FALLBACK"
         occurrences: Counter[tuple[str, str, str | None]] = Counter()
         entries: list[WeeklyTeachingScheduleEntry] = []
 

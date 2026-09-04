@@ -12,6 +12,8 @@ def row(**overrides):
         subject_ref="ENG",
         component_ref="",
         grade=8,
+        academic_year="2026-2027",
+        week_number=1,
         curriculum_period=10,
         lesson_id="L1",
         lesson_title="Unit 2",

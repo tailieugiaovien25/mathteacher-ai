@@ -499,6 +499,74 @@ _COMPOSITE_LABEL_PATTERN = re.compile(
 )
 
 
+
+# G1B_P6B_ENGLISH_STRUCTURAL_METADATA_RECOGNITION
+_ENGLISH_DATE_VALUE = (
+    r"\d{1,2}\s*[/.-]\s*"
+    r"\d{1,2}\s*[/.-]\s*"
+    r"\d{2,4}"
+)
+
+def _extract_english_structural_candidates(original: str) -> tuple[_Candidate, ...]:
+    stripped = str(original).strip()
+    if not stripped:
+        return ()
+
+    match = re.match(
+        rf"(?i)^(?:date\s+of\s+planning|date\s+of\s+preparation|preparation\s+date)"
+        rf"\s*:\s*(?P<value>{_ENGLISH_DATE_VALUE})\s*$",
+        stripped,
+    )
+    if match:
+        return (_Candidate(
+            field=MetadataField.DRAFTING_DATE,
+            value_text=match.group("value"),
+            strategy=MetadataMatchStrategy.INLINE_EXPLICIT,
+            confidence=1.0,
+        ),)
+
+    match = re.match(
+        rf"(?i)^(?:date\s+of\s+teaching|teaching\s+date)"
+        rf"(?:\s+(?P<class>[0-9]{{1,2}}[A-Za-z][0-9A-Za-z]*))?"
+        rf"\s*:\s*(?P<date>{_ENGLISH_DATE_VALUE})\s*$",
+        stripped,
+    )
+    if match:
+        result = [_Candidate(
+            field=MetadataField.TEACHING_DATE,
+            value_text=match.group("date"),
+            strategy=MetadataMatchStrategy.INLINE_EXPLICIT,
+            confidence=1.0,
+        )]
+        if match.group("class"):
+            result.append(_Candidate(
+                field=MetadataField.CLASS_NAME,
+                value_text=match.group("class"),
+                strategy=MetadataMatchStrategy.INLINE_EXPLICIT,
+                confidence=1.0,
+            ))
+        return tuple(result)
+
+    match = re.match(
+        rf"(?is)^(?P<class>[0-9]{{1,2}}[A-Za-z][0-9A-Za-z]*)\s*:\s*"
+        rf"(?P<date>{_ENGLISH_DATE_VALUE})\s*"
+        rf"period\s+(?P<period>\d+)\s*"
+        rf"(?P<title>\S.+?)\s*$",
+        stripped,
+    )
+    if match:
+        return (
+            _Candidate(field=MetadataField.CLASS_NAME, value_text=match.group("class"),
+                       strategy=MetadataMatchStrategy.INLINE_EXPLICIT, confidence=1.0),
+            _Candidate(field=MetadataField.TEACHING_DATE, value_text=match.group("date"),
+                       strategy=MetadataMatchStrategy.INLINE_EXPLICIT, confidence=1.0),
+            _Candidate(field=MetadataField.CURRICULUM_PERIOD, value_text=match.group("period"),
+                       strategy=MetadataMatchStrategy.INLINE_EXPLICIT, confidence=1.0),
+            _Candidate(field=MetadataField.LESSON_TITLE, value_text=match.group("title"),
+                       strategy=MetadataMatchStrategy.INLINE_EXPLICIT, confidence=1.0),
+        )
+    return ()
+
 def _extract_candidates(
     original: str,
 ) -> tuple[_Candidate, ...]:
@@ -526,6 +594,10 @@ def _extract_candidates(
 
     if not stripped:
         return ()
+
+    english_structural = _extract_english_structural_candidates(stripped)
+    if english_structural:
+        return english_structural
 
     matches = list(
         _COMPOSITE_LABEL_PATTERN.finditer(

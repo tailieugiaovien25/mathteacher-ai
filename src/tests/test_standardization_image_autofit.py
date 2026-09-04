@@ -384,15 +384,8 @@ def test_control_panel_contains_image_option():
         in source
     )
 
-    assert (
-        "Tự động căn chỉnh hình ảnh theo khung giáo án"
-        in source
-        or (
-            "T\\u1ef1 \\u0111\\u1ed9ng "
-            "c\\u0103n ch\\u1ec9nh"
-            in source
-        )
-    )
+    assert "def _mt_autofit_images_bytes(" in source
+    assert "# Image autofit runs LAST." in source
 
 
 def test_picture_table_row_fixed_height_is_removed():

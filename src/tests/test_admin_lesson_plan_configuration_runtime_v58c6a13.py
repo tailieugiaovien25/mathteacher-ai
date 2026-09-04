@@ -50,7 +50,7 @@ def test_service_has_admin_first_and_current_default_fallback():
     assert "fallback_payload" in text
 
 
-def test_admin_center_is_isolated_and_read_only():
+def test_admin_center_is_isolated_and_uses_controlled_write_actions():
     text = _text(
         "src/portal_v2/ui/"
         "admin_lesson_plan_coordination_center_streamlit.py"
@@ -58,7 +58,8 @@ def test_admin_center_is_isolated_and_read_only():
     assert "Trung tâm điều phối giáo án" in text
     assert "SupabaseLessonPlanConfigurationRepository" in text
     assert "LessonPlanConfigurationService" in text
-    assert "Giai đoạn này chỉ đọc" in text
+    assert "_render_group_save_button" in text
+    assert "render_admin_subject_coordination_workspace" in text
 
 
 

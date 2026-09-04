@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 import tempfile
+from typing import Any, Callable
 
 from document_standardization.lesson_plan_document_context_applier import (
     ContextApplicationResult,
@@ -15,7 +16,6 @@ from document_standardization.lesson_plan_standardizer import (
 from lesson_planning_v2.contexts import (
     ScheduledLessonContext,
 )
-
 
 @dataclass(frozen=True)
 class LessonPlanDocumentPipelineResult:
@@ -49,6 +49,7 @@ class LessonPlanDocumentPipeline:
         report_path: Path,
         context: ScheduledLessonContext,
         options: LessonPlanStandardizationOptions | None = None,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> LessonPlanDocumentPipelineResult:
         source = source.resolve()
         output = output.resolve()
@@ -100,6 +101,7 @@ class LessonPlanDocumentPipeline:
                         context_applied,
                         output,
                         report_path,
+                        progress_callback=progress_callback,
                     )
                 )
             else:
@@ -109,6 +111,7 @@ class LessonPlanDocumentPipeline:
                         output,
                         report_path,
                         options=resolved_options,
+                        progress_callback=progress_callback,
                     )
                 )
 

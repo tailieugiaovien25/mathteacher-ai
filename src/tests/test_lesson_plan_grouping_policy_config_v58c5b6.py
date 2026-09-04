@@ -44,9 +44,9 @@ def test_inactive_config_does_not_apply():
     assert source.resolve(subject_ref="MATH", component_ref="").mode is LessonPlanGroupingMode.BY_PERIOD
 
 
-def test_grade_is_a_supported_grouping_mode():
+def test_grouping_modes_exclude_grade_partition():
     assert {m.value for m in LessonPlanGroupingMode} == {
-        "BY_PERIOD", "BY_LESSON", "BY_WEEK", "BY_GRADE"
+        "BY_PERIOD", "BY_LESSON", "BY_WEEK"
     }
 
 

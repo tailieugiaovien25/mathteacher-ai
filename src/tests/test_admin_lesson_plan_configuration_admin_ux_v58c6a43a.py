@@ -38,7 +38,7 @@ def test_admin_ux_no_longer_requires_manual_ids_for_main_flow():
 def test_raw_json_is_demoted_to_advanced_configuration():
     text = UI.read_text(encoding="utf-8-sig")
 
-    assert "Nâng cao: xem/chỉnh JSON" in text
+    assert "Cấu hình nâng cao (JSON)" in text
     assert "JSON nâng cao" in text
     assert "Các trường trực quan phía trên sẽ được" in text
 
@@ -49,5 +49,5 @@ def test_safe_lifecycle_actions_remain():
     assert "Tạo phiên bản DRAFT mới" in text
     assert "Lưu DRAFT" in text
     assert "Xuất bản PUBLISHED" in text
-    assert "Đặt làm phiên bản hiện hành / ACTIVE" in text
+    assert "Áp dụng phiên bản này" in text
     assert "retire_previous=retire_previous" in text

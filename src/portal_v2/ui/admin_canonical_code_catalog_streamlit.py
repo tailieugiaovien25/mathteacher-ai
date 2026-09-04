@@ -73,34 +73,46 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
     from lesson_planning_v2.models.lesson_plan_grouping import LessonPlanGroupingMode
     from lesson_planning_v2.models.lesson_plan_grouping_policy_config import LessonPlanGroupingPolicyConfig
     from portal_v2.context.supabase_canonical_code_repository import SupabaseCanonicalCodeRepository
+    from educational_planning_v2.adapters.supabase_subject_catalog_repository import SupabaseSubjectCatalogRepository
+    from educational_planning_v2.models.subject_catalog import CatalogStatus
 
     st.divider()
     st.subheader("\u0043\u0068\u00ed\u006e\u0068 \u0073\u00e1\u0063\u0068 \u006e\u0068\u00f3\u006d \u0067\u0069\u00e1\u006f \u00e1\u006e")
     st.caption("\u0041\u0044\u004d\u0049\u004e \u0063\u1ea5\u0075 \u0068\u00ec\u006e\u0068 \u004d\u00f4\u006e/\u0050\u0068\u00e2\u006e \u006d\u00f4\u006e \u2192 \u0054\u0068\u0065\u006f PPCT, \u0054\u0068\u0065\u006f \u0062\u00e0\u0069 \u0068\u006f\u1eb7\u0063 \u0054\u0068\u0065\u006f \u0074\u0075\u1ea7\u006e \u0068\u006f\u1eb7\u0063 \u0054\u0068\u0065\u006f \u006b\u0068\u1ed1\u0069. \u004b\u0068\u1ed1\u0069 \u006c\u1edb\u0070 \u006c\u0075\u00f4\u006e \u006c\u00e0 \u0070\u0068\u1ea1\u006d \u0076\u0069 \u0062\u1eaft \u0062\u0075\u1ed9\u0063.")
     policy_repo=SupabaseLessonPlanGroupingPolicyRepository(client)
     code_repo=SupabaseCanonicalCodeRepository(client)
+    subject_repo=SupabaseSubjectCatalogRepository(client=client)
     try:
         configs=policy_repo.list_configs(include_inactive=True)
     except Exception as error:
         st.warning("\u0043\u0068\u01b0\u0061 \u0111\u1ecdc \u0111\u01b0\u1ee3\u0063 \u0063\u1ea5\u0075 \u0068\u00ec\u006e\u0068 \u006e\u0068\u00f3\u006d \u0067\u0069\u00e1\u006f \u00e1\u006e: "+str(error))
         return
     st.dataframe([{"\u004d\u00f4\u006e":x.subject_ref,"\u0050\u0068\u00e2\u006e \u006d\u00f4\u006e":x.component_ref or "\u2014","\u0043\u00e1\u0063\u0068 \u006e\u0068\u00f3\u006d":x.mode.value,"\u0054\u0072\u1ea1\u006e\u0067 \u0074\u0068\u00e1\u0069":"ACTIVE" if x.active else "INACTIVE"} for x in configs],hide_index=True,use_container_width=True)
-    subject_items=tuple(code_repo.list_codes(namespace="subject"))
+    subject_items=tuple(subject_repo.list_subjects(status=CatalogStatus.ACTIVE))
     component_items=tuple(code_repo.list_codes(namespace="component"))
     if not subject_items:
         st.info("\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u006d\u00e3 \u006d\u00f4\u006e ACTIVE \u0074\u0072\u006f\u006e\u0067 \u0042\u1ed9 \u006d\u00e3 Canonical.")
         return
-    subjects=tuple(x.code for x in subject_items)
+    subjects=tuple(x.subject_id for x in subject_items)
     components=tuple(x.code for x in component_items)
-    subject_labels={x.code:f"{x.label} ({x.code})" for x in subject_items}
+    subject_labels={x.subject_id:f"{x.name} ({x.code})" for x in subject_items}
     component_labels={x.code:f"{x.label} ({x.code})" for x in component_items}
-    mode_labels={"\u0054\u0068\u0065\u006f \u0074\u0069\u1ebf\u0074 PPCT":LessonPlanGroupingMode.BY_PERIOD,"\u0054\u0068\u0065\u006f \u0062\u00e0\u0069":LessonPlanGroupingMode.BY_LESSON,"\u0054\u0068\u0065\u006f \u0074\u0075\u1ea7\u006e":LessonPlanGroupingMode.BY_WEEK,"\u0054\u0068\u0065\u006f \u006b\u0068\u1ed1\u0069":LessonPlanGroupingMode.BY_GRADE}
+    mode_labels={"\u0054\u0068\u0065\u006f \u0074\u0069\u1ebf\u0074 PPCT":LessonPlanGroupingMode.BY_PERIOD,"\u0054\u0068\u0065\u006f \u0062\u00e0\u0069":LessonPlanGroupingMode.BY_LESSON,"\u0054\u0068\u0065\u006f \u0074\u0075\u1ea7\u006e":LessonPlanGroupingMode.BY_WEEK}
     default_component="\u2014 \u004d\u1eb7\u0063 \u0111\u1ecb\u006e\u0068 \u0063\u1ee7\u0061 \u006d\u00f4\u006e \u2014"
+    _policy_proof = st.session_state.get("_v58_c5e5d7_grouping_policy_read_after_write")
+    if _policy_proof:
+        st.success("\u0110\u00e3 x\u00e1c minh l\u01b0u ch\u00ednh s\u00e1ch v\u00e0 \u0111\u1ecdc l\u1ea1i t\u1eeb Supabase.")
+        st.code(_policy_proof)
     with st.form("admin_lesson_plan_grouping_policy_form"):
         subject_ref=st.selectbox("\u004d\u00f4\u006e",subjects,format_func=lambda c:subject_labels.get(c,c))
         component_ref=st.selectbox("\u0050\u0068\u00e2\u006e \u006d\u00f4\u006e",(default_component,)+components,format_func=lambda c:component_labels.get(c,c))
         selected_component_code="" if component_ref==default_component else str(component_ref)
         current_config=next((item for item in configs if str(item.subject_ref)==str(subject_ref) and str(item.component_ref or "")==selected_component_code),None)
+        mode_options=tuple(mode_labels)
+        current_mode=current_config.mode if current_config is not None else LessonPlanGroupingMode.BY_PERIOD
+        current_mode_label=next((label for label,mode in mode_labels.items() if mode==current_mode),mode_options[0])
+        selected_component_code="" if component_ref==default_component else str(component_ref)
+        current_config=next((x for x in configs if str(x.subject_ref)==str(subject_ref) and str(x.component_ref or "")==selected_component_code),None)
         mode_options=tuple(mode_labels)
         current_mode=current_config.mode if current_config is not None else LessonPlanGroupingMode.BY_PERIOD
         current_mode_label=next((label for label,mode in mode_labels.items() if mode==current_mode),mode_options[0])
@@ -110,12 +122,27 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
     if save:
         component_code="" if component_ref==default_component else str(component_ref)
         try:
-            policy_repo.upsert_config(LessonPlanGroupingPolicyConfig(subject_ref=str(subject_ref),component_ref=component_code,mode=mode_labels[mode_label],active=bool(active)))
+            _saved_policy = policy_repo.upsert_config(LessonPlanGroupingPolicyConfig(subject_ref=str(subject_ref),component_ref=component_code,mode=mode_labels[mode_label],active=bool(active)))
+            _read_back = tuple(policy_repo.list_configs(include_inactive=True) or ())
+            _verified_policy = next((
+                item for item in _read_back
+                if str(item.subject_ref) == str(subject_ref)
+                and str(item.component_ref or "") == component_code
+            ), None)
+            if _verified_policy is None:
+                raise RuntimeError("READ_AFTER_WRITE_POLICY_NOT_FOUND")
+            st.session_state["_v58_c5e5d7_grouping_policy_read_after_write"] = (
+                f"subject_ref={_verified_policy.subject_ref!r}\n"
+                f"component_ref={_verified_policy.component_ref!r}\n"
+                f"mode={getattr(_verified_policy.mode, 'value', _verified_policy.mode)!r}\n"
+                f"active={bool(_verified_policy.active)!r}\n"
+                f"source={getattr(_verified_policy, 'source', None)!r}\n"
+                f"version={getattr(_verified_policy, 'version', None)!r}"
+            )
             st.success("\u0110\u00e3 \u006c\u01b0\u0075 \u0063\u0068\u00ed\u006e\u0068 \u0073\u00e1\u0063\u0068 \u006e\u0068\u00f3\u006d \u0067\u0069\u00e1\u006f \u00e1\u006e.")
             st.rerun()
         except Exception as error:
             st.error("\u004b\u0068\u00f4\u006e\u0067 \u0074\u0068\u1ec3 \u006c\u01b0\u0075 \u0063\u0068\u00ed\u006e\u0068 \u0073\u00e1\u0063\u0068 \u006e\u0068\u00f3\u006d \u0067\u0069\u00e1\u006f \u00e1\u006e: "+str(error))
-
 def render_admin_canonical_code_catalog(st, *, client) -> None:
     _render_admin_canonical_code_catalog_before_grouping_policy(
         st,

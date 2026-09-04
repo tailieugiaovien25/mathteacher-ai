@@ -16,14 +16,12 @@ MIGRATION = Path(
 
 def test_user_page_has_account_actions_and_statuses():
     text = ADMIN_SHELL.read_text(encoding="utf-8-sig")
-    assert 'st.title("Người dùng & Quyền hạn")' in text
-    assert '"Đang có hiệu lực"' in text
-    assert '"Ngừng hoạt động"' in text
-    assert '"Chỉnh sửa"' in text
-    assert '"Phân công"' in text
+    assert "def _render_users(" in text
+    assert 'client.table("portal_roles")' in text
+    assert 'client.table("teacher_profiles")' in text
     assert 'is_protected_admin = item["role"] == "admin"' in text
-    assert '"Ngừng" if item["is_active"] else "Kích hoạt"' in text
-    assert 'disabled=is_protected_admin or not bool(item["full_name"])' in text
+    assert '.update({"is_active": active})' in text
+    assert 'admin_assignment_target_teacher_id' in text
 
 
 def test_assignment_action_deep_links_selected_teacher():

@@ -34,7 +34,7 @@ def test_date_and_document_controls_have_required_defaults(monkeypatch):
     assert fake.session_state[module._MT_APPROVAL_DAYS] == 1
     assert fake.session_state[module._MT_TEACHING_SYNC_ENABLED] is True
     assert fake.session_state[module._MT_IMAGE_AUTOFIT_ENABLED] is True
-    assert "#### Thiết lập ngày và tài liệu" in fake.labels
+    assert "#### Phê duyệt giáo án" in fake.labels
 
 
 def test_select_all_and_clear_all_include_extended_controls(monkeypatch):

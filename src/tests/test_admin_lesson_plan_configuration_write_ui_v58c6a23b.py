@@ -23,7 +23,7 @@ def test_admin_write_actions_are_explicit_and_form_guarded():
         "Tạo phiên bản DRAFT mới",
         "Lưu DRAFT",
         "Xuất bản PUBLISHED",
-        "Đặt làm phiên bản hiện hành / ACTIVE",
+        "Áp dụng phiên bản này",
     ]:
         assert token in text
 

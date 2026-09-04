@@ -14,7 +14,6 @@ class LessonPlanGroupingMode(str, Enum):
     BY_PERIOD = "BY_PERIOD"
     BY_LESSON = "BY_LESSON"
     BY_WEEK = "BY_WEEK"
-    BY_GRADE = "BY_GRADE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +47,8 @@ class LessonPlanGroup:
     representative_row_index: int
     source: str = "LBG_PBSDTB"
 
+    academic_year: str | None = None
+    week_number: int | None = None
     @property
     def class_ids(self) -> tuple[str, ...]:
         return tuple(dict.fromkeys(

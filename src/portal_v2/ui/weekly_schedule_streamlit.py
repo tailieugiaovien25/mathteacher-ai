@@ -73,6 +73,11 @@ from lesson_planning_v2.services.lesson_plan_grouping_service import (
     LessonPlanGroupingService,
 )
 
+from lesson_planning_v2.services.canonical_lesson_plan_naming_service import (
+    CanonicalLessonPlanNamingError,
+    CanonicalLessonPlanNamingService,
+)
+
 from portal_v2.ui.teacher_workspace_styles import (
     apply_lesson_authoring_workspace_styles,
 )
@@ -856,6 +861,12 @@ def _confirm_standardization_options() -> None:
 # STANDARDIZATION_MODERN_3D_UI_V1
 def _render_standardization_modern_3d_header() -> None:
     """Presentation-only shell for Standardization."""
+    # MT-STANDARDIZATION-WORKSPACE-V59: visual scope anchor only.
+    st.markdown(
+        '<span class="mt-standardization-page-v59" '
+        'aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown(
         """
@@ -1663,6 +1674,7 @@ def _process_lesson_plan_upload(
     content: bytes,
     original_name: str,
     modification_plan=None,
+    progress_callback=None,
 ) -> tuple[
     str,
     bytes,
@@ -1699,8 +1711,16 @@ def _process_lesson_plan_upload(
         content=content,
         original_name=original_name,
         modification_plan=modification_plan,
+        progress_callback=progress_callback,
     )
 
+    # G1B_A5E_UPLOAD_EVIDENCE_SIDE_CHANNEL
+    st.session_state["_g1b_v2_pipeline_evidence"] = {
+        "context_result": getattr(result, "context_result", None),
+        "standardization_report": getattr(result, "standardization_report", None),
+        "unresolved_fields": tuple(result.unresolved_fields or ()),
+        "review_warnings": tuple(getattr(result, "review_warnings", ()) or ()),
+    }
     return (
         result.output_name,
         result.output_bytes,
@@ -3511,51 +3531,57 @@ def _standardization_ppct_reverse_sync(
     )
     st.session_state["_v58_c5b2_shadow_week_number"] = week_number
 
-    # V58_C5B5_SHADOW_RUNTIME_BROWSER
-    if st.session_state.get("_v58_c5b2_shadow_lesson_plan_groups"):
-        with st.expander(
-            "Tr?nh duy?t nh?m gi?o ?n (Shadow V58-C5B5)",
-            expanded=False,
-        ):
-            st.caption(
-                "Ch? ??c d? li?u grouping; ch?a thay selector hay authority hi?n h?nh."
-            )
-            _shadow_groups = tuple(
-                st.session_state["_v58_c5b2_shadow_lesson_plan_groups"]
-            )
-            _shadow_grades = sorted(
-                {
-                    int(group.grade)
-                    for group in _shadow_groups
-                    if group.grade is not None
-                }
-            )
-            st.write(
-                "Kh?i c? d? li?u: "
-                + (
-                    ", ".join(str(item) for item in _shadow_grades)
-                    if _shadow_grades
-                    else "-"
-                )
-            )
-            for _group in _shadow_groups:
-                _periods = ", ".join(
-                    str(item) for item in _group.curriculum_periods
-                )
-                _classes = ", ".join(str(item) for item in _group.class_ids)
-                _dates = ", ".join(
-                    f"{class_id}: {teaching_date}"
-                    for class_id, teaching_date in _group.teaching_dates_by_class
-                )
-                st.markdown(
-                    f"**Kh?i {_group.grade} ? {_group.grouping_mode.value}**  "
-                    f"PPCT: {_periods or '-'}  "
-                    f"L?p: {_classes or '-'}"
-                )
-                st.caption(
-                    f"Ng?y d?y theo l?p: {_dates or '-'} ? "
-                    f"Group ID: {_group.group_id}"
-                )
+    # V58-C5C3B_READONLY_GROUP_BROWSER
+    _browser_groups = tuple(st.session_state.get("_v58_c5b2_shadow_lesson_plan_groups", ()) or ())
+    if _browser_groups:
+        st.markdown("### Giáo án cần soạn trong tuần")
+        st.caption("Danh sách chỉ đọc từ dữ liệu tuần đã phân giải; chưa thay bộ chọn PPCT/Bài dạy hiện tại.")
+        _mode_labels = {"BY_PERIOD": "Theo tiết PPCT", "BY_LESSON": "Theo bài", "BY_WEEK": "Theo tuần"}
+        for _group in _browser_groups:
+            _mode = str(getattr(getattr(_group, "grouping_mode", None), "value", getattr(_group, "grouping_mode", "")) or "")
+            _grade = getattr(_group, "grade", None)
+            _subject = str(getattr(_group, "subject_ref", "") or "")
+            _component = str(getattr(_group, "component_ref", "") or "")
+            _periods = tuple(getattr(_group, "curriculum_periods", ()) or ())
+            _occurrences = tuple(getattr(_group, "occurrences", ()) or ())
+            _group_id = str(getattr(_group, "group_id", "") or "")
+            _lesson_title = str(getattr(_group, "lesson_title", "") or "")
+            _classes = tuple(dict.fromkeys(str(getattr(x, "class_id", "") or "") for x in _occurrences if str(getattr(x, "class_id", "") or "")))
+            _teaching_pairs = tuple((str(getattr(x, "class_id", "") or ""), getattr(x, "teaching_date", None)) for x in _occurrences if str(getattr(x, "class_id", "") or ""))
+            _title = " · ".join(x for x in (_subject or "Môn học", ("Khối " + str(_grade)) if _grade is not None else "", _mode_labels.get(_mode, _mode)) if x)
+            with st.container(border=True):
+                st.markdown("#### " + _title)
+                if _component: st.caption("Phân môn: " + _component)
+                if _lesson_title: st.write("**Bài:** " + _lesson_title)
+                if _periods: st.write("**PPCT:** " + ", ".join(str(x) for x in _periods))
+                if _classes: st.write("**Lớp:** " + ", ".join(_classes))
+                if _teaching_pairs: st.write("**Ngày dạy:** " + "; ".join(c + ": " + str(d) for c, d in _teaching_pairs))
+                # V58-C5C3D_CANONICAL_UPLOAD
+                try:
+                    _expected_plan_name = CanonicalLessonPlanNamingService().expected_name(_group)
+                    st.write("**Tên giáo án cần tìm:** `" + _expected_plan_name.filename + "`")
+                    _uploaded_plan = st.file_uploader("Upload giáo án", type=("docx",), key="v58_c5c3d_upload_" + _group_id, help="Chỉ nhận đúng giáo án: " + _expected_plan_name.filename)
+                    if _uploaded_plan is not None:
+                        try:
+                            CanonicalLessonPlanNamingService().validate_upload_filename(_group, str(getattr(_uploaded_plan, "name", "") or ""))
+                            st.success("Đúng giáo án: " + _expected_plan_name.filename)
+                            st.session_state["_v58_c5c3d_valid_upload_" + _group_id] = _uploaded_plan
+                        except CanonicalLessonPlanNamingError:
+                            st.session_state.pop("_v58_c5c3d_valid_upload_" + _group_id, None)
+                            st.error("File vừa chọn không thuộc giáo án này. Cần: " + _expected_plan_name.filename + " · Đã chọn: " + str(getattr(_uploaded_plan, "name", "") or ""))
+                except CanonicalLessonPlanNamingError as _name_error:
+                    st.warning("Chưa thể xác định tên giáo án canonical: " + str(_name_error))
+                if st.button("Mở giáo án", key="v58_c5c3b_open_group_" + _group_id, type="primary"):
+                    st.session_state["_v58_c5c3b_selected_group_id"] = _group_id
+                    st.rerun()
+        _selected_group_id = str(st.session_state.get("_v58_c5c3b_selected_group_id", "") or "")
+        if _selected_group_id:
+            _selected_group = next((x for x in _browser_groups if str(getattr(x, "group_id", "") or "") == _selected_group_id), None)
+            if _selected_group is not None:
+                st.info("LessonPlanGroup đang mở ở chế độ chỉ đọc. Hai công cụ sẽ được kích hoạt sau kiểm chứng runtime.")
+                _actions = st.columns(2)
+                _actions[0].button("Soạn bài cùng AI", key="v58_c5c3b_ai_preview", disabled=True, use_container_width=True)
+                _actions[1].button("Chuẩn hóa giáo án", key="v58_c5c3b_standardize_preview", disabled=True, use_container_width=True)
 
     selected_unit = lesson_units[selected_index]
     representative_index = int(selected_unit.representative_index)
@@ -5289,6 +5315,18 @@ text_input(
                 workflow_state = (
                     workflow_state.with_result(
                         result
+                    )
+                )
+                # G1B_STANDARDIZER_QG_V1B_READONLY_RUNTIME_OBSERVER
+                from document_standardization.lesson_plan_standardization_quality_gate import (
+                    LessonPlanStandardizationQualityGate,
+                )
+                st.session_state["standardization_quality_gate_result_v1"] = (
+                    LessonPlanStandardizationQualityGate().evaluate(
+                        canonical_context=metadata_override,
+                        validated_analysis=preview_view,
+                        context_result=result,
+                        standardization_report=None,
                     )
                 )
 
@@ -8108,6 +8146,59 @@ def _mt_iter_date_paragraphs(
             yield paragraph
 
 
+def _mt_remove_approval_block_bytes(content):
+    """Remove only a near-tail approval block from a standardized DOCX."""
+    from io import BytesIO
+    import re
+    import unicodedata
+    from docx import Document
+    from docx.oxml.ns import qn
+    if not isinstance(content, (bytes, bytearray)):
+        return content
+    def normalize(value):
+        value = unicodedata.normalize("NFD", str(value or ""))
+        value = "".join(ch for ch in value if unicodedata.category(ch) != "Mn")
+        return " ".join(value.casefold().split())
+    markers = ("to cm duyet", "to chuyen mon duyet")
+    date_re = re.compile(r"(ngay|thang|nam).*(ngay|thang|nam)", re.I)
+    document = Document(BytesIO(bytes(content)))
+    elements = [child for child in document.element.body if child.tag != qn("w:sectPr")]
+    marker_index = None
+    for index, element in enumerate(elements):
+        if element.tag != qn("w:p"):
+            continue
+        normalized = normalize("".join(element.itertext()))
+        if any(marker in normalized for marker in markers):
+            marker_index = index
+    if marker_index is None:
+        return bytes(content)
+    remaining = len(elements) - marker_index
+    if remaining > max(20, len(elements) // 3):
+        return bytes(content)
+    start = marker_index
+    for index in range(marker_index - 1, max(-1, marker_index - 5), -1):
+        element = elements[index]
+        if element.tag != qn("w:p"):
+            break
+        raw = "".join(element.itertext()).strip()
+        normalized = normalize(raw)
+        if not raw:
+            start = index
+            continue
+        if date_re.search(normalized) or ("ngay" in normalized and "thang" in normalized):
+            start = index
+            continue
+        break
+    body = document.element.body
+    for element in elements[start:]:
+        parent = element.getparent()
+        if parent is body:
+            body.remove(element)
+    output = BytesIO()
+    document.save(output)
+    return output.getvalue()
+
+
 def _mt_overlay_approval_date_bytes(
     content,
     approval_date,
@@ -8342,27 +8433,17 @@ def _mt_overlay_drafting_date_bytes(
             drafting_label_found = True
             changed = True
 
+    # If the source has a teaching date but no drafting field, place the
+    # drafting date immediately before the first teaching-date paragraph.
+    # This keeps the date block local and avoids appending metadata elsewhere.
     if not drafting_label_found:
-        anchor = next(
-            (
-                paragraph
-                for paragraph in paragraphs
-                if "ngày dạy" in paragraph.text.casefold()
-            ),
-            paragraphs[0] if paragraphs else None,
-        )
-
-        if anchor is not None:
-            inserted = anchor.insert_paragraph_before(
-                "Ngày soạn: " + formatted
-            )
-            if anchor.style is not None:
-                inserted.style = anchor.style
-        else:
-            document.add_paragraph(
-                "Ngày soạn: " + formatted
-            )
-        changed = True
+        teaching_pattern = re.compile(r"(?i)Ng\s*ày\s+d\s*ạy\s*:")
+        for paragraph in paragraphs:
+            if teaching_pattern.search(paragraph.text):
+                paragraph.insert_paragraph_before(f"Ngày soạn: {formatted}")
+                drafting_label_found = True
+                changed = True
+                break
 
     if not changed:
         return content
@@ -8493,9 +8574,17 @@ def _process_lesson_plan_upload(
         _mt_original_process_lesson_plan_upload_dates
     )
 
+    # Compatibility boundary: newer wrappers carry optional V2 context that
+    # the legacy document processor does not declare.  Bind and forward only
+    # parameters supported by that processor instead of failing at runtime.
+    supported_kwargs = {
+        name: value
+        for name, value in kwargs.items()
+        if name in signature.parameters
+    }
     bound = signature.bind_partial(
         *args,
-        **kwargs,
+        **supported_kwargs,
     )
 
     row = bound.arguments.get("row")
@@ -9402,6 +9491,56 @@ def _mt_image_cell_width_emu(
     if tc is None:
         return None
 
+    # A9B: Prefer normalized tblGrid geometry; tcW may be stale after
+    # table balancing. Include gridSpan for merged cells.
+    tr = tc.getparent()
+    tbl = tr.getparent() if tr is not None else None
+    if tr is not None and tbl is not None:
+        cells = [node for node in tr if _mt_image_xml_local_name(node) == "tc"]
+        try:
+            cell_index = cells.index(tc)
+        except ValueError:
+            cell_index = -1
+        grid = next(
+            (node for node in tbl if _mt_image_xml_local_name(node) == "tblGrid"),
+            None,
+        )
+        if cell_index >= 0 and grid is not None:
+            grid_widths = []
+            for col in grid:
+                if _mt_image_xml_local_name(col) != "gridCol":
+                    continue
+                value = next(
+                    (v for k, v in col.attrib.items() if k.rsplit("}", 1)[-1] == "w"),
+                    None,
+                )
+                try:
+                    grid_widths.append(int(value))
+                except (TypeError, ValueError):
+                    grid_widths.append(0)
+            span = 1
+            tc_pr_for_span = next(
+                (node for node in tc if _mt_image_xml_local_name(node) == "tcPr"),
+                None,
+            )
+            if tc_pr_for_span is not None:
+                span_node = next(
+                    (node for node in tc_pr_for_span if _mt_image_xml_local_name(node) == "gridSpan"),
+                    None,
+                )
+                if span_node is not None:
+                    span_value = next(
+                        (v for k, v in span_node.attrib.items() if k.rsplit("}", 1)[-1] == "val"),
+                        None,
+                    )
+                    try:
+                        span = max(1, int(span_value))
+                    except (TypeError, ValueError):
+                        span = 1
+            effective = sum(grid_widths[cell_index:cell_index + span])
+            if effective > 0:
+                return effective * 635
+
     tc_pr = next(
         (
             child
@@ -9896,8 +10035,8 @@ def _mt_reflow_all_lesson_tables(document):
     changed = False
 
     for table in document.tables:
-        table.autofit = True
-
+        # Preserve table geometry resolved by the standardizer.
+        # Final formatter keeps cleanup duties only.
         for row in table.rows:
             tr_pr = row._tr.get_or_add_trPr()
 
@@ -9954,6 +10093,12 @@ def _mt_format_lesson_document_layout_bytes(
     for paragraph in _mt_iter_date_paragraphs(document):
         text = paragraph.text.strip()
 
+        # A9B: WEEK is schedule metadata, not lesson-document content.
+        if re.match(r"(?i)^\s*WEEK\s*:\s*\d+\s*$", text):
+            paragraph._element.getparent().remove(paragraph._element)
+            changed = True
+            continue
+
         if heading_pattern.search(text):
             if paragraph.alignment != WD_ALIGN_PARAGRAPH.CENTER:
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -9963,6 +10108,9 @@ def _mt_format_lesson_document_layout_bytes(
             for run in paragraph.runs:
                 if run.italic is not True:
                     run.italic = True
+                    changed = True
+                if run.bold is not False:
+                    run.bold = False
                     changed = True
 
     body_paragraphs = list(document.paragraphs)
@@ -10124,72 +10272,30 @@ _mt_original_standardization_control_panel_3c = (
 
 
 def _render_standardization_date_and_document_options():
-    """Render date, timetable and image controls inside the main panel."""
-
+    """Render only the USER-owned approval decision."""
     st.session_state.setdefault(_MT_DRAFTING_ENABLED, True)
     st.session_state.setdefault(_MT_DRAFTING_DAYS, 3)
-    st.session_state.setdefault(_MT_APPROVAL_ENABLED, True)
-    st.session_state.setdefault(_MT_APPROVAL_DAYS, 1)
     st.session_state.setdefault(_MT_TEACHING_SYNC_ENABLED, True)
     st.session_state.setdefault(_MT_IMAGE_AUTOFIT_ENABLED, True)
     st.session_state.setdefault(_MT_END_RULE_ENABLED, True)
+    st.session_state.setdefault(_MT_APPROVAL_DAYS, 1)
+    st.session_state.setdefault(_MT_APPROVAL_ENABLED, True)
 
-    st.markdown("#### Thiết lập ngày và tài liệu")
-
-    drafting_enabled = st.checkbox(
-        "Dán đè hoặc bổ sung Ngày soạn",
-        key=_MT_DRAFTING_ENABLED,
-        help="Ngày soạn = Thứ Hai của tuần học trừ N ngày.",
-    )
-
-    if drafting_enabled:
-        st.number_input(
-            "Ngày soạn: trước thứ Hai của tuần học N ngày",
-            min_value=0,
-            value=int(st.session_state.get(_MT_DRAFTING_DAYS, 3)),
-            step=1,
-            key=_MT_DRAFTING_DAYS,
-        )
-
+    st.markdown("#### Phê duyệt giáo án")
     approval_enabled = st.checkbox(
-        "Dán đè hoặc bổ sung Ngày duyệt",
+        "Sinh phần Tổ CM duyệt",
         key=_MT_APPROVAL_ENABLED,
-        help="Ngày duyệt = Thứ Hai của tuần học trừ N ngày.",
+        help=(
+            "Chọn nếu giáo án này cần phần phê duyệt. "
+            "Bỏ chọn khi đây là giáo án thành phần để gộp; "
+            "công cụ Gộp giáo án sẽ quyết định có sinh một phần "
+            "Tổ CM duyệt duy nhất ở cuối file gộp hay không."
+        ),
     )
-
     if approval_enabled:
-        st.number_input(
-            "Ngày duyệt: trước thứ Hai của tuần học N ngày",
-            min_value=0,
-            value=int(st.session_state.get(_MT_APPROVAL_DAYS, 1)),
-            step=1,
-            key=_MT_APPROVAL_DAYS,
-        )
-
-    st.checkbox(
-        "Đồng bộ Ngày dạy theo Phân công + TKB tuần",
-        key=_MT_TEACHING_SYNC_ENABLED,
-        help=(
-            "Xóa lớp thừa, bổ sung lớp thiếu và cập nhật Ngày dạy "
-            "theo đúng phân công chuyên môn và lịch của tuần."
-        ),
-    )
-
-    st.checkbox(
-        "Tự động căn chỉnh hình ảnh theo khung giáo án",
-        key=_MT_IMAGE_AUTOFIT_ENABLED,
-        help=(
-            "Thu nhỏ ảnh vượt khung, giữ nguyên tỷ lệ, không phóng ảnh "
-            "nhỏ và căn giữa ảnh nội tuyến."
-        ),
-    )
-
-    st.checkbox(
-        "Tự động tạo đường kẻ khi hết bài",
-        key=_MT_END_RULE_ENABLED,
-        help="Chèn một đường kẻ trước phần phê duyệt nếu giáo án chưa có.",
-    )
-
+            st.markdown("Phần Tổ CM duyệt được xử lý theo cấu hình đang có hiệu lực của ADMIN.")
+    else:
+        st.caption("Không sinh phần Tổ CM duyệt cho giáo án này.")
 
 def _render_standardization_control_panel():
     # Call the original panel directly. It now renders all extended controls
@@ -10217,6 +10323,7 @@ def _process_lesson_plan_upload(
     options=None,
     original_content=None,
     ai_revised_text="",
+    progress_callback=None,
 ):
     result = (
         _mt_original_process_lesson_plan_upload_3c(
@@ -10228,8 +10335,17 @@ def _process_lesson_plan_upload(
             options=options,
             original_content=original_content,
             ai_revised_text=ai_revised_text,
+            progress_callback=progress_callback,
         )
     )
+
+    if not bool(st.session_state.get(_MT_APPROVAL_ENABLED, True)):
+        approval_content = _mt_result_output_bytes(result)
+        if approval_content is not None:
+            cleaned_content = _mt_remove_approval_block_bytes(approval_content)
+            if cleaned_content != approval_content:
+                result = _mt_result_with_output_bytes(result, cleaned_content)
+
 
     image_enabled = bool(
         st.session_state.get(
@@ -10272,3 +10388,459 @@ def _process_lesson_plan_upload(
         result,
         updated,
     )
+
+
+
+# G1B_13H1_V2_ADMIN_APPROVAL_BLOCK
+def _g1b_v2_ensure_admin_approval_block(
+    content: bytes,
+    *,
+    approval_date,
+    approval_label: str,
+    alignment: str = "right",
+) -> bytes:
+    """Ensure exactly one ADMIN-configured approval block near document end."""
+    from io import BytesIO
+    import unicodedata
+
+    from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
+
+    def normalize(value):
+        normalized = unicodedata.normalize("NFD", str(value or ""))
+        normalized = "".join(
+            character
+            for character in normalized
+            if unicodedata.category(character) != "Mn"
+        )
+        return " ".join(normalized.casefold().split())
+
+    document = Document(BytesIO(bytes(content)))
+    markers = ("to cm duyet", "to chuyen mon duyet")
+    existing = next(
+        (
+            paragraph
+            for paragraph in document.paragraphs
+            if any(marker in normalize(paragraph.text) for marker in markers)
+        ),
+        None,
+    )
+    if existing is not None:
+        return _mt_overlay_approval_date_bytes(content, approval_date)
+
+    alignment_map = {
+        "left": WD_ALIGN_PARAGRAPH.LEFT,
+        "center": WD_ALIGN_PARAGRAPH.CENTER,
+        "right": WD_ALIGN_PARAGRAPH.RIGHT,
+    }
+    paragraph_alignment = alignment_map.get(
+        str(alignment or "right").strip().casefold(),
+        WD_ALIGN_PARAGRAPH.RIGHT,
+    )
+    label = str(approval_label or "").strip() or "T\u1ed5 CM duy\u1ec7t"
+    long_date = approval_date.strftime(
+        "Ng\u00e0y %d th\u00e1ng %m n\u0103m %Y"
+    )
+
+    date_paragraph = document.add_paragraph()
+    date_paragraph.alignment = paragraph_alignment
+    date_paragraph.paragraph_format.space_before = Pt(14)
+    date_paragraph.paragraph_format.space_after = Pt(0)
+    date_run = date_paragraph.add_run(long_date)
+    date_run.italic = True
+
+    label_paragraph = document.add_paragraph()
+    label_paragraph.alignment = paragraph_alignment
+    label_paragraph.paragraph_format.space_before = Pt(0)
+    label_paragraph.paragraph_format.space_after = Pt(56)
+    label_run = label_paragraph.add_run(label)
+    label_run.bold = True
+
+    for run in (date_run, label_run):
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(14)
+        run._element.get_or_add_rPr().rFonts.set(
+            qn("w:eastAsia"),
+            "Times New Roman",
+        )
+
+    output = BytesIO()
+    document.save(output)
+    return output.getvalue()
+
+# G1B_13H1_V2_TRAILING_EMPTY_PARAGRAPH_GUARD
+def _g1b_v2_trim_trailing_empty_paragraphs(content: bytes) -> bytes:
+    """Remove only empty body paragraphs after the final visible element."""
+    from io import BytesIO
+    from zipfile import ZIP_DEFLATED, ZipFile
+
+    from lxml import etree
+
+    word_namespace = (
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    )
+    namespaces = {"w": word_namespace}
+    document_part = "word/document.xml"
+
+    with ZipFile(BytesIO(content), "r") as source_archive:
+        source_items = tuple(source_archive.infolist())
+        source_parts = {
+            item.filename: source_archive.read(item.filename)
+            for item in source_items
+        }
+
+    document_xml = source_parts.get(document_part)
+    if not document_xml:
+        return content
+
+    root = etree.fromstring(document_xml)
+    body = root.find(f"{{{word_namespace}}}body")
+    if body is None:
+        return content
+
+    removed_count = 0
+    for element in reversed(tuple(body)):
+        local_name = etree.QName(element).localname
+        if local_name == "sectPr":
+            continue
+        if local_name != "p":
+            break
+        visible_text = "".join(
+            element.xpath(".//w:t/text()", namespaces=namespaces)
+        ).strip()
+        has_visible_object = bool(
+            element.xpath(
+                ".//w:drawing | .//w:pict | .//w:object",
+                namespaces=namespaces,
+            )
+        )
+        if visible_text or has_visible_object:
+            break
+        body.remove(element)
+        removed_count += 1
+
+    if not removed_count:
+        return content
+
+    source_parts[document_part] = etree.tostring(
+        root,
+        encoding="UTF-8",
+        xml_declaration=True,
+        standalone=True,
+    )
+    output = BytesIO()
+    with ZipFile(output, "w", compression=ZIP_DEFLATED) as target_archive:
+        for item in source_items:
+            target_archive.writestr(item, source_parts[item.filename])
+    return output.getvalue()
+
+# G1B_13H1_V2_STANDARDIZE_ADAPTER
+def standardize_lesson_plan_v2_document(
+    *,
+    file_name: str,
+    content: bytes,
+    group_context,
+    progress_callback=None,
+):
+    from collections.abc import Mapping
+    from datetime import date, datetime
+    from types import SimpleNamespace
+
+    from educational_planning_v2.models import TeachingSession
+
+    context = dict(group_context or {})
+    occurrences = tuple(context.get("occurrences", ()) or ())
+    occurrence = next(
+        (
+            dict(item)
+            for item in occurrences
+            if isinstance(item, Mapping)
+        ),
+        {},
+    )
+
+    def first(*names, default=None):
+        for source in (context, occurrence):
+            for name in names:
+                value = source.get(name)
+                if value not in (None, ""):
+                    return value
+        return default
+
+    teaching_date = first("teaching_date", "date", "lesson_date")
+    if isinstance(teaching_date, str):
+        parsed = None
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                parsed = datetime.strptime(teaching_date, fmt).date()
+                break
+            except ValueError:
+                pass
+        teaching_date = parsed
+    if teaching_date is None:
+        teaching_date = date.today()
+
+    drafting_date = first("drafting_date", default=teaching_date)
+    if isinstance(drafting_date, str):
+        try:
+            drafting_date = datetime.strptime(
+                drafting_date,
+                "%Y-%m-%d",
+            ).date()
+        except ValueError:
+            drafting_date = teaching_date
+
+    period = first("curriculum_period", "period", "ppct_period")
+    if period in (None, ""):
+        curriculum_periods = tuple(
+            context.get("curriculum_periods", ()) or ()
+        )
+        period = curriculum_periods[0] if curriculum_periods else 1
+    try:
+        period = int(period)
+    except (TypeError, ValueError):
+        period = 1
+
+    timetable_period = first(
+        "timetable_period",
+        "schedule_period",
+        default=period,
+    )
+    try:
+        timetable_period = int(timetable_period)
+    except (TypeError, ValueError):
+        timetable_period = period
+
+    period_in_lesson = first("period_in_lesson", default=1)
+    try:
+        period_in_lesson = int(period_in_lesson)
+    except (TypeError, ValueError):
+        period_in_lesson = 1
+
+    session_value = first("session", default=TeachingSession.MORNING)
+    if not isinstance(session_value, TeachingSession):
+        normalized_session = (
+            str(session_value)
+            .strip()
+            .upper()
+            .removeprefix("TEACHINGSESSION.")
+        )
+        session_aliases = {
+            "SANG": TeachingSession.MORNING,
+            "BUOI_SANG": TeachingSession.MORNING,
+            "CHIá»€U": TeachingSession.AFTERNOON,
+            "CHIEU": TeachingSession.AFTERNOON,
+            "BUOI_CHIEU": TeachingSession.AFTERNOON,
+        }
+        if normalized_session in session_aliases:
+            session_value = session_aliases[normalized_session]
+        else:
+            session_value = TeachingSession(normalized_session)
+
+    row = SimpleNamespace(
+        teaching_date=teaching_date,
+        drafting_date=drafting_date,
+        class_id=str(first("class_id", default="")).strip(),
+        subject_ref=str(
+            first("subject_ref", "subject", "subject_name", default="")
+        ).strip(),
+        component_ref=str(
+            first(
+                "component_ref",
+                "component",
+                "component_name",
+                default="",
+            )
+        ).strip(),
+        curriculum_period=period,
+        lesson_id=str(
+            first("lesson_id", "canonical_lesson_id", default="")
+        ).strip(),
+        lesson_title=str(
+            first("lesson_title", "title", "group_name", default="")
+        ).strip(),
+        session=session_value,
+        timetable_period=timetable_period,
+        period_in_lesson=period_in_lesson,
+        class_name=str(
+            first("class_name", "class_display", "class", default="")
+        ).strip(),
+        grade_level=str(first("grade_level", "grade", default="")).strip(),
+        subject=str(first("subject", "subject_name", default="")).strip(),
+        subject_name=str(first("subject_name", "subject", default="")).strip(),
+        component=str(
+            first("component", "component_name", default="")
+        ).strip(),
+        component_name=str(
+            first("component_name", "component", default="")
+        ).strip(),
+    )
+
+    # G1B_P6B_R2R2_DOCUMENT_DISPLAY_CLASS_BOUNDARY
+    # Do not alter the canonical ScheduledLessonContext schema. At this V2
+    # document-processing boundary, prefer the teacher-facing class label
+    # already carried by group_context / occurrence. SimpleNamespace is
+    # intentionally mutable, so this only changes the transient adapter row.
+    document_class_display = str(
+        first(
+            "class_name",
+            "class_display",
+            "class",
+            default="",
+        )
+        or ""
+    ).strip()
+    if document_class_display:
+        row.class_id = document_class_display
+
+    # G1B_13H1R1_SIGNATURE_SAFE_CALL
+    result = _process_lesson_plan_upload(
+        row=row,
+        drafting_date=drafting_date,
+        content=bytes(content),
+        original_name=str(file_name or "giao-an.docx"),
+        modification_plan=None,
+        progress_callback=progress_callback,
+    )
+    if not isinstance(result, tuple) or len(result) < 2:
+        raise RuntimeError(
+            "Pipeline chuan hoa khong tra ve ket qua hop le."
+        )
+    output_name, output_bytes = result[0], result[1]
+    if not isinstance(output_bytes, bytes) or not output_bytes:
+        raise RuntimeError("Pipeline chuan hoa tra ve DOCX rong.")
+
+    # V14B4B2_RESOLVED_CANONICAL_PROVENANCE
+    effective_drafting_date = drafting_date
+    if teaching_date is not None and bool(st.session_state.get(_MT_DRAFTING_ENABLED, False)):
+        effective_drafting_date = _mt_date_before_teaching_week(
+            teaching_date,
+            st.session_state.get(_MT_DRAFTING_DAYS, 0),
+        )
+    resolved_canonical_context = {
+        "class_name": row.class_name or row.class_id or None,
+        "curriculum_period": row.curriculum_period,
+        "lesson_title": row.lesson_title or None,
+        "drafting_date": effective_drafting_date,
+        "teaching_date": row.teaching_date,
+    }
+    pipeline_evidence_v14b4b2 = st.session_state.get("_g1b_v2_pipeline_evidence")
+    if isinstance(pipeline_evidence_v14b4b2, dict):
+        pipeline_evidence_v14b4b2["resolved_canonical_context"] = resolved_canonical_context
+
+    # G1B_ENGLISH_PATCH03C2_RUNTIME_WIRE
+    selected_periods_03c2 = tuple(context.get("curriculum_periods", ()) or ())
+    if len(selected_periods_03c2) > 1:
+        from document_standardization.lesson_plan_multi_period_scope import (
+            apply_scoped_english_period_dates,
+            resolve_multi_period_scope,
+        )
+        from io import BytesIO
+        from docx import Document
+        import re
+
+        source_document_03c2 = Document(BytesIO(bytes(content)))
+        document_periods_03c2 = []
+        for table_03c2 in source_document_03c2.tables:
+            match_03c2 = re.search(
+                r"(?i)\bperiod\s+(\d+)\b",
+                "\n".join(cell.text for row_03c2 in table_03c2.rows for cell in row_03c2.cells),
+            )
+            if match_03c2:
+                document_periods_03c2.append(int(match_03c2.group(1)))
+
+        scope_03c2 = resolve_multi_period_scope(
+            group_context=context,
+            document_periods=document_periods_03c2,
+        )
+        drafting_date_03c2 = _mt_date_before_teaching_week(
+            teaching_date,
+            st.session_state.get(_MT_DRAFTING_DAYS, 3),
+        )
+        overlay_03c2 = apply_scoped_english_period_dates(
+            source_content=bytes(content),
+            output_content=output_bytes,
+            scope=scope_03c2,
+            drafting_date=drafting_date_03c2,
+        )
+        output_bytes = overlay_03c2.content
+        st.session_state["_g1b_english_multi_period_warnings"] = tuple(
+            warning.message for warning in overlay_03c2.warnings
+        )
+        st.session_state["_g1b_english_multi_period_applied_periods"] = (
+            overlay_03c2.applied_periods
+        )
+    # G1B_P6B_R3R1_V2_ALL_SELECTED_CLASS_DATES
+    # Audit 07 proved that the second English class/date is its own paragraph.
+    # Reuse the existing class-specific overlay for every teacher-facing pair.
+    selected_class_date_pairs = tuple(
+        (
+            str(class_name or "").strip(),
+            class_teaching_date,
+        )
+        for class_name, class_teaching_date in tuple(
+            st.session_state.get(
+                "_standardization_selected_teaching_date_pairs",
+                (),
+            )
+            or ()
+        )
+        if str(class_name or "").strip()
+        and class_teaching_date is not None
+    )
+
+    if selected_class_date_pairs:
+        import os
+        import tempfile
+
+        temporary_docx = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                suffix=".docx",
+                delete=False,
+            ) as temporary_file:
+                temporary_docx = temporary_file.name
+                temporary_file.write(output_bytes)
+
+            for class_name, class_teaching_date in selected_class_date_pairs:
+                _mt_overlay_multiclass_teaching_date(
+                    temporary_docx,
+                    SimpleNamespace(
+                        class_id=class_name,
+                        teaching_date=class_teaching_date,
+                    ),
+                )
+
+            with open(temporary_docx, "rb") as temporary_file:
+                output_bytes = temporary_file.read()
+        finally:
+            if temporary_docx and os.path.exists(temporary_docx):
+                os.unlink(temporary_docx)
+
+    if bool(st.session_state.get(_MT_APPROVAL_ENABLED, True)):
+        approval_date = _mt_date_before_teaching_week(
+            teaching_date,
+            st.session_state.get(_MT_APPROVAL_DAYS, 1),
+        )
+        output_bytes = _g1b_v2_ensure_admin_approval_block(
+            output_bytes,
+            approval_date=approval_date,
+            approval_label=str(
+                st.session_state.get(
+                    "lesson_plan_admin_approval_label",
+                    "T\u1ed5 CM duy\u1ec7t",
+                )
+                or "T\u1ed5 CM duy\u1ec7t"
+            ),
+            alignment=str(
+                st.session_state.get(
+                    "lesson_plan_admin_approval_alignment",
+                    "right",
+                )
+                or "right"
+            ),
+        )
+    output_bytes = _g1b_v2_trim_trailing_empty_paragraphs(output_bytes)
+    return str(output_name or file_name), output_bytes

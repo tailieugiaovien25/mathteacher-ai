@@ -81,19 +81,20 @@ class LessonPlanGroupingService:
             )
 
             if mode is LessonPlanGroupingMode.BY_PERIOD:
+                academic_year = self._text(row, "academic_year")
+                week_number = getattr(row, "week_number", None)
+                if not academic_year or week_number is None:
+                    raise LessonPlanGroupValidationError(
+                        "BY_PERIOD_REQUIRES_ACADEMIC_YEAR_AND_WEEK"
+                    )
                 key = (
                     mode.value,
+                    academic_year,
+                    int(week_number),
                     subject_ref,
                     component_ref,
                     grade,
                     getattr(row, "curriculum_period", None),
-                )
-            elif mode is LessonPlanGroupingMode.BY_GRADE:
-                key = (
-                    mode.value,
-                    subject_ref,
-                    component_ref,
-                    grade,
                 )
             elif mode is LessonPlanGroupingMode.BY_WEEK:
                 academic_year = self._text(row, "academic_year")
@@ -111,12 +112,25 @@ class LessonPlanGroupingService:
                     grade,
                 )
             else:
+                academic_year = self._text(row, "academic_year")
+                week_number = getattr(row, "week_number", None)
+                if not academic_year or week_number is None:
+                    raise LessonPlanGroupValidationError(
+                        "BY_LESSON_REQUIRES_ACADEMIC_YEAR_AND_WEEK"
+                    )
+                lesson_identity = self._lesson_identity(row)
+                if lesson_identity is None:
+                    raise LessonPlanGroupValidationError(
+                        "BY_LESSON_REQUIRES_STABLE_LESSON_ID"
+                    )
                 key = (
                     mode.value,
+                    academic_year,
+                    int(week_number),
                     subject_ref,
                     component_ref,
                     grade,
-                    self._lesson_identity(row),
+                    lesson_identity,
                 )
 
             grouped.setdefault(key, []).append((row_index, row, grade))
@@ -147,15 +161,7 @@ class LessonPlanGroupingService:
             lesson_title = self._text(first_row, "lesson_title")
             result.append(
                 LessonPlanGroup(
-                    group_id=self._group_id(
-                        mode=mode,
-                        subject_ref=self._text(first_row, "subject_ref"),
-                        component_ref=self._text(first_row, "component_ref"),
-                        grade=grade,
-                        lesson_id=lesson_id,
-                        lesson_title=lesson_title,
-                        curriculum_periods=periods,
-                    ),
+                    group_id=self._group_id(key=key),
                     grouping_mode=mode,
                     subject_ref=self._text(first_row, "subject_ref"),
                     component_ref=self._text(first_row, "component_ref"),
@@ -165,6 +171,12 @@ class LessonPlanGroupingService:
                     curriculum_periods=periods,
                     occurrences=occurrences,
                     representative_row_index=first_index,
+                    academic_year=self._text(first_row, "academic_year") or None,
+                    week_number=(
+                        int(getattr(first_row, "week_number"))
+                        if getattr(first_row, "week_number", None) is not None
+                        else None
+                    ),
                 )
             )
 
@@ -198,7 +210,7 @@ class LessonPlanGroupingService:
             return None
         return value if 1 <= value <= 12 else None
 
-    def _lesson_identity(self, row: object) -> tuple[str, str]:
+    def _lesson_identity(self, row: object) -> tuple[str, str] | None:
         lesson_id = self._text(row, "lesson_id")
         if lesson_id:
             return ("lesson_id", lesson_id)
@@ -207,28 +219,9 @@ class LessonPlanGroupingService:
         if lesson_group_id:
             return ("lesson_group_id", lesson_group_id)
 
-        return ("provisional_title", self._text(row, "lesson_title").casefold())
+        return None
 
     @staticmethod
-    def _group_id(
-        *,
-        mode: LessonPlanGroupingMode,
-        subject_ref: str,
-        component_ref: str,
-        grade: int | None,
-        lesson_id: str | None,
-        lesson_title: str,
-        curriculum_periods: tuple,
-    ) -> str:
-        payload = "|".join(
-            (
-                mode.value,
-                subject_ref,
-                component_ref,
-                str(grade or ""),
-                str(lesson_id or ""),
-                lesson_title.casefold(),
-                ",".join(str(item) for item in curriculum_periods),
-            )
-        )
+    def _group_id(*, key: tuple[Any, ...]) -> str:
+        payload = repr(tuple(key))
         return "lpg_" + sha256(payload.encode("utf-8")).hexdigest()[:20]

@@ -23,13 +23,14 @@ def test_merged_actions_and_provenance():
         assert token in text
     assert '" → ".join(' in text
 
-def test_merged_save_visible_but_disabled():
+def test_merged_save_uses_injected_save_handler():
     text = _text()
-    pos = text.index('"standardized_merge_save_disabled_v4"')
+    pos = text.index('"standardized_merge_save_v5"')
     nearby = text[pos-250:pos+450]
     assert '"Lưu hệ thống"' in nearby
-    assert "disabled=True" in nearby
-    assert "provenance" in nearby
+    assert "disabled=save_handler is None" in nearby
+    assert "artifact_file_name" in nearby
+    assert "artifact_content" in nearby
 
 def test_locked_labels_preserved():
     text = _text()

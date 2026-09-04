@@ -17,6 +17,7 @@ _PREVIEW_KEY = "standardized_lesson_plan_preview_record_v2"
 _MERGE_ORDER_KEY = "standardized_lesson_plan_merge_order_v4"
 _MERGE_RESULT_KEY = "standardized_lesson_plan_merge_result_v4"
 _MERGE_PREVIEW_KEY = "standardized_lesson_plan_merge_preview_v4"
+_DELETED_CURRENT_RECORD_KEY = "standardized_lesson_plan_deleted_current_record_v1"
 
 
 def _record_id(*, file_name: str, content: bytes) -> str:
@@ -62,6 +63,8 @@ def _remove_record(record_id: str) -> None:
     order = st.session_state.get(_MERGE_ORDER_KEY, [])
     if isinstance(order, list):
         st.session_state[_MERGE_ORDER_KEY] = [x for x in order if x != record_id]
+    # G1B_13H1R4B5P_DELETE_CURRENT_READD_GUARD
+    st.session_state[_DELETED_CURRENT_RECORD_KEY] = record_id
     _clear_merge_result()
 
 
@@ -98,7 +101,10 @@ def _move(record_id: str, delta: int) -> None:
         _clear_merge_result()
 
 
-def _render_merge_workspace(preview_html_builder: Callable[[bytes], str] | None) -> None:
+def _render_merge_workspace(
+    preview_html_builder: Callable[[bytes], str] | None,
+    save_handler: Callable[..., None] | None,
+) -> None:
     ordered = _ordered_selected_records()
     st.markdown("---")
     st.subheader("Gộp giáo án")
@@ -122,33 +128,56 @@ def _render_merge_workspace(preview_html_builder: Callable[[bytes], str] | None)
             _move(rid, 1)
             st.rerun()
 
+    include_approval = st.checkbox(
+        "Sinh phần Tổ CM duyệt ở cuối file gộp",
+        value=True,
+        key="standardized_merge_include_approval_v1",
+        help="Có: đúng một phần duyệt ở cuối. Không: không có phần duyệt.",
+    )
+
     if st.button("GỘP FILE", key="standardized_lesson_plan_merge_v4", type="primary", width="stretch"):
         try:
-            result = LessonPlanMergeService().merge([
-                LessonPlanMergeSource(
-                    source_id=str(x["id"]),
-                    file_name=str(x["file_name"]),
-                    content=bytes(x["content"]),
-                )
-                for x in ordered
-            ])
+            result = LessonPlanMergeService().merge(
+                [
+                    LessonPlanMergeSource(
+                        source_id=str(x["id"]),
+                        file_name=str(x["file_name"]),
+                        content=bytes(x["content"]),
+                    )
+                    for x in ordered
+                ],
+                include_approval=include_approval,
+            )
             st.session_state[_MERGE_RESULT_KEY] = {
                 "file_name": f"giao-an-gop-{len(ordered)}-bai.docx",
                 "content": result.content,
                 "source_ids": result.source_ids,
                 "source_file_names": result.source_file_names,
+                "include_approval": include_approval,
             }
             st.session_state[_MERGE_PREVIEW_KEY] = False
             st.success("Đã gộp giáo án theo đúng thứ tự đã chọn.")
         except LessonPlanMergeError as error:
             st.error("Không thể gộp giáo án: " + str(error))
         except Exception as error:
-            st.error("Có lỗi khi gộp giáo án: " + str(error))
+            # G1B_13H1R4B5C_EXACT_MERGE_RUNTIME_CAUSE
+            error_text = str(error).strip()
+            if not error_text:
+                error_text = repr(error)
+            st.error(
+                "Có lỗi khi gộp giáo án: "
+                + type(error).__name__
+                + ": "
+                + error_text
+            )
 
     merged = st.session_state.get(_MERGE_RESULT_KEY)
     if not isinstance(merged, dict):
         return
     if tuple(merged.get("source_ids", ())) != tuple(str(x["id"]) for x in ordered):
+        _clear_merge_result()
+        return
+    if bool(merged.get("include_approval", True)) != bool(include_approval):
         _clear_merge_result()
         return
 
@@ -162,12 +191,20 @@ def _render_merge_workspace(preview_html_builder: Callable[[bytes], str] | None)
             st.session_state.get(_MERGE_PREVIEW_KEY, False)
         )
 
-    actions[1].button(
+    if actions[1].button(
         "Lưu hệ thống",
-        key="standardized_merge_save_disabled_v4",
-        disabled=True,
-        help="Sẽ bật sau khi lớp lưu provenance của file gộp được hoàn thiện.",
-    )
+        key="standardized_merge_save_v5",
+        disabled=save_handler is None,
+        help="Lưu file gộp vào Kho giáo án của USER.",
+    ):
+        if save_handler is not None:
+            try:
+                save_handler(
+                    artifact_file_name=str(merged["file_name"]),
+                    artifact_content=bytes(merged["content"]),
+                )
+            except Exception as error:
+                st.error("Không thể lưu file giáo án đã gộp: " + str(error))
     actions[2].download_button(
         "Tải file Word",
         data=bytes(merged["content"]),
@@ -197,7 +234,19 @@ def render_standardized_lesson_plan_management(
     if not current_file_name or not current_content:
         return
 
-    _remember_current_artifact(file_name=current_file_name, content=current_content)
+    # G1B_13H1R4B5P_CURRENT_ARTIFACT_TOMBSTONE
+    current_record_id = _record_id(
+        file_name=current_file_name,
+        content=current_content,
+    )
+    deleted_current_record_id = st.session_state.get(_DELETED_CURRENT_RECORD_KEY)
+    if deleted_current_record_id != current_record_id:
+        st.session_state.pop(_DELETED_CURRENT_RECORD_KEY, None)
+        _remember_current_artifact(
+            file_name=current_file_name,
+            content=current_content,
+        )
+
     st.markdown("---")
     st.subheader("Danh sách giáo án đã chuẩn hóa")
     st.caption(
@@ -223,43 +272,83 @@ def render_standardized_lesson_plan_management(
         st.rerun()
     toolbar[2].caption(f"{len(records)} giáo án trong danh sách làm việc.")
 
+    # G1B_13H1R4B2_ROW_ACTIONS
     for index, item in enumerate(records, start=1):
         rid = str(item["id"])
         file_name = str(item["file_name"])
         content = bytes(item["content"])
-        row = st.columns([0.75, 3.3, 1.1, 1.25, 0.9, 1.25])
-        row[0].checkbox("Lựa chọn", key=_selection_key(rid))
-        row[1].markdown(f"**{index}. {file_name}**")
+        row = st.columns([3.2, 1.0, 0.9, 1.0, 1.25, 1.0])
+        row[0].markdown(f"**{index}. {file_name}**")
 
-        if row[2].button("Xem trước", key=f"standardized_lesson_plan_preview_v2_{rid}"):
-            current = st.session_state.get(_PREVIEW_KEY)
-            st.session_state[_PREVIEW_KEY] = None if current == rid else rid
-
-        if row[3].button(
-            "Lưu hệ thống", key=f"standardized_lesson_plan_save_v2_{rid}",
-            disabled=save_handler is None,
+        preview_open = st.session_state.get(_PREVIEW_KEY) == rid
+        if row[1].button(
+            "Xem trước" if not preview_open else "Đóng xem trước",
+            key=f"standardized_lesson_plan_preview_v3_{rid}",
+            disabled=preview_html_builder is None,
         ):
-            if save_handler is not None:
-                save_handler(artifact_file_name=file_name, artifact_content=content)
+            if preview_open:
+                st.session_state.pop(_PREVIEW_KEY, None)
+            else:
+                st.session_state[_PREVIEW_KEY] = rid
+            st.rerun()
 
-        if row[4].button("Xóa", key=f"standardized_lesson_plan_remove_v1_{rid}"):
+        if row[2].button(
+            "Xóa",
+            key=f"standardized_lesson_plan_remove_v3_{rid}",
+        ):
             _remove_record(rid)
             st.rerun()
 
-        row[5].download_button(
-            "Tải xuống", data=content, file_name=file_name,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            key=f"standardized_lesson_plan_download_v1_{rid}",
+        if row[3].button(
+            "Lưu",
+            key=f"standardized_lesson_plan_save_v3_{rid}",
+            disabled=save_handler is None,
+            help="Lưu vào kho tài liệu của USER.",
+        ):
+            if save_handler is not None:
+                save_handler(
+                    artifact_file_name=file_name,
+                    artifact_content=content,
+                )
+
+        row[4].download_button(
+            "Tải xuống",
+            data=content,
+            file_name=file_name,
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.document"
+            ),
+            key=f"standardized_lesson_plan_download_v3_{rid}",
         )
 
-        if st.session_state.get(_PREVIEW_KEY) == rid:
-            if preview_html_builder is None:
-                st.warning("Chức năng xem trước chưa sẵn sàng.")
-            else:
-                try:
-                    st.components.v1.html(preview_html_builder(content), height=720, scrolling=True)
-                except Exception as error:
-                    st.warning("Không thể xem trước giáo án này: " + str(error))
+        selected_now = bool(
+            st.session_state.get(_selection_key(rid), False)
+        )
+        select_label = "Bỏ chọn" if selected_now else "Lựa chọn"
+        if row[5].button(
+            select_label,
+            key=f"standardized_lesson_plan_select_v3_{rid}",
+        ):
+            st.session_state[_selection_key(rid)] = not selected_now
+            _clear_merge_result()
+            st.rerun()
+
+        if (
+            st.session_state.get(_PREVIEW_KEY) == rid
+            and preview_html_builder is not None
+        ):
+            try:
+                st.components.v1.html(
+                    preview_html_builder(content),
+                    height=820,
+                    scrolling=True,
+                )
+            except Exception as error:
+                st.warning(
+                    "Không thể xem trước giáo án: "
+                    + str(error)
+                )
 
     selected_count = len(selected_standardized_lesson_plan_records())
     if selected_count:
@@ -267,4 +356,4 @@ def render_standardized_lesson_plan_management(
     else:
         st.caption("Chưa lựa chọn giáo án nào để chuẩn bị gộp.")
 
-    _render_merge_workspace(preview_html_builder)
+    _render_merge_workspace(preview_html_builder, save_handler)

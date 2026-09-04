@@ -9,12 +9,96 @@ from docx import Document
 from lesson_planning_v2.contexts import (
     ScheduledLessonContext,
 )
-
+from educational_planning_v2.models import TeachingSession
 
 @dataclass(frozen=True)
 class ContextApplicationResult:
     applied_fields: tuple[str, ...]
     unresolved_fields: tuple[str, ...]
+
+
+# G1B_13H1R4B5S5_REHYDRATE_STALE_TEACHING_SESSION
+def _g1b_rehydrate_teaching_session(session):
+    if isinstance(session, TeachingSession):
+        return session
+
+    candidates = (
+        getattr(session, "value", None),
+        getattr(session, "name", None),
+        session,
+    )
+    aliases = {
+        "SANG": TeachingSession.MORNING,
+        "BUOI_SANG": TeachingSession.MORNING,
+        "MORNING": TeachingSession.MORNING,
+        "CHIEU": TeachingSession.AFTERNOON,
+        "BUOI_CHIEU": TeachingSession.AFTERNOON,
+        "AFTERNOON": TeachingSession.AFTERNOON,
+    }
+
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        normalized = (
+            str(candidate)
+            .strip()
+            .upper()
+            .removeprefix("TEACHINGSESSION.")
+        )
+        if normalized in aliases:
+            return aliases[normalized]
+        try:
+            return TeachingSession(normalized)
+        except (TypeError, ValueError):
+            continue
+
+    raise TypeError("session must be TeachingSession")
+
+
+# G1B_13H1R4B5S4_REHYDRATE_STALE_CONTEXT
+def _g1b_rehydrate_scheduled_lesson_context(context):
+    if isinstance(context, ScheduledLessonContext):
+        return context
+
+    actual_type = type(context)
+    same_canonical_symbol = (
+        actual_type.__module__ == ScheduledLessonContext.__module__
+        and actual_type.__name__ == ScheduledLessonContext.__name__
+    )
+    if not same_canonical_symbol:
+        raise TypeError(
+            "context must be ScheduledLessonContext"
+            + " [actual="
+            + actual_type.__module__
+            + "."
+            + actual_type.__name__
+            + ", actual_type_id="
+            + str(id(actual_type))
+            + ", expected="
+            + ScheduledLessonContext.__module__
+            + "."
+            + ScheduledLessonContext.__name__
+            + ", expected_type_id="
+            + str(id(ScheduledLessonContext))
+            + "]"
+        )
+
+    field_names = tuple(ScheduledLessonContext.__dataclass_fields__.keys())
+    try:
+        payload = {name: getattr(context, name) for name in field_names}
+        payload["session"] = _g1b_rehydrate_teaching_session(
+            payload["session"]
+        )
+        return ScheduledLessonContext(**payload)
+    except Exception as error:
+        raise TypeError(
+            "context must be ScheduledLessonContext"
+            + " [reload-safe rehydrate failed: "
+            + type(error).__name__
+            + ": "
+            + str(error)
+            + "]"
+        ) from error
 
 
 class LessonPlanDocumentContextApplier:
@@ -70,13 +154,8 @@ class LessonPlanDocumentContextApplier:
                     "Context applier ch\u1ec9 x\u1eed l\u00fd t\u1ec7p .docx."
                 )
 
-            if not isinstance(
-                context,
-                ScheduledLessonContext,
-            ):
-                raise TypeError(
-                    "context must be ScheduledLessonContext"
-                )
+            # G1B_13H1R4B5S4_APPLY_RELOAD_SAFE_CONTEXT
+            context = _g1b_rehydrate_scheduled_lesson_context(context)
 
             from document_standardization.lesson_plan_metadata import (
                 LessonPlanMetadata,
@@ -335,9 +414,9 @@ class LessonPlanDocumentContextApplier:
                 text,
                 pattern=(
                     r"(?P<prefix>"
-                    r"ng\u00e0y\s+so\u1ea1n"
-                    r"\s*:\s*)"
-                    r"\d{1,2}/\d{1,2}/\d{2,4}"
+                    r"(?:ng\u00e0y\s+so\u1ea1n|date\s+of\s+planning)"
+                    r"\s*:?\s*)"
+                    r"(?:\d{1,2}/\d{1,2}/\d{2,4}|[.\u2026\u00b7_\-\s]+)"
                 ),
                 value=value,
             )
@@ -347,10 +426,9 @@ class LessonPlanDocumentContextApplier:
                 text,
                 pattern=(
                     r"(?P<prefix>"
-                    r"ng\u00e0y\s+"
-                    r"(?:d\u1ea1y|gi\u1ea3ng)"
-                    r"\s*:\s*)"
-                    r"\d{1,2}/\d{1,2}/\d{2,4}"
+                    r"(?:ng\u00e0y\s+(?:d\u1ea1y|gi\u1ea3ng)|date\s+of\s+teaching)"
+                    r"\s*:?\s*)"
+                    r"(?:\d{1,2}/\d{1,2}/\d{2,4}|[.\u2026\u00b7_\-\s]+)"
                 ),
                 value=value,
             )
@@ -484,7 +562,7 @@ class LessonPlanDocumentContextApplier:
         match = re.match(
             (
                 r"(?P<prefix>"
-                r"^\s*ti\u1ebft\s+)"
+                r"^\s*(?:ti\u1ebft|period)\s+)"
                 r"(?P<periods>"
                 r"\d+(?:\s*(?:,|\+)\s*\d+)*"
                 r")"

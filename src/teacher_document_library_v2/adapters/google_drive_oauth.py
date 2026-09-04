@@ -15,6 +15,11 @@ from teacher_document_library_v2.storage import StoredDocumentFile
 
 
 DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly"
+GOOGLE_DRIVE_SCOPES = (
+    DRIVE_FILE_SCOPE,
+    DRIVE_READONLY_SCOPE,
+)
 DEFAULT_FOLDER_NAME = "MathTeacher-AI"
 OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60
 
@@ -53,7 +58,7 @@ def create_authorization_request(settings: GoogleOAuthSettings) -> tuple[str, st
     code_verifier = derive_code_verifier(state, settings.client_secret)
     flow = Flow.from_client_config(
         settings.client_config(),
-        scopes=[DRIVE_FILE_SCOPE],
+        scopes=list(GOOGLE_DRIVE_SCOPES),
         state=state,
         code_verifier=code_verifier,
         autogenerate_code_verifier=False,
@@ -127,7 +132,7 @@ def exchange_authorization_code(
         raise ValueError("OAuth code and state must not be empty")
     flow = Flow.from_client_config(
         settings.client_config(),
-        scopes=[DRIVE_FILE_SCOPE],
+        scopes=list(GOOGLE_DRIVE_SCOPES),
         state=state,
         code_verifier=derive_code_verifier(state, settings.client_secret),
         autogenerate_code_verifier=False,
@@ -144,7 +149,7 @@ def credentials_to_dict(credentials: Any) -> dict[str, object]:
         "token_uri": credentials.token_uri,
         "client_id": credentials.client_id,
         "client_secret": credentials.client_secret,
-        "scopes": list(credentials.scopes or [DRIVE_FILE_SCOPE]),
+        "scopes": list(credentials.scopes or GOOGLE_DRIVE_SCOPES),
     }
 
 
@@ -234,6 +239,80 @@ class GoogleDriveFileStorage:
         if not name or name in (".", ".."):
             raise ValueError("file_name must not be empty")
         return name[:255]
+
+    def list_folder_tree(
+        self,
+        folder_id: str,
+        *,
+        recursive: bool = True,
+        mime_type: str | None = None,
+    ) -> tuple[StoredDocumentFile, ...]:
+        # Strictly read-only Drive folder traversal for Smart Up.
+        normalized_folder_id = str(folder_id).strip()
+        if not normalized_folder_id:
+            raise ValueError("folder_id must not be empty")
+
+        service = self._drive_service()
+        folder_mime = "application/vnd.google-apps.folder"
+        queue = [normalized_folder_id]
+        seen_folders = {normalized_folder_id}
+        found: list[StoredDocumentFile] = []
+
+        while queue:
+            parent_id = queue.pop(0)
+            escaped_parent = parent_id.replace("'", "\\'")
+            page_token = None
+
+            while True:
+                response = service.files().list(
+                    q=(
+                        f"'{escaped_parent}' in parents "
+                        "and trashed = false"
+                    ),
+                    spaces="drive",
+                    fields=(
+                        "nextPageToken,"
+                        "files(id,name,mimeType,size,webViewLink)"
+                    ),
+                    pageSize=1000,
+                    pageToken=page_token,
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True,
+                ).execute()
+
+                for row in response.get("files", []):
+                    row_id = str(row.get("id") or "").strip()
+                    row_name = str(row.get("name") or "").strip()
+                    row_mime = str(row.get("mimeType") or "").strip()
+
+                    if not row_id:
+                        continue
+
+                    if row_mime == folder_mime:
+                        if recursive and row_id not in seen_folders:
+                            seen_folders.add(row_id)
+                            queue.append(row_id)
+                        continue
+
+                    if mime_type and row_mime != mime_type:
+                        continue
+
+                    found.append(
+                        StoredDocumentFile(
+                            provider="google_drive_oauth",
+                            file_id=row_id,
+                            file_name=row_name,
+                            mime_type=row_mime,
+                            size_bytes=int(row.get("size") or 0),
+                            web_view_link=row.get("webViewLink"),
+                        )
+                    )
+
+                page_token = response.get("nextPageToken")
+                if not page_token:
+                    break
+
+        return tuple(found)
 
     def download(
         self,

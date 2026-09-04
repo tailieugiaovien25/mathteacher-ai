@@ -64,6 +64,8 @@ class LessonPlanMergeService:
     def merge(
         self,
         sources: Sequence[LessonPlanMergeSource],
+        *,
+        include_approval: bool = True,
     ) -> LessonPlanMergeResult:
         ordered = tuple(sources)
 
@@ -86,7 +88,7 @@ class LessonPlanMergeService:
 
         final_range = approval_ranges[-1]
 
-        if final_range is None:
+        if include_approval and final_range is None:
             raise LessonPlanMergeError(
                 "The final lesson plan does not contain an approval block."
             )
@@ -123,18 +125,20 @@ class LessonPlanMergeService:
                 )
                 self._append_before_sectpr(base, cloned)
 
-        # Append exactly one approval block, taken from the final source.
-        final_document = documents[-1]
-        for element in self._approval_elements(
-            final_document,
-            final_range,
-        ):
-            cloned = self._clone_with_relationships(
-                source_document=final_document,
-                target_document=base,
-                element=element,
-            )
-            self._append_before_sectpr(base, cloned)
+        # USER decides whether the merged artifact needs approval.
+        if include_approval:
+            final_document = documents[-1]
+            assert final_range is not None
+            for element in self._approval_elements(
+                final_document,
+                final_range,
+            ):
+                cloned = self._clone_with_relationships(
+                    source_document=final_document,
+                    target_document=base,
+                    element=element,
+                )
+                self._append_before_sectpr(base, cloned)
 
         self._collapse_trailing_empty_paragraphs(base)
 
@@ -151,9 +155,11 @@ class LessonPlanMergeService:
             if self._is_approval_marker(text)
         )
 
-        if marker_count != 1:
+        expected_marker_count = 1 if include_approval else 0
+        if marker_count != expected_marker_count:
             raise LessonPlanMergeError(
-                "Merged document must contain exactly one approval marker."
+                "Merged document approval marker count does not match "
+                "the USER approval choice."
             )
 
         return LessonPlanMergeResult(
@@ -406,11 +412,60 @@ class LessonPlanMergeService:
             )
 
         if relationship.reltype == RT.IMAGE:
+            # G1B_13H1R4B5J_RAW_OPC_IMAGE_PART_COPY
+            from docx.opc.part import Part
+
             image_part = relationship.target_part
-            new_rid, _ = target_document.part.get_or_add_image(
-                BytesIO(image_part.blob)
+            source_partname = str(image_part.partname)
+            suffix = (
+                "." + source_partname.rsplit(".", 1)[-1]
+                if "." in source_partname
+                else ".bin"
             )
-            return new_rid
+            package = target_document.part.package
+            target_partname = package.next_partname(
+                "/word/media/image%d" + suffix
+            )
+            copied_part = Part(
+                target_partname,
+                image_part.content_type,
+                image_part.blob,
+                package,
+            )
+            return target_document.part.relate_to(
+                copied_part,
+                RT.IMAGE,
+            )
+
+        if (
+            relationship.reltype
+            == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject"
+            and not relationship.is_external
+        ):
+            # G1B_13H1R4B5U1_RAW_OPC_OLE_PART_COPY
+            from docx.opc.part import Part
+
+            embedded_part = relationship.target_part
+            source_partname = str(embedded_part.partname)
+            suffix = (
+                "." + source_partname.rsplit(".", 1)[-1]
+                if "." in source_partname
+                else ".bin"
+            )
+            package = target_document.part.package
+            target_partname = package.next_partname(
+                "/word/embeddings/oleObject%d" + suffix
+            )
+            copied_part = Part(
+                target_partname,
+                embedded_part.content_type,
+                embedded_part.blob,
+                package,
+            )
+            return target_document.part.relate_to(
+                copied_part,
+                relationship.reltype,
+            )
 
         if (
             relationship.reltype == RT.HYPERLINK
