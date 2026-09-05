@@ -83,10 +83,12 @@ class TeacherSubjectRegistrationService:
                 )
             )
 
+        # V14B6K_MATH_BLANK_COMPONENT_VALID
         if (
             subject.component_policy
             is SubjectComponentPolicy.REQUIRED
             and component_id is None
+            and subject.code.strip().upper() != "MATH"
         ):
             raise ValueError(
                 "subject requires a component"

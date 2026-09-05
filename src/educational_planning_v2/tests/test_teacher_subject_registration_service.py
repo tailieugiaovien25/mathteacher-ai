@@ -369,3 +369,52 @@ def test_service_requires_catalog_repository():
         TeacherSubjectRegistrationService(
             catalog_repository=None
         )
+
+
+def test_math_required_policy_allows_blank_component():
+    service = _service(
+        subjects=(
+            Subject(
+                subject_id="subject-math",
+                code="MATH",
+                name="To?n",
+                component_policy=SubjectComponentPolicy.REQUIRED,
+            ),
+        ),
+    )
+
+    result = service.validate_registration(
+        registration=_registration(
+            subject_id="subject-math",
+            component_id=None,
+        )
+    )
+
+    assert result.registration.component_id is None
+
+
+def test_non_math_required_policy_still_rejects_blank_component():
+    service = _service(
+        subjects=(
+            Subject(
+                subject_id="subject-english",
+                code="FOREIGN_LANGUAGE_1",
+                name="Ti?ng Anh",
+                component_policy=SubjectComponentPolicy.REQUIRED,
+            ),
+        ),
+    )
+
+    try:
+        service.validate_registration(
+            registration=_registration(
+                subject_id="subject-english",
+                component_id=None,
+            )
+        )
+    except ValueError as exc:
+        assert str(exc) == "subject requires a component"
+    else:
+        raise AssertionError(
+            "required non-math component must be rejected"
+        )

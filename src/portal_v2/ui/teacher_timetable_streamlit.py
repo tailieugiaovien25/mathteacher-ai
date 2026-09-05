@@ -473,6 +473,22 @@ def render_teacher_timetable(
                 )
             )
 
+            # V14B6K_MATH_SUBJECT_LEVEL_TIMETABLE_SCOPE
+            # Mathematics may be scheduled at subject level even when
+            # canonical Math components exist.
+            if (
+                str(subject.code or "").strip().upper()
+                == "MATH"
+            ):
+                subject_scopes_list.append(
+                    TeacherTimetableSubjectScope(
+                        subject_id=subject.subject_id,
+                        subject_name=subject.name,
+                        component_id=None,
+                        component_name=None,
+                    )
+                )
+
             if components:
                 for component in components:
                     subject_scopes_list.append(
@@ -572,8 +588,12 @@ def render_teacher_timetable(
         )
         return
 
-    canonical_option_by_assignment_id = {
-        item.assignment_id: item
+    # V14B6K_TIMETABLE_COMPONENT_RESTORE
+    canonical_option_by_selection_key = {
+        (
+            item.assignment_id,
+            item.component_id or "",
+        ): item
         for item in canonical_assignment_options
     }
 
@@ -906,8 +926,11 @@ def render_teacher_timetable(
         )
 
         existing_canonical_option = (
-            canonical_option_by_assignment_id.get(
-                existing.assignment_id
+            canonical_option_by_selection_key.get(
+                (
+                    existing.assignment_id,
+                    existing.component_id or "",
+                )
             )
             if existing is not None
             else None
@@ -1297,6 +1320,14 @@ def render_teacher_timetable(
                     existing is not None
                     and existing.assignment_id
                     == selected_id
+                    and (
+                        existing.component_id
+                        or ""
+                    )
+                    == (
+                        selected_component
+                        or ""
+                    )
                     and existing.effective_from
                     == assignment.effective_from
                     and existing.effective_to
@@ -1317,6 +1348,10 @@ def render_teacher_timetable(
                     academic_year=academic_year,
                     assignment_id=(
                         selected_id
+                    ),
+                    component_id=(
+                        selected_component
+                        or None
                     ),
                     weekday=weekday,
                     session=session,

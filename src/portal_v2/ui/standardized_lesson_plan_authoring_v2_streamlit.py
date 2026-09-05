@@ -179,10 +179,12 @@ def _render_admin_configuration_diagnostic(state):
     }.get(status, status)
     expected = evidence.get("expected")
     actual = evidence.get("actual")
+    # V14B6L_COLLAPSED_REPORTS
+    # B?o c?o v?n ???c gi? ??y ?? nh?ng m?c ??nh thu g?n.
     with st.container(key="g1b_report_card_1"):
         with st.expander(
             "Chi tiết nhiệm vụ 1: Cấu hình ADMIN — " + status_display,
-            expanded=status != "PASS",
+            expanded=False,
         ):
             st.markdown("**Yêu cầu bắt buộc:** " + str(expected or "Bản chụp cấu hình ACTIVE bất biến"))
             if isinstance(actual, Mapping):
@@ -761,7 +763,7 @@ def render_standardized_lesson_plan_authoring_v2(
                     if str(getattr(item, 'file_name', '') or '').lower().endswith('.docx')
                 )
                 with st.container(key="g1b_report_card_2"):
-                    with st.expander('Chẩn đoán Smart Up PPCT (tạm thời)', expanded=True):
+                    with st.expander('Chẩn đoán Smart Up PPCT (tạm thời)', expanded=False):
                         st.write('Tên tệp ưu tiên:', preferred_file_name or '—')
                         st.write('Tên tệp dự kiến:', expected_file_name or '—')
                         st.write('Tiết PPCT của nhóm:', tuple(context.get('curriculum_periods', ()) or ()))
@@ -1370,7 +1372,7 @@ def render_standardized_lesson_plan_authoring_v2(
         with st.container(key="g1b_report_card_3"):
             with st.expander(
                 "\u0043h\u1ea9n \u0111o\u00e1n t\u1ea1m th\u1eddi: Kiểm tra tuân thủ cấu hình ADMIN khi vận hành",
-                expanded=True,
+                expanded=False,
             ):
                 st.caption(
                     "\u0043h\u1ec9 \u0111\u1ecdc b\u1eb1ng ch\u1ee9ng runtime c\u1ee7a l\u1ea7n chu\u1ea9n h\u00f3a hi\u1ec7n t\u1ea1i. "
@@ -1579,7 +1581,7 @@ def render_standardized_lesson_plan_authoring_v2(
             with st.container(key="g1b_report_card_4"):
                 with st.expander(
                     "\u0110\u1ed1i chi\u1ebfu 5 tr\u01b0\u1eddng d\u1eef li\u1ec7u canonical",
-                    expanded=(not canonical_pass_100),
+                    expanded=False,
                 ):
                     st.caption(
                         "M\u1ed7i tr\u01b0\u1eddng ch\u1ec9 \u0111\u01b0\u1ee3c ch\u1ea5p nh\u1eadn khi gi\u00e1 tr\u1ecb "
@@ -1777,9 +1779,16 @@ def render_standardized_lesson_plan_authoring_v2(
             "Bộ chuẩn hóa do ADMIN cấu hình sẽ được "
             "nối ở bước tiếp theo."
         )
-    original_tab, standardized_tab = st.tabs(
-        ("Xem trước giáo án gốc", "Xem giáo án đã chuẩn")
-    )
+    # V14B6L_STANDARDIZED_DOCUMENT_PRIMARY_VIEW
+    # After successful standardization, show the generated DOCX first.
+    if standardized_content:
+        standardized_tab, original_tab = st.tabs(
+            ('Xem giáo án đã chuẩn', 'Xem trước giáo án gốc')
+        )
+    else:
+        original_tab, standardized_tab = st.tabs(
+            ('Xem trước giáo án gốc', 'Xem giáo án đã chuẩn')
+        )
     with original_tab:
         _render_document(
             content=original_content,

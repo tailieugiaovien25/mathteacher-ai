@@ -55,6 +55,8 @@ class TeacherTimetableSlot:
     status: TeacherTimetableSlotStatus = (
         TeacherTimetableSlotStatus.ACTIVE
     )
+    # V14B6K_TIMETABLE_COMPONENT_SCOPE
+    component_id: str | None = None
 
     def __post_init__(self) -> None:
         for field_name, maximum in (

@@ -74,6 +74,8 @@ class SupabaseTeacherTimetableRepository(
             "owner_id": slot.owner_id,
             "academic_year": slot.academic_year,
             "assignment_id": slot.assignment_id,
+            # V14B6K_TIMETABLE_COMPONENT_PERSISTENCE
+            "component_id": slot.component_id,
             "weekday": slot.weekday,
             "session": slot.session.value,
             "period": slot.period,
@@ -348,6 +350,10 @@ class SupabaseTeacherTimetableRepository(
             owner_id=row["owner_id"],
             academic_year=row["academic_year"],
             assignment_id=row["assignment_id"],
+            component_id=(
+                row.get("component_id")
+                or None
+            ),
             weekday=int(row["weekday"]),
             session=TeachingSession(
                 row["session"]
