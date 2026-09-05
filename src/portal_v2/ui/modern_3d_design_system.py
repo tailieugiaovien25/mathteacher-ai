@@ -151,36 +151,96 @@ small {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
 
-/* Buttons: raised controls with a clear pressed state. */
+/* V14B6M_GLOBAL_DARK_3D_BUTTONS
+   Shared dark navy / black tactile controls.
+   Visual-only change: button actions and disabled semantics are preserved. */
 .stButton > button,
 .stDownloadButton > button,
 [data-testid="stFormSubmitButton"] > button,
 [data-testid="baseButton-secondary"],
 [data-testid="baseButton-primary"] {
     min-height: 44px;
-    border: 1px solid rgba(111, 143, 182, 0.34) !important;
+    border: 1px solid rgba(73, 143, 205, 0.72) !important;
     border-radius: var(--mt-radius-sm) !important;
-    color: #17304f !important;
+    color: #f7fbff !important;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(235, 243, 252, 0.98)) !important;
-    box-shadow: var(--mt-shadow-control) !important;
+        linear-gradient(
+            180deg,
+            #123b64 0%,
+            #0a2949 48%,
+            #06182e 100%
+        ) !important;
+    box-shadow:
+        0 7px 0 #041224,
+        0 12px 22px rgba(2, 17, 38, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.42) !important;
     font-weight: 650 !important;
-    transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.46);
+    transition:
+        transform 150ms ease,
+        box-shadow 150ms ease,
+        border-color 150ms ease,
+        filter 150ms ease !important;
 }
 
-.stButton > button:hover,
-.stDownloadButton > button:hover,
-[data-testid="stFormSubmitButton"] > button:hover {
-    border-color: rgba(44, 117, 198, 0.58) !important;
+.stButton > button:hover:not(:disabled),
+.stDownloadButton > button:hover:not(:disabled),
+[data-testid="stFormSubmitButton"] > button:hover:not(:disabled),
+[data-testid="baseButton-secondary"]:hover:not(:disabled),
+[data-testid="baseButton-primary"]:hover:not(:disabled) {
+    border-color: rgba(89, 190, 255, 0.9) !important;
+    background:
+        linear-gradient(
+            180deg,
+            #174b7d 0%,
+            #0d3156 48%,
+            #071c34 100%
+        ) !important;
     transform: translateY(-2px);
-    box-shadow: 0 12px 24px rgba(24, 71, 124, 0.16) !important;
+    box-shadow:
+        0 9px 0 #041224,
+        0 16px 28px rgba(2, 17, 38, 0.30),
+        inset 0 1px 0 rgba(255, 255, 255, 0.20) !important;
 }
 
-.stButton > button:active,
-.stDownloadButton > button:active,
-[data-testid="stFormSubmitButton"] > button:active {
-    transform: translateY(1px);
-    box-shadow: var(--mt-shadow-pressed) !important;
+.stButton > button:active:not(:disabled),
+.stDownloadButton > button:active:not(:disabled),
+[data-testid="stFormSubmitButton"] > button:active:not(:disabled),
+[data-testid="baseButton-secondary"]:active:not(:disabled),
+[data-testid="baseButton-primary"]:active:not(:disabled) {
+    transform: translateY(5px);
+    box-shadow:
+        0 2px 0 #041224,
+        0 5px 10px rgba(2, 17, 38, 0.22),
+        inset 0 3px 8px rgba(0, 0, 0, 0.30) !important;
+}
+
+/* Keep disabled buttons readable instead of washed-out/near-invisible.
+   They remain disabled and cannot be clicked. */
+.stButton > button:disabled,
+.stDownloadButton > button:disabled,
+[data-testid="stFormSubmitButton"] > button:disabled,
+[data-testid="baseButton-secondary"]:disabled,
+[data-testid="baseButton-primary"]:disabled {
+    color: rgba(232, 241, 250, 0.72) !important;
+    -webkit-text-fill-color: rgba(232, 241, 250, 0.72) !important;
+    border-color: rgba(79, 112, 145, 0.48) !important;
+    background:
+        linear-gradient(
+            180deg,
+            #26394d 0%,
+            #192b3d 52%,
+            #111f2d 100%
+        ) !important;
+    box-shadow:
+        0 4px 0 #0b1420,
+        0 8px 14px rgba(3, 14, 28, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    opacity: 0.82 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    text-shadow: none !important;
 }
 
 .stButton > button[kind="primary"],
