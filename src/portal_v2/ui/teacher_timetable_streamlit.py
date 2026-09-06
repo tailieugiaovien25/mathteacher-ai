@@ -1315,6 +1315,9 @@ def render_teacher_timetable(
                         selected_id
                     ]
                 )
+                selected_component = str(
+                    getattr(assignment, "component_ref", "") or ""
+                ).strip()
 
                 if (
                     existing is not None

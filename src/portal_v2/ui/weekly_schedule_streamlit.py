@@ -10844,7 +10844,7 @@ def standardize_lesson_plan_v2_document(
         document_periods_03c2 = []
         for table_03c2 in source_document_03c2.tables:
             match_03c2 = re.search(
-                r"(?i)\bperiod\s+(\d+)\b",
+                r"(?i)\b(?:period|peroid)\s+(\d+)\b",
                 "\n".join(cell.text for row_03c2 in table_03c2.rows for cell in row_03c2.cells),
             )
             if match_03c2:

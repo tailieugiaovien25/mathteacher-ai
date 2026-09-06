@@ -204,7 +204,7 @@ def _table_period(table) -> int | None:
                 continue
             visited.add(identity)
             for paragraph in cell.paragraphs:
-                match = re.search(r"(?i)\bperiod\s+(\d+)\b", paragraph.text)
+                match = re.search(r"(?i)\b(?:period|peroid)\s+(\d+)\b", paragraph.text)
                 if match:
                     return int(match.group(1))
     return None
@@ -233,7 +233,7 @@ def _replace_english_date_field(paragraph, *, label: str, value: date) -> bool:
     import re
     pattern = re.compile(
         rf"(?i)(?P<prefix>\b{re.escape(label)}\s*:\s*)"
-        r"(?P<value>(?:\d{1,2}[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|[.\u2026\u00b7_\- \t]+)"
+        r"(?P<value>(?:\d{1,2}[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|(?:[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|[.\u2026\u00b7_\- \t]+)"
     )
     match = pattern.search(paragraph.text)
     if not match:
