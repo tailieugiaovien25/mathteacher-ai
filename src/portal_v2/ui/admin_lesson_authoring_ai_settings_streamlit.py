@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -27,6 +27,9 @@ _DEFAULTS = {
     "standardization_handoff": "Cho phép chuyển sang Chuẩn hóa giáo án",
     "advanced_prompt_guard": True,
     "advanced_trace": False,
+    "document_ai_enabled": False,
+    "document_ai_provider": "gemini",
+    "document_ai_model": "",
 }
 
 
@@ -39,6 +42,40 @@ def _settings(st) -> dict[str, Any]:
     merged.update(current)
     return merged
 
+
+# V14B6N_R7B2D5B_STANDARDIZATION_AI_RENDERER
+def render_admin_standardization_ai_settings(st, *, client=None) -> None:
+    current = _settings(st)
+    st.markdown("#### AI phân tích tài liệu khi Chuẩn hóa giáo án")
+    st.caption("ADMIN chọn nhà cung cấp AI cho lớp phân tích tài liệu. API key chỉ được đọc từ secrets hệ thống và không hiển thị tại đây.")
+    with st.form("admin_standardization_ai_runtime_settings_v14b6n"):
+        enabled = st.checkbox(
+            "Bật AI phân tích tài liệu khi Chuẩn hóa giáo án",
+            value=bool(current.get("document_ai_enabled", False)),
+        )
+        providers = ["gemini", "openai"]
+        provider = str(current.get("document_ai_provider") or "gemini").strip().lower()
+        if provider not in providers:
+            provider = "gemini"
+        selected_provider = st.selectbox(
+            "Nhà cung cấp AI cho Chuẩn hóa giáo án",
+            providers,
+            index=providers.index(provider),
+            format_func=lambda value: {"gemini": "Google Gemini", "openai": "OpenAI"}.get(value, value),
+        )
+        model = st.text_input(
+            "Model AI cho Chuẩn hóa giáo án",
+            value=str(current.get("document_ai_model") or ""),
+            help="Để trống để dùng model mặc định đã cấu hình cho nhà cung cấp.",
+        )
+        save_ai = st.form_submit_button("Lưu cấu hình AI chuẩn hóa", use_container_width=True)
+    if save_ai:
+        updated = dict(_settings(st))
+        updated["document_ai_enabled"] = bool(enabled)
+        updated["document_ai_provider"] = str(selected_provider).strip().lower()
+        updated["document_ai_model"] = str(model or "").strip()
+        st.session_state[_STATE_KEY] = updated
+        st.success("Đã lưu cấu hình AI chuẩn hóa cho phiên làm việc hiện tại.")
 
 def render_admin_lesson_authoring_ai_settings(st, *, client=None) -> None:
     del client
@@ -210,6 +247,41 @@ def render_admin_lesson_authoring_ai_settings(st, *, client=None) -> None:
                 index=0,
             )
 
+            st.markdown("#### AI phân tích tài liệu khi Chuẩn hóa giáo án")
+            st.caption(
+                "ADMIN chọn nhà cung cấp AI dùng cho lớp phân tích tài liệu. "
+                "API key được lấy từ secrets của hệ thống và không lưu tại đây."
+            )
+            document_ai_enabled = st.checkbox(
+                "Bật AI phân tích tài liệu khi Chuẩn hóa giáo án",
+                value=bool(current["document_ai_enabled"]),
+            )
+            document_ai_provider_options = ["gemini", "openai"]
+            current_document_ai_provider = str(
+                current.get("document_ai_provider") or "gemini"
+            ).strip().lower()
+            if current_document_ai_provider not in document_ai_provider_options:
+                current_document_ai_provider = "gemini"
+            document_ai_provider = st.selectbox(
+                "Nhà cung cấp AI cho Chuẩn hóa giáo án",
+                document_ai_provider_options,
+                index=document_ai_provider_options.index(
+                    current_document_ai_provider
+                ),
+                format_func=lambda value: {
+                    "gemini": "Google Gemini",
+                    "openai": "OpenAI",
+                }.get(value, value),
+            )
+            document_ai_model = st.text_input(
+                "Model AI cho Chuẩn hóa giáo án",
+                value=str(current.get("document_ai_model") or ""),
+                help=(
+                    "Có thể để trống để dùng model mặc định an toàn "
+                    "đã cấu hình cho nhà cung cấp."
+                ),
+            )
+
         with format_tab:
             st.markdown("### 3. Định dạng & Trình bày")
             st.caption(
@@ -313,6 +385,9 @@ def render_admin_lesson_authoring_ai_settings(st, *, client=None) -> None:
             "standardization_handoff": standardization_handoff,
             "advanced_prompt_guard": bool(advanced_prompt_guard),
             "advanced_trace": bool(advanced_trace),
+            "document_ai_enabled": bool(document_ai_enabled),
+            "document_ai_provider": str(document_ai_provider).strip().lower(),
+            "document_ai_model": str(document_ai_model or "").strip(),
         }
         st.success(
             "Đã lưu thiết lập Soạn bài cùng AI cho phiên làm việc hiện tại. "

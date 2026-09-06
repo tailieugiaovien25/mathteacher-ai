@@ -482,6 +482,35 @@ def _build_configuration_payload_from_editor(editor: dict) -> dict:
     )
     payload["approval_policy"] = approval_policy
 
+    # V14B6N_R7B2D11D2_PERSIST_ADMIN_AI_RUNTIME
+    # The ADMIN AI editor remains a UI input surface only. The persisted source
+    # of truth is configuration_payload after the normal DRAFT -> PUBLISHED -> ACTIVE flow.
+    try:
+        import streamlit as st
+
+        _admin_ai_settings = st.session_state.get(
+            "admin_lesson_authoring_ai_settings_v1"
+        )
+    except Exception:
+        _admin_ai_settings = None
+
+    if isinstance(_admin_ai_settings, dict):
+        _document_ai_provider = str(
+            _admin_ai_settings.get("document_ai_provider") or "gemini"
+        ).strip().lower()
+        if _document_ai_provider not in {"gemini", "openai"}:
+            _document_ai_provider = "gemini"
+        _document_ai_model = str(
+            _admin_ai_settings.get("document_ai_model") or ""
+        ).strip()
+        payload["ai_runtime"] = {
+            "enabled": bool(
+                _admin_ai_settings.get("document_ai_enabled", False)
+            ),
+            "provider": _document_ai_provider,
+            "model": _document_ai_model or None,
+        }
+
     _g1b_payload = payload
     # G1B_H4D3_PERSIST_DRIVE_FOLDER_FIELD
     _g1b_repository = dict(
@@ -825,12 +854,79 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                 st.success("Đã tạo phiên bản DRAFT mới.")
                 with st.expander("Chi tiết kỹ thuật phiên bản", expanded=False):
                     st.json(version)
+                # V14B6N_R7B2D11E4F_REFRESH_AFTER_DRAFT_CREATE
+                # Refresh so list_versions() sees the newly created DRAFT.
+                st.rerun()
 
     draft_ids = [
         version_id
         for version_id, row in version_by_id.items()
         if row.get("version_status") == "DRAFT"
     ]
+    # V14B6N_R7B2D11E4D2_READONLY_DRAFT_AI_RUNTIME
+    # Read-only evidence from the already authenticated ADMIN repository result.
+    # Never render credential material even if malformed payload data contains it.
+    if draft_ids:
+        with st.expander(
+            "Kiểm tra AI runtime trong DRAFT (chỉ đọc)",
+            expanded=False,
+        ):
+            readonly_draft_id = st.selectbox(
+                "Chọn DRAFT để kiểm tra AI runtime",
+                draft_ids,
+                format_func=_version_label,
+                key="admin_lesson_plan_configuration_ai_runtime_readonly_draft_id",
+            )
+            readonly_payload = version_by_id[readonly_draft_id].get(
+                "configuration_payload"
+            ) or {}
+            readonly_ai_runtime = (
+                readonly_payload.get("ai_runtime")
+                if isinstance(readonly_payload, dict)
+                else None
+            )
+            readonly_ai_present = isinstance(readonly_ai_runtime, dict)
+            readonly_enabled = (
+                bool(readonly_ai_runtime.get("enabled", False))
+                if readonly_ai_present
+                else False
+            )
+            readonly_provider = (
+                str(readonly_ai_runtime.get("provider") or "").strip().lower()
+                if readonly_ai_present
+                else ""
+            )
+            readonly_model = (
+                str(readonly_ai_runtime.get("model") or "").strip()
+                if readonly_ai_present
+                else ""
+            )
+            forbidden_ai_runtime_fields = (
+                "api_key", "apikey", "secret", "credential", "token"
+            )
+            readonly_credential_field_present = (
+                any(
+                    any(
+                        forbidden in str(field_name).strip().lower()
+                        for forbidden in forbidden_ai_runtime_fields
+                    )
+                    for field_name in readonly_ai_runtime
+                )
+                if readonly_ai_present
+                else False
+            )
+            st.write(
+                "AI_RUNTIME_PRESENT: "
+                "YES" if readonly_ai_present else "NO",
+            )
+            st.write("ENABLED: ", readonly_enabled)
+            st.write("PROVIDER: ", readonly_provider or "UNKNOWN")
+            st.write("MODEL: ", readonly_model or "DEFAULT/NULL")
+            st.write(
+                "CREDENTIAL_FIELD_PRESENT: "
+                "YES" if readonly_credential_field_present else "NO",
+            )
+
     if draft_ids:
         with st.expander("Chỉnh sửa phiên bản đang soạn", expanded=False):
             selected_draft_id = st.selectbox(
@@ -892,6 +988,9 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                 else:
                     st.success("Phiên bản đã chuyển sang PUBLISHED.")
                     st.json(version)
+                    # V14B6N_R7B2D11E5A_REFRESH_AFTER_PUBLISH
+                    # Refresh so published_ids sees the newly PUBLISHED version.
+                    st.rerun()
 
     published_ids = [
         version_id
@@ -1028,5 +1127,10 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
             render_admin_standardizer_tool_configuration,
         )
         render_admin_standardizer_tool_configuration(st, client=client)
+        from portal_v2.ui.admin_lesson_authoring_ai_settings_streamlit import (
+            render_admin_standardization_ai_settings,
+        )
+        render_admin_standardization_ai_settings(st, client=client)
+
         # Compatibility contract only: render_admin_lesson_authoring_ai_settings(st, client=client)
         _render_group_save_button(st, group_key="tools", group_label="III")

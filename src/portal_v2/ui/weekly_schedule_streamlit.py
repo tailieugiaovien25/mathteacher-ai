@@ -1667,6 +1667,69 @@ def _render_lbg_table(
 
 
 
+# V14B6N_R7B2B_ADMIN_AI_APPLICATION_BOUNDARY
+def _v14b6n_standardization_secret(name: str) -> str:
+    try:
+        value = st.secrets.get(name, "")
+    except Exception:
+        value = ""
+    return str(value or "").strip()
+
+
+def _v14b6n_build_standardization_document_analyzer():
+    from document_intelligence.admin_ai_runtime_config import (
+        resolve_document_runtime_config_from_admin_payload,
+    )
+    from document_intelligence.runtime_factory import (
+        build_document_analyzer,
+    )
+
+    payload = st.session_state.get(
+        "lesson_plan_admin_runtime_configuration_payload"
+    )
+    runtime_config = (
+        resolve_document_runtime_config_from_admin_payload(
+            payload
+        )
+    )
+
+    credentials = None
+    if runtime_config.ai_enabled:
+        provider_id = str(runtime_config.provider or "").strip().lower()
+        secret_name = {
+            "gemini": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+        }.get(provider_id)
+
+        if secret_name:
+            secret_value = _v14b6n_standardization_secret(
+                secret_name
+            )
+            if secret_value:
+                credentials = {
+                    provider_id: secret_value
+                }
+
+    # V14B6N_R7B2D9F_SANITIZED_AI_REQUEST_EVIDENCE
+    runtime_provider_id = str(runtime_config.provider or "").strip().lower()
+    credential_configured = bool(
+        credentials
+        and runtime_provider_id
+        and credentials.get(runtime_provider_id)
+    )
+    st.session_state["_g1b_v2_ai_runtime_request_evidence"] = {
+        "document_ai_requested": bool(runtime_config.ai_enabled),
+        "document_ai_provider": runtime_provider_id or None,
+        "document_ai_model": str(runtime_config.model or "").strip() or None,
+        "document_ai_credential_configured": bool(credential_configured),
+    }
+
+    return build_document_analyzer(
+        config=runtime_config,
+        credentials=credentials,
+    )
+
+
 def _process_lesson_plan_upload(
     *,
     row,
@@ -1696,12 +1759,17 @@ def _process_lesson_plan_upload(
         except Exception:
             runtime_profile = None
 
+    document_analyzer = (
+        _v14b6n_build_standardization_document_analyzer()
+    )
+
     service = (
         LessonPlanDocumentProcessingService(
             profile_path=(
                 _LESSON_PLAN_PROFILE
             ),
             profile=runtime_profile,
+            document_analyzer=document_analyzer,
         )
     )
 
@@ -1715,11 +1783,42 @@ def _process_lesson_plan_upload(
     )
 
     # G1B_A5E_UPLOAD_EVIDENCE_SIDE_CHANNEL
+    # V14B6N_R7B2D9F_PIPELINE_AI_REQUEST_EVIDENCE
+    ai_runtime_request_evidence = st.session_state.get(
+        "_g1b_v2_ai_runtime_request_evidence",
+        {},
+    )
+    if not isinstance(ai_runtime_request_evidence, dict):
+        ai_runtime_request_evidence = {}
+
     st.session_state["_g1b_v2_pipeline_evidence"] = {
+        "document_ai_requested": bool(
+            ai_runtime_request_evidence.get("document_ai_requested", False)
+        ),
+        "document_ai_provider": ai_runtime_request_evidence.get(
+            "document_ai_provider"
+        ),
+        "document_ai_model": ai_runtime_request_evidence.get(
+            "document_ai_model"
+        ),
+        "document_ai_credential_configured": bool(
+            ai_runtime_request_evidence.get(
+                "document_ai_credential_configured",
+                False,
+            )
+        ),
         "context_result": getattr(result, "context_result", None),
         "standardization_report": getattr(result, "standardization_report", None),
         "unresolved_fields": tuple(result.unresolved_fields or ()),
         "review_warnings": tuple(getattr(result, "review_warnings", ()) or ()),
+        "document_analysis": getattr(result, "document_analysis", None),
+        "document_ai_used": bool(getattr(result, "document_ai_used", False)),
+        "document_ai_failed": bool(getattr(result, "document_ai_failed", False)),
+        "document_intelligence_error": getattr(
+            result,
+            "document_intelligence_error",
+            None,
+        ),
     }
     return (
         result.output_name,

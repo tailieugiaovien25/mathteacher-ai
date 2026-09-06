@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
@@ -13,6 +13,9 @@ from document_intelligence.contracts import (
 )
 from document_intelligence.lesson_plan_modification_plan import (
     LessonPlanModificationPlan,
+)
+from document_intelligence.lesson_plan_preview import (
+    LessonPlanIntelligencePreviewService,
 )
 import tempfile
 
@@ -35,6 +38,11 @@ class LessonPlanDocumentProcessingResult:
     # G1B_A5E_PIPELINE_EVIDENCE_FIELDS
     context_result: object | None = None
     standardization_report: object | None = None
+    # V14B6N_R7B2B_DOCUMENT_INTELLIGENCE_SEAM
+    document_analysis: object | None = None
+    document_ai_used: bool = False
+    document_ai_failed: bool = False
+    document_intelligence_error: str | None = None
 
 
 class LessonPlanDocumentProcessingService:
@@ -52,6 +60,7 @@ class LessonPlanDocumentProcessingService:
         *,
         profile_path: Path,
         profile: dict[str, object] | None = None,
+        document_analyzer=None,
     ) -> None:
         self._profile_path = Path(
             profile_path
@@ -61,6 +70,7 @@ class LessonPlanDocumentProcessingService:
             if isinstance(profile, dict)
             else None
         )
+        self._document_analyzer = document_analyzer
     @staticmethod
     def apply_modification_plan(
         *,
@@ -254,6 +264,33 @@ class LessonPlanDocumentProcessingService:
                 content
             )
 
+            # V14B6N_R7B2B_DOCUMENT_INTELLIGENCE_READ_ONLY
+            document_analysis = None
+            document_ai_used = False
+            document_ai_failed = False
+            document_intelligence_error = None
+
+            if self._document_analyzer is not None:
+                try:
+                    intelligence_preview = (
+                        LessonPlanIntelligencePreviewService(
+                            analyzer=self._document_analyzer
+                        )
+                        .preview(source=working_source)
+                    )
+                    document_analysis = intelligence_preview.analysis
+                    document_ai_used = bool(
+                        intelligence_preview.ai_used
+                    )
+                    document_ai_failed = bool(
+                        intelligence_preview.ai_failed
+                    )
+                except Exception as error:
+                    # Intelligence is advisory only. Standardization
+                    # must continue on the deterministic canonical path.
+                    document_ai_failed = True
+                    document_intelligence_error = type(error).__name__
+
             review_warnings: tuple[str, ...] = ()
             if resolved_options.preserve_original_maximum:
                 if original_content:
@@ -343,6 +380,10 @@ class LessonPlanDocumentProcessingService:
                 # G1B_A5E_PIPELINE_EVIDENCE_RETURN
                 context_result=result.context_result,
                 standardization_report=getattr(result, "standardization_report", None),
+                document_analysis=document_analysis,
+                document_ai_used=document_ai_used,
+                document_ai_failed=document_ai_failed,
+                document_intelligence_error=document_intelligence_error,
             )
         )
 

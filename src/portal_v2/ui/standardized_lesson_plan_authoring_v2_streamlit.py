@@ -1662,6 +1662,133 @@ def render_standardized_lesson_plan_authoring_v2(
                             # V14B6F_A8_R2_TEACHER_CONFIRMATION_IS_FINAL
                             # No revoke control: teacher confirmation is final business verification.
 
+        # V14B6N_R7B2D7B_AI_RUNTIME_EVIDENCE_UI
+        ai_runtime_evidence = st.session_state.get(
+            "_g1b_v2_pipeline_evidence", {}
+        )
+        if isinstance(ai_runtime_evidence, Mapping):
+            # V14B6N_R7B2D9F_SANITIZED_AI_REQUEST_UI
+            ai_requested = bool(
+                ai_runtime_evidence.get("document_ai_requested", False)
+            )
+            ai_provider = str(
+                ai_runtime_evidence.get("document_ai_provider") or ""
+            ).strip()
+            ai_model = str(
+                ai_runtime_evidence.get("document_ai_model") or ""
+            ).strip()
+            ai_credential_configured = bool(
+                ai_runtime_evidence.get(
+                    "document_ai_credential_configured",
+                    False,
+                )
+            )
+            ai_used = bool(
+                ai_runtime_evidence.get("document_ai_used", False)
+            )
+            ai_failed = bool(
+                ai_runtime_evidence.get("document_ai_failed", False)
+            )
+            ai_error = ai_runtime_evidence.get(
+                "document_intelligence_error"
+            )
+            ai_analysis = ai_runtime_evidence.get("document_analysis")
+
+            with st.container(key="g1b_report_card_ai_runtime_v14b6n"):
+                with st.expander(
+                    "AI phân tích tài liệu - Bằng chứng runtime",
+                    expanded=False,
+                ):
+                    st.caption(
+                        "Chỉ đọc bằng chứng AI của lần chuẩn hóa hiện tại. "
+                        "Khối này không thay đổi kết luận canonical/compliance "
+                        "hay quyền Lưu/Tải/Gộp."
+                    )
+
+                    st.write(
+                        "**ADMIN yêu cầu AI:**",
+                        "Có" if ai_requested else "Không",
+                    )
+                    st.write(
+                        "**Nhà cung cấp yêu cầu:**",
+                        ai_provider or "Không xác định",
+                    )
+                    st.write(
+                        "**Model yêu cầu:**",
+                        ai_model or "Mặc định của nhà cung cấp",
+                    )
+                    st.write(
+                        "**Credential đã cấu hình:**",
+                        "Có" if ai_credential_configured else "Không",
+                    )
+
+                    # V14B6N_R7B2D10E_ADMIN_BRIDGE_TRACE_UI
+                    admin_bridge_trace = st.session_state.get(
+                        "_g1b_v2_ai_admin_bridge_trace",
+                        {},
+                    )
+                    if not isinstance(admin_bridge_trace, Mapping):
+                        admin_bridge_trace = {}
+
+                    st.markdown("**Dấu vết bridge ADMIN → runtime**")
+                    st.write(
+                        "**1. ADMIN state trước khi áp dụng cấu hình:**",
+                        "Có" if admin_bridge_trace.get("admin_state_present") else "Không",
+                    )
+                    st.write(
+                        "**1a. AI bật trong ADMIN state:**",
+                        "Có" if admin_bridge_trace.get("admin_state_enabled") else "Không",
+                    )
+                    st.write(
+                        "**1b. Provider trong ADMIN state:**",
+                        str(admin_bridge_trace.get("admin_state_provider") or "Không xác định"),
+                    )
+                    st.write(
+                        "**1c. Model trong ADMIN state:**",
+                        str(admin_bridge_trace.get("admin_state_model") or "Mặc định/Trống"),
+                    )
+                    st.write(
+                        "**2. Payload sau apply_active_admin... tồn tại:**",
+                        "Có" if admin_bridge_trace.get("payload_after_apply_present") else "Không",
+                    )
+                    st.write(
+                        "**2a. ai_runtime đã có sau apply_active_admin...:**",
+                        "Có" if admin_bridge_trace.get("payload_after_apply_ai_runtime_present") else "Không",
+                    )
+                    st.write(
+                        "**3. AI overlay đã được ghi:**",
+                        "Có" if admin_bridge_trace.get("overlay_written") else "Không",
+                    )
+                    st.write(
+                        "**3a. AI bật sau overlay:**",
+                        "Có" if admin_bridge_trace.get("overlay_enabled") else "Không",
+                    )
+                    st.write(
+                        "**3b. Provider sau overlay:**",
+                        str(admin_bridge_trace.get("overlay_provider") or "Không xác định"),
+                    )
+                    st.write(
+                        "**3c. Model sau overlay:**",
+                        str(admin_bridge_trace.get("overlay_model") or "Mặc định/Trống"),
+                    )
+                    st.divider()
+
+                    if ai_failed:
+                        st.error("Trạng thái AI: GẶP LỖI")
+                    elif ai_used:
+                        st.success("Trạng thái AI: ĐÃ SỬ DỤNG AI")
+                    else:
+                        st.info("Trạng thái AI: KHÔNG SỬ DỤNG AI")
+
+                    st.write(
+                        "**Kết quả phân tích tài liệu:**",
+                        "Có" if ai_analysis is not None else "Không",
+                    )
+                    st.write(
+                        "**Lỗi AI:**",
+                        str(ai_error) if ai_error else "Không",
+                    )
+        # V14B6N_R7B2D7B_AI_RUNTIME_EVIDENCE_UI_END
         # G1B_ENGLISH_PILOT01_A5J2A_AUDIT_EXPLAINABILITY
         audit_evidence = getattr(audit_result, "evidence", ())
         if isinstance(audit_result, Mapping):

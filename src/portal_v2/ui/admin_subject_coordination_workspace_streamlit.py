@@ -178,7 +178,7 @@ def _render_lesson_plan_effective(st, *, status: str, value: Any) -> None:
         st.caption("Configuration payload hiện tại rỗng.")
 
     # G1B_P1B_R2A_EFFECTIVE_LESSON_PLAN_DETAILS_CALL
-    _g1b_p1b_r2a_render_effective_lesson_plan_details(st, configuration_payload)
+    _g1b_p1b_r2a_render_effective_lesson_plan_details(st, payload)
 
 # G1B_P1B_R2A_EFFECTIVE_LESSON_PLAN_DETAILS
 def _g1b_p1b_r2a_render_effective_lesson_plan_details(st, payload) -> None:

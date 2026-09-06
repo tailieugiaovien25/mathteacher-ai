@@ -1292,10 +1292,147 @@ def main() -> None:
                 st.session_state.pop(state_key, None)
 
             try:
+                # V14B6N_R7B2D10E_ADMIN_BRIDGE_TRACE_BEFORE_APPLY
+                admin_ai_state_before = st.session_state.get(
+                    "admin_lesson_authoring_ai_settings_v1"
+                )
+                admin_ai_state_before_is_dict = isinstance(
+                    admin_ai_state_before,
+                    dict,
+                )
+                st.session_state["_g1b_v2_ai_admin_bridge_trace"] = {
+                    "admin_state_present": bool(
+                        admin_ai_state_before_is_dict
+                    ),
+                    "admin_state_enabled": bool(
+                        admin_ai_state_before.get(
+                            "document_ai_enabled",
+                            False,
+                        )
+                    ) if admin_ai_state_before_is_dict else False,
+                    "admin_state_provider": str(
+                        admin_ai_state_before.get(
+                            "document_ai_provider"
+                        ) or ""
+                    ).strip().lower() if admin_ai_state_before_is_dict else None,
+                    "admin_state_model": str(
+                        admin_ai_state_before.get(
+                            "document_ai_model"
+                        ) or ""
+                    ).strip() or None if admin_ai_state_before_is_dict else None,
+                    "payload_after_apply_present": False,
+                    "payload_after_apply_ai_runtime_present": False,
+                    "overlay_written": False,
+                    "overlay_enabled": False,
+                    "overlay_provider": None,
+                    "overlay_model": None,
+                }
+
                 apply_active_admin_lesson_plan_configuration(
                     client=client,
                     session_state=st.session_state,
                 )
+
+                # V14B6N_R7B2D3_ADMIN_AI_RUNTIME_SESSION_BRIDGE
+                # V14B6N_R7B2D10E_ADMIN_BRIDGE_TRACE_AFTER_APPLY
+                payload_after_apply = st.session_state.get(
+                    "lesson_plan_admin_runtime_configuration_payload"
+                )
+                bridge_trace = dict(
+                    st.session_state.get(
+                        "_g1b_v2_ai_admin_bridge_trace",
+                        {},
+                    )
+                )
+                bridge_trace["payload_after_apply_present"] = isinstance(
+                    payload_after_apply,
+                    dict,
+                )
+                bridge_trace["payload_after_apply_ai_runtime_present"] = bool(
+                    isinstance(payload_after_apply, dict)
+                    and isinstance(
+                        payload_after_apply.get("ai_runtime"),
+                        dict,
+                    )
+                )
+                st.session_state["_g1b_v2_ai_admin_bridge_trace"] = bridge_trace
+
+                admin_ai_settings = st.session_state.get(
+                    "admin_lesson_authoring_ai_settings_v1"
+                )
+                # V14B6N_R7B2D11D2_PREFER_PERSISTED_AI_RUNTIME
+                _persisted_runtime_payload = st.session_state.get(
+                    "lesson_plan_admin_runtime_configuration_payload"
+                )
+                _persisted_ai_runtime = (
+                    _persisted_runtime_payload.get("ai_runtime")
+                    if isinstance(_persisted_runtime_payload, dict)
+                    else None
+                )
+                if (
+                    isinstance(admin_ai_settings, dict)
+                    and not isinstance(_persisted_ai_runtime, dict)
+                ):
+                    document_ai_provider = str(
+                        admin_ai_settings.get("document_ai_provider")
+                        or "gemini"
+                    ).strip().lower()
+                    if document_ai_provider not in {"gemini", "openai"}:
+                        document_ai_provider = "gemini"
+
+                    runtime_payload = st.session_state.get(
+                        "lesson_plan_admin_runtime_configuration_payload"
+                    )
+                    if not isinstance(runtime_payload, dict):
+                        runtime_payload = {}
+                    else:
+                        runtime_payload = dict(runtime_payload)
+
+                    document_ai_model = str(
+                        admin_ai_settings.get("document_ai_model") or ""
+                    ).strip()
+                    runtime_payload["ai_runtime"] = {
+                        "enabled": bool(
+                            admin_ai_settings.get(
+                                "document_ai_enabled",
+                                False,
+                            )
+                        ),
+                        "provider": document_ai_provider,
+                        "model": document_ai_model or None,
+                    }
+                    st.session_state[
+                        "lesson_plan_admin_runtime_configuration_payload"
+                    ] = runtime_payload
+
+                    # V14B6N_R7B2D10E_ADMIN_BRIDGE_TRACE_AFTER_OVERLAY
+                    overlay_runtime = runtime_payload.get("ai_runtime")
+                    bridge_trace = dict(
+                        st.session_state.get(
+                            "_g1b_v2_ai_admin_bridge_trace",
+                            {},
+                        )
+                    )
+                    bridge_trace["overlay_written"] = isinstance(
+                        overlay_runtime,
+                        dict,
+                    )
+                    bridge_trace["overlay_enabled"] = bool(
+                        overlay_runtime.get("enabled", False)
+                    ) if isinstance(overlay_runtime, dict) else False
+                    bridge_trace["overlay_provider"] = str(
+                        overlay_runtime.get("provider") or ""
+                    ).strip().lower() or None if isinstance(
+                        overlay_runtime,
+                        dict,
+                    ) else None
+                    bridge_trace["overlay_model"] = str(
+                        overlay_runtime.get("model") or ""
+                    ).strip() or None if isinstance(
+                        overlay_runtime,
+                        dict,
+                    ) else None
+                    st.session_state["_g1b_v2_ai_admin_bridge_trace"] = bridge_trace
 
                 st.session_state[
                     "standardization_approval_before_monday_enabled"
@@ -1924,4 +2061,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
