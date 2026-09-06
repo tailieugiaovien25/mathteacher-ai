@@ -1089,15 +1089,6 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
                     )
                     st.json(dict(resolved.configuration_payload))
 
-        st.subheader("Chính sách nhóm giáo án")
-        try:
-            from portal_v2.ui.admin_canonical_code_catalog_streamlit import (
-                render_admin_lesson_plan_grouping_policy,
-            )
-            render_admin_lesson_plan_grouping_policy(st, client=client)
-        except Exception as error:
-            st.error("Không thể tải chính sách nhóm giáo án: " + str(error))
-
         st.subheader("Phạm vi chuyển giao từ USER")
         st.write(
             "ADMIN quản lý mẫu giáo án, quy tắc chuẩn hóa, ngày soạn/ngày duyệt "
@@ -1111,6 +1102,21 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
             "Điều phối riêng theo Môn/Phân môn và kiểm tra cấu hình hiệu lực. "
             "Không lặp lại chính sách toàn hệ thống hoặc thiết lập công cụ."
         )
+        st.subheader("Chính sách nhóm giáo án")
+        st.caption(
+            "ADMIN chọn cách tạo nhóm giáo án theo từng Môn/Phân môn. "
+            "Chọn “Theo tiết PPCT” khi mỗi tiết là một giáo án; "
+            "chọn “Theo bài” khi nhiều tiết cùng bài dùng chung một giáo án."
+        )
+        try:
+            from portal_v2.ui.admin_canonical_code_catalog_streamlit import (
+                render_admin_lesson_plan_grouping_policy,
+            )
+            render_admin_lesson_plan_grouping_policy(st, client=client)
+        except Exception as error:
+            st.error("Không thể tải cấu hình cách soạn giáo án: " + str(error))
+
+
         render_admin_subject_coordination_workspace(client=client)
         _render_group_save_button(st, group_key="subject", group_label="II")
 
