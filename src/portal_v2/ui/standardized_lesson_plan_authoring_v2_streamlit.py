@@ -183,7 +183,7 @@ def _render_admin_configuration_diagnostic(state):
     # B?o c?o v?n ???c gi? ??y ?? nh?ng m?c ??nh thu g?n.
     with st.container(key="g1b_report_card_1"):
         with st.expander(
-            "Chi tiết nhiệm vụ 1: Cấu hình ADMIN — " + status_display,
+            "1. Kiểm tra cấu hình hệ thống — " + status_display,
             expanded=False,
         ):
             st.markdown("**Yêu cầu bắt buộc:** " + str(expected or "Bản chụp cấu hình ACTIVE bất biến"))
@@ -763,7 +763,7 @@ def render_standardized_lesson_plan_authoring_v2(
                     if str(getattr(item, 'file_name', '') or '').lower().endswith('.docx')
                 )
                 with st.container(key="g1b_report_card_2"):
-                    with st.expander('Chẩn đoán Smart Up PPCT (tạm thời)', expanded=False):
+                    with st.expander('2. Kiểm tra tìm và tải giáo án', expanded=False):
                         st.write('Tên tệp ưu tiên:', preferred_file_name or '—')
                         st.write('Tên tệp dự kiến:', expected_file_name or '—')
                         st.write('Tiết PPCT của nhóm:', tuple(context.get('curriculum_periods', ()) or ()))
@@ -1371,7 +1371,7 @@ def render_standardized_lesson_plan_authoring_v2(
         ).upper()
         with st.container(key="g1b_report_card_3"):
             with st.expander(
-                "\u0043h\u1ea9n \u0111o\u00e1n t\u1ea1m th\u1eddi: Kiểm tra tuân thủ cấu hình ADMIN khi vận hành",
+                "3. Kiểm tra tuân thủ cấu hình",
                 expanded=False,
             ):
                 st.caption(
@@ -1531,7 +1531,11 @@ def render_standardized_lesson_plan_authoring_v2(
         )
         # V14B6F_A8_R2_LOCKED_TEACHER_AUTHORITY_RELEASE_POLICY
         # ADMIN Compliance remains an independent supervision result.
-        release_allowed = canonical_pass_100
+        # R4A2C2B2B1_CANONICAL_AND_ADMIN_RELEASE_GATE
+        release_allowed = (
+            canonical_pass_100
+            and admin_enforcement_pass
+        )
         audit_blocks_save = not release_allowed
         score_text = str(int(trust_score)) + "%" if isinstance(trust_score, (int, float)) else "N/A"
         # V14B3_ADMIN_FORMAT_CONCLUSION
@@ -1580,7 +1584,7 @@ def render_standardized_lesson_plan_authoring_v2(
             }
             with st.container(key="g1b_report_card_4"):
                 with st.expander(
-                    "\u0110\u1ed1i chi\u1ebfu 5 tr\u01b0\u1eddng d\u1eef li\u1ec7u canonical",
+                    "4. Đối chiếu dữ liệu giáo án",
                     expanded=False,
                 ):
                     st.caption(
@@ -1646,18 +1650,132 @@ def render_standardized_lesson_plan_authoring_v2(
                                 key=f"g1b_v2_teacher_confirm_{group_id}_{field_key}",
                                 disabled=not str(proposed_teacher_value or "").strip(),
                             ):
-                                updated = dict(teacher_verification)
-                                updated[field_key] = {
-                                    "confirmed": True,
-                                    "teacher_value": str(proposed_teacher_value).strip(),
-                                    "expected_snapshot": expected,
-                                    "found_snapshot": found,
-                                    "group_id": verification_scope["group_id"],
-                                    "output_sha256": verification_scope["output_sha256"],
-                                    "verified_by": str(user_id or ""),
-                                    "verified_at": datetime.now(timezone.utc).isoformat(),
-                                }
-                                st.session_state[TEACHER_VERIFICATION_KEY] = updated
+                                # R4A2C2B2C2B2B_ATOMIC_TEACHER_CONFIRM_REPAIR_REAUDIT
+                                # Repair and re-audit complete before session state is committed.
+                                try:
+                                    from document_standardization.lesson_plan_canonical_field_repair_runtime import (
+                                        repair_canonical_field_bytes,
+                                    )
+                                    from document_standardization.lesson_plan_repaired_content_audit_runtime import (
+                                        audit_repaired_content,
+                                    )
+
+                                    repair_snapshot = st.session_state.get(
+                                        STANDARDIZED_DOCUMENT_KEY
+                                    )
+                                    repair_source_content = (
+                                        bytes(repair_snapshot.get("content", b""))
+                                        if isinstance(repair_snapshot, Mapping)
+                                        else b""
+                                    )
+                                    if not repair_source_content:
+                                        raise RuntimeError(
+                                            "Khong co DOCX da chuan hoa de sua."
+                                        )
+                                    if not original_content:
+                                        raise RuntimeError(
+                                            "Khong con DOCX goc de tai kiem duyet."
+                                        )
+
+                                    repair_result = repair_canonical_field_bytes(
+                                        repair_source_content,
+                                        group_context=context,
+                                        field_key=field_key,
+                                        teacher_value=str(
+                                            proposed_teacher_value or ""
+                                        ).strip(),
+                                    )
+                                    if not repair_result.changed:
+                                        raise RuntimeError(
+                                            "Khong tim thay vi tri can sua trong DOCX."
+                                        )
+
+                                    pipeline_evidence = st.session_state.get(
+                                        "_g1b_v2_pipeline_evidence"
+                                    )
+                                    repaired_audit = audit_repaired_content(
+                                        original_content=original_content,
+                                        repaired_content=repair_result.content,
+                                        group_context=context,
+                                        pipeline_evidence=(
+                                            pipeline_evidence
+                                            if isinstance(pipeline_evidence, Mapping)
+                                            else None
+                                        ),
+                                    )
+
+                                    repaired_snapshot = dict(repair_snapshot)
+                                    repaired_snapshot["content"] = repair_result.content
+
+                                    # Commit one coherent repaired artifact and its new audit.
+                                    st.session_state[STANDARDIZED_DOCUMENT_KEY] = (
+                                        repaired_snapshot
+                                    )
+                                    st.session_state.pop(
+                                        TEACHER_VERIFICATION_KEY,
+                                        None,
+                                    )
+                                    st.session_state.pop(
+                                        AUDIT_RESULT_KEY,
+                                        None,
+                                    )
+                                    st.session_state.pop(
+                                        AUDIT_FIELD_EVIDENCE_KEY,
+                                        None,
+                                    )
+                                    st.session_state.pop(
+                                        AI_TASK_EVIDENCE_KEY,
+                                        None,
+                                    )
+                                    st.session_state[
+                                        "_g1b_v2_runtime_compliance_diagnostic"
+                                    ] = dict(repaired_audit.compliance)
+                                    st.session_state[AUDIT_RESULT_KEY] = (
+                                        repaired_audit.audit_result
+                                    )
+                                    st.session_state[AUDIT_FIELD_EVIDENCE_KEY] = (
+                                        dict(repaired_audit.canonical_field_rows)
+                                    )
+                                    if repaired_audit.compliance:
+                                        st.session_state[AI_TASK_MONITOR_KEY] = (
+                                            _compliance_monitor_state(
+                                                repaired_audit.compliance
+                                            )
+                                        )
+                                    else:
+                                        st.session_state[AI_TASK_MONITOR_KEY] = (
+                                            _monitor_state(
+                                                phase="complete",
+                                                checks={
+                                                    "GATE": "blocked",
+                                                    "RELEASE": "blocked",
+                                                },
+                                                message=(
+                                                    "Tai kiem duyet khong co "
+                                                    "bang chung tuan thu ADMIN."
+                                                ),
+                                            )
+                                        )
+                                    st.session_state[
+                                        f"g1b_v2_standardize_notice_{group_id}"
+                                    ] = {
+                                        "level": "success",
+                                        "message": (
+                                            "Da sua truong giao vien xac nhan "
+                                            "va tai kiem duyet DOCX."
+                                        ),
+                                    }
+                                except Exception as repair_error:
+                                    # Fail closed: retain the prior coherent artifact/audit.
+                                    st.session_state[
+                                        f"g1b_v2_standardize_notice_{group_id}"
+                                    ] = {
+                                        "level": "error",
+                                        "message": (
+                                            "Khong the sua truong da xac nhan: "
+                                            + str(repair_error)
+                                        ),
+                                    }
                                 st.rerun()
                             # V14B6F_A8_R2_TEACHER_CONFIRMATION_IS_FINAL
                             # No revoke control: teacher confirmation is final business verification.
@@ -1797,7 +1915,7 @@ def render_standardized_lesson_plan_authoring_v2(
 
         if audit_evidence:
             with st.container(key="g1b_report_card_5"):
-                with st.expander("B\u1eb1ng ch\u1ee9ng k\u1ef9 thu\u1eadt", expanded=False):
+                with st.expander("5. Bằng chứng kiểm duyệt", expanded=False):
                     st.caption(
                         "B\u1ea3ng n\u00e0y ghi l\u1ea1i b\u1eb1ng ch\u1ee9ng \u0111\u1ed9c l\u1eadp "
                         "\u0111\u00e3 d\u00f9ng \u0111\u1ec3 k\u1ebft lu\u1eadn. FAIL/XUNG \u0110\u1ed8T "
@@ -1931,7 +2049,7 @@ def render_standardized_lesson_plan_authoring_v2(
             trace_checks = dict(trace_state.get("checks") or {})
             if trace_checks:
                 with st.container(key="g1b_report_card_6"):
-                    with st.expander("Xem nhật ký các công đoạn đã tác động đến giáo án", expanded=False):
+                    with st.expander("6. Nhật ký xử lý giáo án", expanded=False):
                         for task_code, task_label in _AI_TASKS:
                             task_status = str(trace_checks.get(task_code) or "queued")
                             st.caption(task_label + ": " + {

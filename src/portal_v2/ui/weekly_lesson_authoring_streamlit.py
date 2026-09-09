@@ -132,6 +132,18 @@ def _group_context_payload(group, *, client=None) -> dict:
             ),
             "timetable_period": getattr(item, "timetable_period", None),
             "curriculum_period": getattr(item, "curriculum_period", None),
+            # R4A2C2B2C2A_REPAIR_CONTEXT_PAYLOAD_FIELDS
+            # Serialize the enum value so the session payload remains stable
+            # across Streamlit reruns and Python module reloads.
+            "session": str(
+                getattr(
+                    getattr(item, "session", None),
+                    "value",
+                    getattr(item, "session", ""),
+                )
+                or ""
+            ),
+            "period_in_lesson": getattr(item, "period_in_lesson", None),
         })
     return {
         "schema_version": 1,

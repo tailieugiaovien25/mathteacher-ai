@@ -820,6 +820,69 @@ def _mt_iter_all_paragraphs(document):
                     yield paragraph
 
 
+
+# R4A2C2B1_ISOLATED_CANONICAL_FIELD_REPAIR
+def repair_lesson_plan_canonical_field(
+    source,
+    output,
+    *,
+    field_name: str,
+    value: str,
+    context,
+) -> bool:
+    """Repair exactly one confirmed canonical field in a DOCX copy."""
+
+    from docx import Document
+
+    field_name = str(field_name or "").strip()
+    value = str(value or "").strip()
+
+    supported = {
+        "drafting_date",
+        "teaching_date",
+        "class_id",
+        "curriculum_period",
+        "lesson_title",
+    }
+
+    if field_name not in supported or not value:
+        return False
+
+    source = Path(source)
+    output = Path(output)
+
+    document = Document(source)
+
+    applier = LessonPlanDocumentContextApplier()
+
+    if field_name == "teaching_date":
+        class_id = str(
+            getattr(context, "class_id", "") or ""
+        ).strip()
+
+        if not class_id:
+            return False
+
+        document.save(output)
+
+        return _mt_overlay_multiclass_teaching_date(
+            output,
+            context,
+        )
+
+    changed = applier._apply_field(
+        document,
+        field_name,
+        value,
+        context=context,
+    )
+
+    if not changed:
+        return False
+
+    document.save(output)
+    return True
+
 def _mt_overlay_multiclass_teaching_date(
     output,
     context,

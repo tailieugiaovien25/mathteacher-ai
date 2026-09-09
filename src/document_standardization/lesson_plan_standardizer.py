@@ -1349,6 +1349,22 @@ class LessonPlanWordStandardizer:
                         existing_no_split
                     )
 
+                # R4A2C1D5_NON_HEADER_CANTSPLIT
+                if (
+                    row_index != 0
+                    and not bool(
+                        table_profile.get(
+                            "allow_row_split",
+                            True,
+                        )
+                    )
+                ):
+                    row_pr.append(
+                        OxmlElement(
+                            "w:cantSplit"
+                        )
+                    )
+
                 if (
                     row_index == 0
                     and len(table.rows) > 1

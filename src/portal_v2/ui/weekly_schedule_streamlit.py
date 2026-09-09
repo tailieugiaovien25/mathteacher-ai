@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 
@@ -4484,18 +4484,36 @@ text_input(
     # its technical class_id with a display string (for example "8A1, 8A2"),
     # so assignment-id matching must not be used as the primary source at the
     # later DOCX processing boundary.
+    # G1B_P6B_R3R2B_CANONICAL_MULTICLASS_TEACHING_DATE_SOURCE
+    # Reuse the canonical class/date pairs already resolved from selected_unit.
+    # Do not derive a second teaching-date scope from selected_timetable_rows.
     st.session_state[
         "_standardization_selected_teaching_date_pairs"
     ] = tuple(
         (
             _class_display_name(
-                str(getattr(row, "class_id", "") or ""),
+                str(class_id or ""),
                 client=client,
             ),
-            getattr(row, "teaching_date", None),
+            teaching_date,
         )
-        for row in selected_timetable_rows
-        if getattr(row, "teaching_date", None) is not None
+        for class_id, teaching_date in selected_teaching_date_pairs
+        if teaching_date is not None
+    )
+
+    # G1B_P6B_R3R7_SOURCE_PAIRS_DIAGNOSTIC
+    print(
+        "[G1B-P6B-R3R7] source selected_teaching_date_pairs=",
+        repr(selected_teaching_date_pairs),
+    )
+    print(
+        "[G1B-P6B-R3R7] session selected_teaching_date_pairs=",
+        repr(
+            st.session_state.get(
+                "_standardization_selected_teaching_date_pairs",
+                (),
+            )
+        ),
     )
 
     # ---------------------------------------------------------
@@ -5390,6 +5408,17 @@ text_input(
                 "th\u00f4ng tin v\u00e0 "
                 "chu\u1ea9n h\u00f3a gi\u00e1o \u00e1n..."
             ):
+                # G1B_P6B_R3R8_SELECTED_LESSON_DATE_PAIRS_DIAGNOSTIC
+                print(
+                    "[G1B-P6B-R3R8] selected_lesson teaching_dates_by_class=",
+                    repr(
+                        selected_lesson.get(
+                            "teaching_dates_by_class",
+                            (),
+                        )
+                    ),
+                )
+
                 result = (
                     _process_lesson_plan_upload(
                         row=reviewed_row,
@@ -10438,6 +10467,70 @@ def _process_lesson_plan_upload(
         )
     )
 
+    # G1B_P6B_R3R5C_RUNTIME_MULTICLASS_TEACHING_DATE_SYNC
+    selected_class_date_pairs = tuple(
+        (
+            str(class_name or "").strip(),
+            class_teaching_date,
+        )
+        for class_name, class_teaching_date in tuple(
+            st.session_state.get(
+                "_standardization_selected_teaching_date_pairs",
+                (),
+            )
+            or ()
+        )
+        if str(class_name or "").strip()
+        and class_teaching_date is not None
+    )
+
+    # G1B_P6B_R3R6B_RUNTIME_PAIRS_DIAGNOSTIC
+    print(
+        "[G1B-P6B-R3R6B] runtime selected_class_date_pairs=",
+        repr(selected_class_date_pairs),
+    )
+
+    if selected_class_date_pairs:
+        runtime_content = _mt_result_output_bytes(result)
+
+        if runtime_content:
+            import os
+            import tempfile
+            from types import SimpleNamespace
+            from document_standardization.lesson_plan_document_context_applier import (
+                _mt_overlay_multiclass_teaching_date,
+            )
+
+            temporary_docx = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".docx",
+                    delete=False,
+                ) as temporary_file:
+                    temporary_docx = temporary_file.name
+                    temporary_file.write(runtime_content)
+
+                for class_name, class_teaching_date in selected_class_date_pairs:
+                    _mt_overlay_multiclass_teaching_date(
+                        temporary_docx,
+                        SimpleNamespace(
+                            class_id=class_name,
+                            teaching_date=class_teaching_date,
+                        ),
+                    )
+
+                with open(temporary_docx, "rb") as temporary_file:
+                    runtime_updated = temporary_file.read()
+
+                if runtime_updated != runtime_content:
+                    result = _mt_result_with_output_bytes(
+                        result,
+                        runtime_updated,
+                    )
+            finally:
+                if temporary_docx and os.path.exists(temporary_docx):
+                    os.unlink(temporary_docx)
+
     if not bool(st.session_state.get(_MT_APPROVAL_ENABLED, True)):
         approval_content = _mt_result_output_bytes(result)
         if approval_content is not None:
@@ -10648,9 +10741,43 @@ def standardize_lesson_plan_v2_document(
     from types import SimpleNamespace
 
     from educational_planning_v2.models import TeachingSession
-
+    from document_standardization.lesson_plan_document_context_applier import (
+        _mt_overlay_multiclass_teaching_date,
+    )
     context = dict(group_context or {})
+
+    # G1B_P6B_R3R9B_RESOLVED_CONTEXT_DIAGNOSTIC
+    print(
+        "[G1B-P6B-R3R9B] group_context teaching_dates_by_class=",
+        repr(context.get("teaching_dates_by_class", ())),
+    )
+    print(
+        "[G1B-P6B-R3R9B] resolved_lbg teaching_dates_by_class=",
+        repr(
+            (
+                st.session_state.get(
+                    "_v58_resolved_lbg_lesson_context",
+                    {},
+                )
+                or {}
+            ).get(
+                "teaching_dates_by_class",
+                (),
+            )
+        ),
+    )
+
     occurrences = tuple(context.get("occurrences", ()) or ())
+
+    # G1B_P6B_R3R10_GROUP_CONTEXT_DIAGNOSTIC
+    print(
+        "[G1B-P6B-R3R10] group_context keys=",
+        repr(tuple(sorted(context.keys()))),
+    )
+    print(
+        "[G1B-P6B-R3R10] occurrences=",
+        repr(occurrences),
+    )
     occurrence = next(
         (
             dict(item)
@@ -10874,7 +11001,29 @@ def standardize_lesson_plan_v2_document(
     # G1B_P6B_R3R1_V2_ALL_SELECTED_CLASS_DATES
     # Audit 07 proved that the second English class/date is its own paragraph.
     # Reuse the existing class-specific overlay for every teacher-facing pair.
+    # G1B_P6B_R3R11E_V2_OCCURRENCE_SOURCE
     selected_class_date_pairs = tuple(
+        (
+            str(
+                item.get("class_display")
+                or item.get("class_name")
+                or item.get("class_id")
+                or ""
+            ).strip(),
+            date.fromisoformat(item["teaching_date"])
+            if isinstance(item.get("teaching_date"), str)
+            else item.get("teaching_date"),
+        )
+        for item in occurrences
+        if isinstance(item, Mapping)
+        and str(
+            item.get("class_display")
+            or item.get("class_name")
+            or item.get("class_id")
+            or ""
+        ).strip()
+        and item.get("teaching_date") is not None
+    ) or tuple(
         (
             str(class_name or "").strip(),
             class_teaching_date,
@@ -10889,8 +11038,13 @@ def standardize_lesson_plan_v2_document(
         if str(class_name or "").strip()
         and class_teaching_date is not None
     )
-
     if selected_class_date_pairs:
+        # G1B_P6B_R3R4B_RUNTIME_MULTICLASS_DIAGNOSTIC
+        print(
+            "[G1B-P6B-R3R4B] selected_class_date_pairs=",
+            repr(selected_class_date_pairs),
+        )
+
         import os
         import tempfile
 
