@@ -26,6 +26,7 @@ from educational_planning_v2.models.teaching_assignment import (
 )
 from educational_planning_v2.models.weekly_teaching_schedule import (
     AcademicWeek,
+    LessonExecutionRecord,
     WeeklyTeachingSchedule,
 )
 from educational_planning_v2.repositories.operational_data_source_repository import (
@@ -60,6 +61,8 @@ class WeeklyScheduleApplicationRequest:
     owner_id: str
     academic_year: str
     academic_week: AcademicWeek
+    prior_academic_weeks: tuple[AcademicWeek, ...] = ()
+    prior_schedule_records: tuple[LessonExecutionRecord, ...] = ()
 
 
 class WeeklyScheduleApplicationService:
@@ -217,7 +220,12 @@ class WeeklyScheduleApplicationService:
             curriculum_periods=tuple(
                 curriculum_periods
             ),
-            execution_records=(),
+            execution_records=(
+                request.prior_schedule_records
+            ),
+            prior_academic_weeks=(
+                request.prior_academic_weeks
+            ),
         )
 
     def _load_active_ppct_rows(

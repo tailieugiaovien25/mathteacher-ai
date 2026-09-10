@@ -29,10 +29,12 @@ class WeeklyTeachingScheduleService:
         timetable_slots: tuple[TimetableSlot, ...],
         curriculum_periods: tuple[CurriculumPeriod, ...],
         execution_records: tuple[LessonExecutionRecord, ...] = (),
+        prior_academic_weeks: tuple[AcademicWeek, ...] = (),
     ) -> WeeklyTeachingSchedule:
         self._require_tuple(timetable_slots, "timetable_slots")
         self._require_tuple(curriculum_periods, "curriculum_periods")
         self._require_tuple(execution_records, "execution_records")
+        self._require_tuple(prior_academic_weeks, "prior_academic_weeks")
 
         if not isinstance(academic_week, AcademicWeek):
             raise TypeError("academic_week must be an AcademicWeek")
@@ -66,6 +68,14 @@ class WeeklyTeachingScheduleService:
             if academic_week.week_number == 1:
                 completed_counts = Counter()
                 baseline_source = "ACADEMIC_YEAR_WEEK1"
+            elif prior_academic_weeks:
+                completed_counts = self._scheduled_counts_for_weeks(
+                    timetable_slots=timetable_slots,
+                    teacher_id=normalized_teacher_id,
+                    academic_week=academic_week,
+                    prior_academic_weeks=prior_academic_weeks,
+                )
+                baseline_source = "CONFIGURED_ACADEMIC_WEEKS"
             else:
                 completed_counts = (
                     self._scheduled_counts_before_week(
@@ -167,6 +177,70 @@ class WeeklyTeachingScheduleService:
                 "period_baseline_source": baseline_source,
             },
         )
+
+    @classmethod
+    def _scheduled_counts_for_weeks(
+        cls,
+        *,
+        timetable_slots: tuple[TimetableSlot, ...],
+        teacher_id: str,
+        academic_week: AcademicWeek,
+        prior_academic_weeks: tuple[AcademicWeek, ...],
+    ) -> Counter[tuple[str, str, str | None]]:
+        """Count TKB occurrences only inside configured prior school weeks."""
+
+        result: Counter[tuple[str, str, str | None]] = Counter()
+        seen_occurrences = set()
+
+        for week in prior_academic_weeks:
+            if not isinstance(week, AcademicWeek):
+                raise TypeError(
+                    "all prior_academic_weeks must be AcademicWeek instances"
+                )
+
+            if week.academic_year != academic_week.academic_year:
+                raise ValueError(
+                    "prior academic week belongs to another academic year"
+                )
+
+            if (
+                week.week_number >= academic_week.week_number
+                or week.end_date >= academic_week.start_date
+            ):
+                raise ValueError(
+                    "prior academic weeks must end before the current week"
+                )
+
+            for slot in timetable_slots:
+                if slot.teacher_id != teacher_id:
+                    continue
+
+                teaching_date = week.start_date + timedelta(
+                    days=slot.weekday - 1
+                )
+
+                if (
+                    teaching_date > week.end_date
+                    or not (
+                        slot.effective_from
+                        <= teaching_date
+                        <= slot.effective_to
+                    )
+                ):
+                    continue
+
+                occurrence_key = cls._slot_occurrence_key(
+                    teaching_date=teaching_date,
+                    slot=slot,
+                )
+
+                if occurrence_key in seen_occurrences:
+                    continue
+
+                seen_occurrences.add(occurrence_key)
+                result[slot.curriculum_key] += 1
+
+        return result
 
     @classmethod
     def _scheduled_counts_before_week(

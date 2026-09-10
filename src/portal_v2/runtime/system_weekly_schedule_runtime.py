@@ -26,6 +26,9 @@ from educational_planning_v2.adapters.supabase_academic_year_configuration_repos
 from educational_planning_v2.adapters.supabase_academic_week_repository import (
     SupabaseAcademicWeekRepository,
 )
+from educational_planning_v2.adapters.supabase_weekly_schedule_repository import (
+    SupabaseWeeklyScheduleRepository,
+)
 from educational_planning_v2.adapters.supabase_class_catalog_repository import (
     SupabaseClassCatalogRepository,
 )
@@ -51,6 +54,7 @@ from educational_planning_v2.models.operational_payload import (
 )
 from educational_planning_v2.models.weekly_teaching_schedule import (
     AcademicWeek,
+    LessonExecutionRecord,
     WeeklyTeachingSchedule,
 )
 from educational_planning_v2.services.ppct_scope_catalog import (
@@ -433,6 +437,21 @@ class SystemWeeklyScheduleRuntime:
             )
         )
 
+        prior_academic_weeks = (
+            self._resolve_prior_academic_weeks(
+                academic_year=request.academic_year,
+                current_week=academic_week,
+            )
+        )
+
+        prior_schedule_records = (
+            self._load_prior_schedule_records(
+                academic_year=request.academic_year,
+                current_week=academic_week,
+                prior_academic_weeks=prior_academic_weeks,
+            )
+        )
+
         ppct_scope_rules = (
             request.ppct_scope_rules
         )
@@ -478,6 +497,106 @@ class SystemWeeklyScheduleRuntime:
                     request.academic_year
                 ),
                 academic_week=academic_week,
+                prior_academic_weeks=(
+                    prior_academic_weeks
+                ),
+                prior_schedule_records=(
+                    prior_schedule_records
+                ),
+            )
+        )
+
+    def _load_prior_schedule_records(
+        self,
+        *,
+        academic_year: str,
+        current_week: AcademicWeek,
+        prior_academic_weeks: tuple[AcademicWeek, ...],
+    ) -> tuple[LessonExecutionRecord, ...]:
+        if current_week.week_number == 1:
+            return ()
+
+        repository = SupabaseWeeklyScheduleRepository(
+            self._client,
+            self._user_id,
+        )
+        records = []
+
+        for week in prior_academic_weeks:
+            schedule_id = (
+                "SYSTEM-"
+                + self._user_id
+                + "-"
+                + academic_year
+                + "-W"
+                + str(week.week_number)
+            )
+            schedule = repository.get(schedule_id)
+
+            if schedule is None:
+                raise LookupError(
+                    "Chưa có Lịch báo giảng đã lưu cho "
+                    f"Tuần {week.week_number}; không thể tính "
+                    f"chính xác PPCT Tuần {current_week.week_number}."
+                )
+
+            if (
+                schedule.teacher_id != self._user_id
+                or schedule.academic_week.academic_year != academic_year
+                or schedule.academic_week.week_number != week.week_number
+            ):
+                raise ValueError(
+                    "Lịch báo giảng tuần trước không khớp "
+                    "giáo viên, năm học hoặc số tuần."
+                )
+
+            records.extend(
+                LessonExecutionRecord(
+                    teacher_id=entry.teacher_id,
+                    class_id=entry.class_id,
+                    subject_ref=entry.subject_ref,
+                    component_ref=entry.component_ref,
+                    teaching_date=entry.teaching_date,
+                    curriculum_period=entry.curriculum_period,
+                    status="COMPLETED",
+                )
+                for entry in schedule.entries
+            )
+
+        return tuple(records)
+
+    def _resolve_prior_academic_weeks(
+        self,
+        *,
+        academic_year: str,
+        current_week: AcademicWeek,
+    ) -> tuple[AcademicWeek, ...]:
+        current_year = self._academic_year_repository.get_current()
+
+        if (
+            current_year is None
+            or current_year.academic_year != academic_year
+        ):
+            raise LookupError(
+                "current academic year configuration not found"
+            )
+
+        configured_weeks = self._academic_week_repository.list_weeks(
+            academic_year_id=current_year.academic_year_id,
+        )
+
+        return tuple(
+            AcademicWeek(
+                academic_year=week.academic_year,
+                week_number=week.week_number,
+                start_date=week.start_date,
+                end_date=week.end_date,
+            )
+            for week in configured_weeks
+            if (
+                week.status == AcademicWeekStatus.ACTIVE
+                and week.week_number < current_week.week_number
+                and week.end_date < current_week.start_date
             )
         )
 
