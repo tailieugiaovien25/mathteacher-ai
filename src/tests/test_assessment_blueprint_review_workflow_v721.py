@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from assessment_generation_v2.services.assessment_matrix_cell_authoring import (
+    build_default_matrix_cell_rows,
+    matrix_cell_rows_payload,
+)
 from portal_v2.ui.assessment_blueprint_authoring_streamlit import (
     AssessmentProfileSectionOption,
     CognitiveLevelOption,
@@ -137,3 +144,103 @@ def test_admin_ui_reviews_through_governed_rpc_and_receives_actor_id() -> None:
     assert "reviewer_user_id=authorization.user_id" in shell
     for forbidden in (".insert(", ".update(", ".delete(", "service_role"):
         assert forbidden not in text
+
+
+
+def test_portal_default_cells_delegate_to_shared_matrix_service() -> None:
+    kwargs = {
+        "sections": _sections(),
+        "topic_codes": ("TOPIC-1", "TOPIC-2"),
+        "cognitive_levels": _levels(),
+        "level_allocations": (
+            ProfileLevelAllocation(
+                "KNOW", Decimal("4"), Decimal("40")
+            ),
+            ProfileLevelAllocation(
+                "UNDERSTAND", Decimal("3"), Decimal("30")
+            ),
+            ProfileLevelAllocation(
+                "APPLY", Decimal("3"), Decimal("30")
+            ),
+        ),
+        "existing_cells": (),
+    }
+    assert _default_cell_rows(**kwargs) == (
+        build_default_matrix_cell_rows(**kwargs)
+    )
+
+
+def test_portal_default_cells_preserve_legacy_fraction_fallback() -> None:
+    sections = (
+        AssessmentProfileSectionOption(
+            "ESSAY",
+            "T? lu?n",
+            "ESSAY",
+            10,
+            1,
+            1,
+            Decimal("1"),
+        ),
+    )
+    levels = (
+        CognitiveLevelOption("KNOW", "Nh?n bi?t", 10),
+        CognitiveLevelOption("UNDERSTAND", "Th?ng hi?u", 20),
+    )
+    allocations = (
+        ProfileLevelAllocation(
+            "KNOW", Decimal("0.5"), Decimal("50")
+        ),
+        ProfileLevelAllocation(
+            "UNDERSTAND", Decimal("0.5"), Decimal("50")
+        ),
+    )
+    kwargs = {
+        "sections": sections,
+        "topic_codes": ("TOPIC-1",),
+        "cognitive_levels": levels,
+        "level_allocations": allocations,
+        "existing_cells": (),
+    }
+    rows = _default_cell_rows(**kwargs)
+    assert rows == build_default_matrix_cell_rows(**kwargs)
+    assert rows == [
+        {
+            "section_code": "ESSAY",
+            "topic_code": "TOPIC-1",
+            "cognitive_level_code": "KNOW",
+            "question_count": 1,
+            "response_count": 1,
+            "target_score": 1.0,
+            "sequence_number": 10,
+            "specification_note": "",
+        }
+    ]
+
+
+def test_portal_cell_payload_delegates_to_shared_matrix_service() -> None:
+    rows = (
+        {
+            "section_code": "MCQ",
+            "topic_code": "TOPIC-1",
+            "cognitive_level_code": "KNOW",
+            "question_count": 12,
+            "response_count": 12,
+            "target_score": "3.00",
+            "sequence_number": 10,
+            "specification_note": "Tr?ng t?m",
+        },
+    )
+    assert _cell_payload(rows) == matrix_cell_rows_payload(rows)
+
+
+def test_teacher_ui_uses_shared_matrix_authoring_service() -> None:
+    text = TEACHER_UI.read_text(encoding="utf-8")
+    assert (
+        "assessment_generation_v2.services."
+        "assessment_matrix_cell_authoring"
+    ) in text
+    assert "build_default_matrix_cell_rows(" in text
+    assert "matrix_cell_rows_payload(" in text
+    assert "class AssessmentProfileSectionOption:" not in text
+    assert "class CognitiveLevelOption:" not in text
+    assert "class ProfileLevelAllocation:" not in text
