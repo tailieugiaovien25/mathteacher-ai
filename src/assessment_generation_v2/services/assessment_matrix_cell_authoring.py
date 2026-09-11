@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 
 class AssessmentMatrixAuthoringError(ValueError):
@@ -248,70 +248,77 @@ class AssessmentMatrixCell:
         }
 
 
-def build_default_matrix_cells(
+def build_default_matrix_cell_rows(
     *,
     sections: Sequence[AssessmentProfileSectionOption],
     topic_codes: Sequence[str],
     cognitive_levels: Sequence[CognitiveLevelOption],
     level_allocations: Sequence[ProfileLevelAllocation],
-) -> tuple[AssessmentMatrixCell, ...]:
-    section_rows = tuple(sections)
-    level_rows = tuple(cognitive_levels)
-    allocation_rows = tuple(level_allocations)
-    topics = tuple(
-        dict.fromkeys(
-            _text(code, "topic_code").upper()
-            for code in topic_codes
-        )
-    )
-    if not section_rows:
-        raise AssessmentMatrixAuthoringError(
-            "at least one assessment section is required"
-        )
-    if not topics:
-        raise AssessmentMatrixAuthoringError(
-            "at least one topic_code is required"
-        )
-    if not level_rows:
-        raise AssessmentMatrixAuthoringError(
-            "at least one cognitive level is required"
-        )
-    if not allocation_rows:
-        raise AssessmentMatrixAuthoringError(
-            "at least one level allocation is required"
-        )
+    existing_cells: Sequence[Mapping[str, object]] = (),
+) -> list[dict[str, object]]:
+    # Shared editable-row algorithm; preserves the portal's legacy fallback.
+    if existing_cells:
+        return [
+            {
+                "section_code": str(row.get("section_code", "")),
+                "topic_code": str(row.get("topic_code", "")),
+                "cognitive_level_code": str(
+                    row.get("cognitive_level_code", "")
+                ),
+                "question_count": int(
+                    row.get("question_count", 0) or 0
+                ),
+                "response_count": int(
+                    row.get("response_count", 0) or 0
+                ),
+                "target_score": float(
+                    row.get("target_score", 0) or 0
+                ),
+                "sequence_number": int(
+                    row.get("sequence_number", 0) or 0
+                ),
+                "specification_note": str(
+                    row.get("specification_note") or ""
+                ),
+            }
+            for row in existing_cells
+        ]
+
+    if not topic_codes or not cognitive_levels:
+        return []
 
     allocation_by_level = {
         item.cognitive_level_code: item.target_score
-        for item in allocation_rows
+        for item in level_allocations
     }
-    ordered_targets: list[list[object]] = [
+    ordered_targets = [
         [
             level.cognitive_level_code,
             allocation_by_level.get(
                 level.cognitive_level_code,
-                Decimal("0"),
+                Decimal(0),
             ),
         ]
-        for level in level_rows
+        for level in cognitive_levels
         if allocation_by_level.get(
             level.cognitive_level_code,
-            Decimal("0"),
-        ) > 0
+            Decimal(0),
+        )
+        > 0
     ]
 
-    allocated: list[AssessmentMatrixCell] = []
+    allocated_rows: list[dict[str, object]] = []
     target_index = 0
     allocation_possible = bool(ordered_targets)
 
-    for section in section_rows:
+    for section in sections:
         remaining_score = section.section_score
         section_part = 0
-        while remaining_score > 0 and target_index < len(ordered_targets):
-            level_code = str(ordered_targets[target_index][0])
-            level_remaining = Decimal(
-                str(ordered_targets[target_index][1])
-            )
+        while (
+            remaining_score > 0
+            and target_index < len(ordered_targets)
+        ):
+            level_code, level_remaining = ordered_targets[target_index]
             chunk_score = min(remaining_score, level_remaining)
             question_fraction = (
                 Decimal(section.question_count)
@@ -332,27 +339,26 @@ def build_default_matrix_cells(
                 allocation_possible = False
                 break
 
-            allocated.append(
-                AssessmentMatrixCell(
-                    section_code=section.section_code,
-                    topic_code=topics[len(allocated) % len(topics)],
-                    cognitive_level_code=level_code,
-                    question_count=int(question_fraction),
-                    response_count=int(response_fraction),
-                    target_score=chunk_score,
-                    sequence_number=(
+            allocated_rows.append(
+                {
+                    "section_code": section.section_code,
+                    "topic_code": topic_codes[
+                        len(allocated_rows) % len(topic_codes)
+                    ],
+                    "cognitive_level_code": level_code,
+                    "question_count": int(question_fraction),
+                    "response_count": int(response_fraction),
+                    "target_score": float(chunk_score),
+                    "sequence_number": (
                         section.sequence_number + section_part
                     ),
-                )
+                    "specification_note": "",
+                }
             )
             section_part += 1
             remaining_score -= chunk_score
-            ordered_targets[target_index][1] = (
-                level_remaining - chunk_score
-            )
-            if Decimal(
-                str(ordered_targets[target_index][1])
-            ) == 0:
+            ordered_targets[target_index][1] -= chunk_score
+            if ordered_targets[target_index][1] == 0:
                 target_index += 1
 
         if not allocation_possible or remaining_score != 0:
@@ -361,35 +367,68 @@ def build_default_matrix_cells(
 
     if (
         allocation_possible
-        and all(
-            Decimal(str(remaining)) == 0
-            for _, remaining in ordered_targets
-        )
+        and all(remaining == 0 for _, remaining in ordered_targets)
     ):
-        result = tuple(allocated)
-    else:
-        result = tuple(
-            AssessmentMatrixCell(
-                section_code=section.section_code,
-                topic_code=topics[index % len(topics)],
-                cognitive_level_code=(
-                    level_rows[index % len(level_rows)].cognitive_level_code
-                ),
-                question_count=section.question_count,
-                response_count=section.response_count,
-                target_score=section.section_score,
-                sequence_number=section.sequence_number,
-            )
-            for index, section in enumerate(section_rows)
+        return allocated_rows
+
+    result: list[dict[str, object]] = []
+    for index, section in enumerate(sections):
+        level = cognitive_levels[index % len(cognitive_levels)]
+        result.append(
+            {
+                "section_code": section.section_code,
+                "topic_code": topic_codes[index % len(topic_codes)],
+                "cognitive_level_code": level.cognitive_level_code,
+                "question_count": section.question_count,
+                "response_count": section.response_count,
+                "target_score": float(section.section_score),
+                "sequence_number": section.sequence_number,
+                "specification_note": "",
+            }
+        )
+    return result
+
+
+def build_default_matrix_cells(
+    *,
+    sections: Sequence[AssessmentProfileSectionOption],
+    topic_codes: Sequence[str],
+    cognitive_levels: Sequence[CognitiveLevelOption],
+    level_allocations: Sequence[ProfileLevelAllocation],
+) -> tuple[AssessmentMatrixCell, ...]:
+    # Strict typed cells for service-layer workflows.
+    rows = build_default_matrix_cell_rows(
+        sections=sections,
+        topic_codes=topic_codes,
+        cognitive_levels=cognitive_levels,
+        level_allocations=level_allocations,
+        existing_cells=(),
+    )
+    if not rows:
+        raise AssessmentMatrixAuthoringError(
+            "matrix must contain at least one cell"
         )
 
-    validate_matrix_cells(
-        cells=result,
-        sections=section_rows,
-        cognitive_levels=level_rows,
-        level_allocations=allocation_rows,
+    cells = tuple(
+        AssessmentMatrixCell(
+            section_code=row["section_code"],
+            topic_code=row["topic_code"],
+            cognitive_level_code=row["cognitive_level_code"],
+            question_count=row["question_count"],
+            response_count=row["response_count"],
+            target_score=row["target_score"],
+            sequence_number=row["sequence_number"],
+            specification_note=row["specification_note"],
+        )
+        for row in rows
     )
-    return result
+    validate_matrix_cells(
+        cells=cells,
+        sections=sections,
+        cognitive_levels=cognitive_levels,
+        level_allocations=level_allocations,
+    )
+    return cells
 
 
 def validate_matrix_cells(
@@ -482,6 +521,57 @@ def validate_matrix_cells(
         raise AssessmentMatrixAuthoringError(
             "section and cognitive-level score totals must match"
         )
+
+
+def matrix_cell_rows_payload(
+    rows: Sequence[Mapping[str, object]],
+) -> tuple[dict[str, object], ...]:
+    result = []
+    for row in rows:
+        section_code = str(row.get("section_code", "")).strip()
+        topic_code = str(row.get("topic_code", "")).strip()
+        cognitive_level_code = str(
+            row.get("cognitive_level_code", "")
+        ).strip()
+        if not section_code or not topic_code or not cognitive_level_code:
+            raise AssessmentMatrixAuthoringError(
+                "M?i ? ma tr?n ph?i c? ph?n ??, ch? ?? v? m?c ??."
+            )
+        try:
+            target_score = Decimal(
+                str(row.get("target_score", 0))
+            )
+        except InvalidOperation as error:
+            raise AssessmentMatrixAuthoringError(
+                "?i?m c?a ? ma tr?n ph?i l? s? h?p l?."
+            ) from error
+
+        result.append(
+            {
+                "section_code": section_code,
+                "topic_code": topic_code,
+                "cognitive_level_code": cognitive_level_code,
+                "question_count": int(
+                    row.get("question_count", 0)
+                ),
+                "response_count": int(
+                    row.get("response_count", 0)
+                ),
+                "target_score": str(target_score),
+                "sequence_number": int(
+                    row.get("sequence_number", 0)
+                ),
+                "specification_note": str(
+                    row.get("specification_note") or ""
+                ).strip(),
+            }
+        )
+
+    if not result:
+        raise AssessmentMatrixAuthoringError(
+            "Ma tr?n ph?i c? ?t nh?t m?t ? ph?n b?."
+        )
+    return tuple(result)
 
 
 def matrix_cells_payload(

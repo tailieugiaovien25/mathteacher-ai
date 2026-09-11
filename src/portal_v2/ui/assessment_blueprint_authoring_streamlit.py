@@ -21,6 +21,14 @@ from assessment_generation_v2.services.blueprint_requirement_link_service import
 from assessment_generation_v2.services.canonical_assessment_selection_service import (
     CanonicalAssessmentSelectionService,
 )
+from assessment_generation_v2.services.assessment_matrix_cell_authoring import (
+    AssessmentMatrixAuthoringError,
+    AssessmentProfileSectionOption,
+    CognitiveLevelOption,
+    ProfileLevelAllocation,
+    build_default_matrix_cell_rows,
+    matrix_cell_rows_payload,
+)
 
 
 class AssessmentBlueprintAuthoringError(RuntimeError):
@@ -90,42 +98,6 @@ class ApprovedExamSettingOption:
             f"{self.setting_code} — {self.setting_name} "
             f"(Lớp {self.grade_level}, {self.academic_year})"
         )
-
-
-@dataclass(frozen=True, slots=True)
-class AssessmentProfileSectionOption:
-    section_code: str
-    section_name: str
-    question_type_code: str
-    sequence_number: int
-    question_count: int
-    response_count: int
-    section_score: Decimal
-
-    @property
-    def label(self) -> str:
-        return f"{self.section_code} — {self.section_name}"
-
-
-@dataclass(frozen=True, slots=True)
-class CognitiveLevelOption:
-    cognitive_level_code: str
-    cognitive_level_name: str
-    sequence_number: int
-
-    @property
-    def label(self) -> str:
-        return (
-            f"{self.cognitive_level_code} — "
-            f"{self.cognitive_level_name}"
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class ProfileLevelAllocation:
-    cognitive_level_code: str
-    target_score: Decimal
-    target_percentage: Decimal
 
 
 def _data(response: object) -> object:
@@ -658,159 +630,24 @@ def _default_cell_rows(
     level_allocations: Sequence[ProfileLevelAllocation],
     existing_cells: Sequence[Mapping[str, object]],
 ) -> list[dict[str, object]]:
-    if existing_cells:
-        return [
-            {
-                "section_code": str(row.get("section_code", "")),
-                "topic_code": str(row.get("topic_code", "")),
-                "cognitive_level_code": str(
-                    row.get("cognitive_level_code", "")
-                ),
-                "question_count": int(
-                    row.get("question_count", 0) or 0
-                ),
-                "response_count": int(
-                    row.get("response_count", 0) or 0
-                ),
-                "target_score": float(
-                    row.get("target_score", 0) or 0
-                ),
-                "sequence_number": int(
-                    row.get("sequence_number", 0) or 0
-                ),
-                "specification_note": str(
-                    row.get("specification_note") or ""
-                ),
-            }
-            for row in existing_cells
-        ]
-    if not topic_codes or not cognitive_levels:
-        return []
-    allocation_by_level = {
-        item.cognitive_level_code: item.target_score
-        for item in level_allocations
-    }
-    ordered_targets = [
-        [
-            level.cognitive_level_code,
-            allocation_by_level.get(level.cognitive_level_code, Decimal(0)),
-        ]
-        for level in cognitive_levels
-        if allocation_by_level.get(level.cognitive_level_code, Decimal(0))
-        > 0
-    ]
-    allocated_rows: list[dict[str, object]] = []
-    target_index = 0
-    allocation_possible = bool(ordered_targets)
-    for section_index, section in enumerate(sections):
-        remaining_score = section.section_score
-        section_part = 0
-        while remaining_score > 0 and target_index < len(ordered_targets):
-            level_code, level_remaining = ordered_targets[target_index]
-            chunk_score = min(remaining_score, level_remaining)
-            question_fraction = (
-                Decimal(section.question_count)
-                * chunk_score
-                / section.section_score
-            )
-            response_fraction = (
-                Decimal(section.response_count)
-                * chunk_score
-                / section.section_score
-            )
-            if (
-                question_fraction != question_fraction.to_integral_value()
-                or response_fraction
-                != response_fraction.to_integral_value()
-            ):
-                allocation_possible = False
-                break
-            allocated_rows.append(
-                {
-                    "section_code": section.section_code,
-                    "topic_code": topic_codes[
-                        len(allocated_rows) % len(topic_codes)
-                    ],
-                    "cognitive_level_code": level_code,
-                    "question_count": int(question_fraction),
-                    "response_count": int(response_fraction),
-                    "target_score": float(chunk_score),
-                    "sequence_number": (
-                        section.sequence_number + section_part
-                    ),
-                    "specification_note": "",
-                }
-            )
-            section_part += 1
-            remaining_score -= chunk_score
-            ordered_targets[target_index][1] -= chunk_score
-            if ordered_targets[target_index][1] == 0:
-                target_index += 1
-        if not allocation_possible or remaining_score != 0:
-            allocation_possible = False
-            break
-    if (
-        allocation_possible
-        and all(remaining == 0 for _, remaining in ordered_targets)
-    ):
-        return allocated_rows
-    result: list[dict[str, object]] = []
-    for index, section in enumerate(sections):
-        level = cognitive_levels[index % len(cognitive_levels)]
-        result.append(
-            {
-                "section_code": section.section_code,
-                "topic_code": topic_codes[index % len(topic_codes)],
-                "cognitive_level_code": level.cognitive_level_code,
-                "question_count": section.question_count,
-                "response_count": section.response_count,
-                "target_score": float(section.section_score),
-                "sequence_number": section.sequence_number,
-                "specification_note": "",
-            }
-        )
-    return result
+    return build_default_matrix_cell_rows(
+        sections=sections,
+        topic_codes=topic_codes,
+        cognitive_levels=cognitive_levels,
+        level_allocations=level_allocations,
+        existing_cells=existing_cells,
+    )
 
 
 def _cell_payload(
     rows: Sequence[Mapping[str, object]],
 ) -> tuple[dict[str, object], ...]:
-    result = []
-    for row in rows:
-        section_code = str(row.get("section_code", "")).strip()
-        topic_code = str(row.get("topic_code", "")).strip()
-        cognitive_level_code = str(
-            row.get("cognitive_level_code", "")
-        ).strip()
-        if not section_code or not topic_code or not cognitive_level_code:
-            raise AssessmentBlueprintAuthoringError(
-                "Mỗi ô ma trận phải có phần đề, chủ đề và mức độ."
-            )
-        try:
-            target_score = Decimal(str(row.get("target_score", 0)))
-        except InvalidOperation as error:
-            raise AssessmentBlueprintAuthoringError(
-                "Điểm của ô ma trận phải là số hợp lệ."
-            ) from error
-        result.append(
-            {
-                "section_code": section_code,
-                "topic_code": topic_code,
-                "cognitive_level_code": cognitive_level_code,
-                "question_count": int(row.get("question_count", 0)),
-                "response_count": int(row.get("response_count", 0)),
-                "target_score": str(target_score),
-                "sequence_number": int(row.get("sequence_number", 0)),
-                "specification_note": str(
-                    row.get("specification_note") or ""
-                ).strip(),
-            }
-        )
-    if not result:
+    try:
+        return matrix_cell_rows_payload(rows)
+    except AssessmentMatrixAuthoringError as error:
         raise AssessmentBlueprintAuthoringError(
-            "Ma trận phải có ít nhất một ô phân bổ."
-        )
-    return tuple(result)
+            str(error)
+        ) from error
 
 
 def render_assessment_blueprint_authoring_page(
