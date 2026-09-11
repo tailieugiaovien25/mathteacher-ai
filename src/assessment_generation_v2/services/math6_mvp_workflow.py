@@ -18,6 +18,13 @@ from json import dumps, loads
 from typing import Iterable, Mapping
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
+from assessment_generation_v2.services.blueprint_requirement_link_service import (
+    BlueprintRequirementAssignment,
+)
+from assessment_generation_v2.services.canonical_assessment_selection_service import (
+    CanonicalAssessmentSelection,
+)
+
 
 DRAFT = "DRAFT"
 PENDING_REVIEW = "PENDING_REVIEW"
@@ -151,6 +158,11 @@ class Math6Blueprint:
     question_count: int
     total_score: Decimal
     topic_codes: tuple[str, ...]
+    canonical_subject_code: str = ""
+    canonical_program_code: str = ""
+    canonical_topic_codes: tuple[str, ...] = ()
+    canonical_requirement_codes: tuple[str, ...] = ()
+    requirement_assignments: tuple[BlueprintRequirementAssignment, ...] = ()
     review_status: str = DRAFT
     locked: bool = False
     review_note: str = ""
@@ -416,6 +428,75 @@ class InMemoryMath6MvpWorkflow:
         self._blueprints[code] = blueprint
         return blueprint
 
+    def bind_canonical_coverage(
+        self,
+        blueprint_code: str,
+        *,
+        selection: CanonicalAssessmentSelection,
+        assignments: Iterable[BlueprintRequirementAssignment],
+    ) -> Math6Blueprint:
+        blueprint = self._blueprint(blueprint_code)
+        if blueprint.locked or blueprint.review_status not in {
+            DRAFT,
+            REVISION_REQUIRED,
+        }:
+            raise Math6MvpWorkflowError(
+                "canonical coverage can only be bound to an editable blueprint"
+            )
+        if not isinstance(selection, CanonicalAssessmentSelection):
+            raise Math6MvpWorkflowError(
+                "canonical assessment selection is required"
+            )
+        if not selection.finalized:
+            raise Math6MvpWorkflowError(
+                "canonical assessment selection must be finalized"
+            )
+        if int(selection.grade_level) != 6:
+            raise Math6MvpWorkflowError(
+                "canonical assessment selection must target grade 6"
+            )
+
+        rows = tuple(assignments)
+        if not rows or any(
+            not isinstance(row, BlueprintRequirementAssignment)
+            for row in rows
+        ):
+            raise Math6MvpWorkflowError(
+                "canonical requirement assignments are required"
+            )
+
+        assignment_codes = tuple(row.requirement_code for row in rows)
+        if len(set(assignment_codes)) != len(assignment_codes):
+            raise Math6MvpWorkflowError(
+                "canonical requirement assignments contain duplicate codes"
+            )
+        if set(assignment_codes) != set(selection.selected_requirement_codes):
+            raise Math6MvpWorkflowError(
+                "canonical requirement assignments must match selection"
+            )
+
+        ordered_rows = tuple(
+            sorted(
+                rows,
+                key=lambda row: (
+                    row.sequence_number,
+                    row.requirement_code,
+                ),
+            )
+        )
+        updated = replace(
+            blueprint,
+            canonical_subject_code=selection.subject_code,
+            canonical_program_code=selection.program_code,
+            canonical_topic_codes=tuple(selection.selected_topic_codes),
+            canonical_requirement_codes=tuple(
+                selection.selected_requirement_codes
+            ),
+            requirement_assignments=ordered_rows,
+        )
+        self._blueprints[updated.blueprint_code] = updated
+        return updated
+
     def submit_blueprint(self, blueprint_code: str) -> Math6Blueprint:
         blueprint = self._blueprint(blueprint_code)
         if blueprint.locked or blueprint.review_status not in {
@@ -565,6 +646,24 @@ class InMemoryMath6MvpWorkflow:
                 "question_count": blueprint.question_count,
                 "total_score": str(blueprint.total_score),
                 "topic_codes": list(blueprint.topic_codes),
+                "canonical_coverage": (
+                    {
+                        "subject_code": blueprint.canonical_subject_code,
+                        "program_code": blueprint.canonical_program_code,
+                        "topic_codes": list(
+                            blueprint.canonical_topic_codes
+                        ),
+                        "requirement_codes": list(
+                            blueprint.canonical_requirement_codes
+                        ),
+                        "requirement_assignments": [
+                            row.as_rpc_record()
+                            for row in blueprint.requirement_assignments
+                        ],
+                    }
+                    if blueprint.canonical_subject_code
+                    else None
+                ),
             },
             "questions": [
                 {
