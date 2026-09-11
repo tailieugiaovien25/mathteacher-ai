@@ -11,6 +11,7 @@ ADMIN_PAGE_USERS = "users_permissions"
 ADMIN_PAGE_SYSTEM_HEALTH = "system_health"
 ADMIN_PAGE_ASSESSMENT_TEMPLATES = "assessment_templates"
 ADMIN_PAGE_ASSESSMENT_REVIEWS = "assessment_reviews"
+ADMIN_PAGE_MATH6_ASSESSMENT = "math6_assessment"
 ADMIN_PAGE_USER_REGISTRATIONS = "user_registrations"
 ADMIN_PAGE_SUBJECT_CATALOG = "subject_catalog"
 ADMIN_PAGE_COMPETENCY_CATALOG = "competency_catalog"
@@ -69,6 +70,10 @@ ADMIN_PORTAL_PAGES = (
     ),    AdminPortalPage(
         ADMIN_PAGE_ASSESSMENT_REVIEWS,
         "Duyệt đề kiểm tra",
+    ),
+    AdminPortalPage(
+        ADMIN_PAGE_MATH6_ASSESSMENT,
+        "Quản trị đề kiểm tra Toán 6",
     ),
     AdminPortalPage(
         ADMIN_PAGE_USER_REGISTRATIONS,

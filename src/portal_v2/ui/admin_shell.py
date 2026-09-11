@@ -50,6 +50,7 @@ from portal_v2.ui.admin_navigation import (
     ADMIN_PAGE_LESSON_PLAN_COORDINATION_CENTER,
     ADMIN_PAGE_ASSESSMENT_TEMPLATES,
     ADMIN_PAGE_ASSESSMENT_REVIEWS,
+    ADMIN_PAGE_MATH6_ASSESSMENT,
     ADMIN_PAGE_USER_REGISTRATIONS,
     ADMIN_PAGE_DASHBOARD,
     ADMIN_PAGE_SOURCES,
@@ -562,6 +563,14 @@ def render_admin_page(
             client=client,
             reviewer_user_id=authorization.user_id,
         )
+        return
+
+    if page.page_id == ADMIN_PAGE_MATH6_ASSESSMENT:
+        from portal_v2.ui.math6_mvp_demo_streamlit import (
+            render_math6_mvp_demo_role,
+        )
+
+        render_math6_mvp_demo_role(st, role="admin")
         return
 
     renderers[page.page_id](st)

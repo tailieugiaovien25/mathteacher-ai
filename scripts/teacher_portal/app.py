@@ -39,6 +39,7 @@ PORTAL_PAGES = (
     'Thi\u1ebft \u0111\u1eb7t \u0111\u1ec1 ki\u1ec3m tra',
     'Ma tr\u1eadn & b\u1ea3n \u0111\u1eb7c t\u1ea3',
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra',
+    'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra To\xe1n 6',
     'Xu\u1ea5t \u0111\u1ec1 ki\u1ec3m tra',
     'Thi\u1ebft \u0111\u1eb7t gi\xe1o vi\xean',
 )
@@ -2046,6 +2047,13 @@ def main() -> None:
             client=client,
             user_id=str(user_id),
         )
+
+    elif selected == "Tạo đề kiểm tra Toán 6":
+        from portal_v2.ui.math6_mvp_demo_streamlit import (
+            render_math6_mvp_demo_role,
+        )
+
+        render_math6_mvp_demo_role(st, role="teacher")
 
     elif selected == "Xuất đề kiểm tra":
         from portal_v2.ui.assessment_document_export_streamlit import (

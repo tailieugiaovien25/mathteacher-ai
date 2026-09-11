@@ -178,7 +178,10 @@ def _render_summary(st: Any, workflow: InMemoryMath6MvpWorkflow) -> None:
 
 
 def _render_question_bank(
-    st: Any, workflow: InMemoryMath6MvpWorkflow
+    st: Any,
+    workflow: InMemoryMath6MvpWorkflow,
+    *,
+    role: str,
 ) -> None:
     st.header("1. Ngân hàng câu hỏi")
     st.caption(
@@ -320,7 +323,7 @@ def _render_question_bank(
         except Exception as error:
             _show_error(st, "Không thể cập nhật câu hỏi", error)
 
-    if workflow.question_review_queue:
+    if role == "admin" and workflow.question_review_queue:
         st.subheader("ADMIN duyệt câu hỏi")
         pending_codes = tuple(
             item.question_code for item in workflow.question_review_queue
@@ -369,7 +372,7 @@ def _render_question_bank(
         item for item in workflow.questions
         if item.review_status == APPROVED and not item.locked
     )
-    if lockable:
+    if role == "admin" and lockable:
         st.subheader("ADMIN khóa câu hỏi")
         lock_code = st.selectbox(
             "Câu hỏi đã duyệt",
@@ -390,7 +393,10 @@ def _render_question_bank(
 
 
 def _render_blueprint(
-    st: Any, workflow: InMemoryMath6MvpWorkflow
+    st: Any,
+    workflow: InMemoryMath6MvpWorkflow,
+    *,
+    role: str,
 ) -> None:
     st.header("2. Ma trận")
     status = workflow_status(workflow)
@@ -458,6 +464,8 @@ def _render_blueprint(
                 _rerun(st)
     elif blueprint.review_status == PENDING_REVIEW:
         st.warning("Ma trận đang chờ ADMIN duyệt.")
+        if role != "admin":
+            return
         note = st.text_input(
             "Nhận xét ma trận khi yêu cầu sửa",
             key="math6_mvp_blueprint_note",
@@ -496,7 +504,12 @@ def _render_blueprint(
         st.success("Ma trận đã được ADMIN duyệt và khóa.")
 
 
-def _render_exam(st: Any, workflow: InMemoryMath6MvpWorkflow) -> None:
+def _render_exam(
+    st: Any,
+    workflow: InMemoryMath6MvpWorkflow,
+    *,
+    role: str,
+) -> None:
     st.header("3. Tạo, duyệt và xuất bản đề")
     ready_blueprints = tuple(
         item for item in workflow.blueprints
@@ -557,6 +570,8 @@ def _render_exam(st: Any, workflow: InMemoryMath6MvpWorkflow) -> None:
                 _rerun(st)
     elif exam.review_status == PENDING_REVIEW:
         st.warning("Đề đang chờ ADMIN duyệt.")
+        if role != "admin":
+            return
         note = st.text_input(
             "Nhận xét đề khi yêu cầu sửa",
             key="math6_mvp_exam_note",
@@ -593,6 +608,8 @@ def _render_exam(st: Any, workflow: InMemoryMath6MvpWorkflow) -> None:
                 _rerun(st)
     elif exam.review_status == APPROVED:
         st.success("Đề đã được ADMIN duyệt, có thể xuất bản.")
+        if role != "admin":
+            return
         variant_code = st.text_input(
             "Mã đề", value="101", key="math6_mvp_variant_code"
         )
@@ -638,24 +655,39 @@ def _render_exam(st: Any, workflow: InMemoryMath6MvpWorkflow) -> None:
         )
 
 
-def render_math6_mvp_demo(st: Any) -> None:
-    """Render the complete local demo without any external service."""
+def render_math6_mvp_demo_role(
+    st: Any,
+    *,
+    role: str,
+) -> None:
+    """Render the Math 6 MVP with deterministic Teacher/ADMIN controls."""
+
+    if role not in {"teacher", "admin"}:
+        raise ValueError(f"invalid role: {role}")
 
     st.title("MVP tạo đề Toán 6 · Demo không credential")
     st.caption(
         "Dữ liệu chỉ tồn tại trong phiên Streamlit hiện tại; "
         "không kết nối Supabase và không thay đổi dữ liệu production."
     )
+
     workflow = st.session_state.get(SESSION_WORKFLOW_KEY)
     if not isinstance(workflow, InMemoryMath6MvpWorkflow):
         workflow = InMemoryMath6MvpWorkflow()
         st.session_state[SESSION_WORKFLOW_KEY] = workflow
+
     _render_summary(st, workflow)
-    _render_question_bank(st, workflow)
+    _render_question_bank(st, workflow, role=role)
     st.divider()
-    _render_blueprint(st, workflow)
+    _render_blueprint(st, workflow, role=role)
     st.divider()
-    _render_exam(st, workflow)
+    _render_exam(st, workflow, role=role)
+
+
+def render_math6_mvp_demo(st: Any) -> None:
+    """Render the complete legacy demo with ADMIN capabilities."""
+
+    render_math6_mvp_demo_role(st, role="admin")
 
 
 __all__ = [
@@ -663,6 +695,7 @@ __all__ = [
     "SESSION_WORKFLOW_KEY",
     "parse_question_import_json",
     "render_math6_mvp_demo",
+    "render_math6_mvp_demo_role",
     "sample_import_json",
     "sample_question_rows",
     "workflow_status",
