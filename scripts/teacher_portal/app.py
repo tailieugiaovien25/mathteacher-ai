@@ -29,6 +29,7 @@ PORTAL_PAGES = (
     'Soạn bài cùng chuẩn giáo án',
     'Qu\u1ea3n l\xfd gi\xe1o \xe1n',
     'Thư viện Prompt & AI',
+    'Trợ lý OpenClaw',
     'Soạn bài theo tuần',
     'So\u1ea1n b\xe0i c\xf9ng AI',
     'L\u1ecbch b\xe1o gi\u1ea3ng & PBSDTB',
@@ -1505,6 +1506,17 @@ def main() -> None:
         render_prompt_library_ai_page(
             client=client,
             user_id=str(user_id),
+        )
+
+    elif selected == 'Trợ lý OpenClaw':
+        from portal_v2.ui.openclaw_chat_streamlit import (
+            render_openclaw_chat_page,
+        )
+
+        render_openclaw_chat_page(
+            client=client,
+            user_id=str(user_id),
+            authorized=authorization.can_access_admin_portal,
         )
 
     elif selected == 'Soạn bài theo tuần':

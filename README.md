@@ -287,3 +287,19 @@ Recovery Verification
 ```text
 https://github.com/tailieugiaovien25/mathteacher-ai
 ```
+
+## Vertical slice MVP tạo đề Toán 6
+
+Repository có một luồng tham chiếu chạy hoàn toàn trong bộ nhớ, không cần
+credential, để kiểm chứng chuỗi: nhập/chỉnh sửa câu hỏi → ADMIN duyệt và khóa
+→ duyệt ma trận → tạo và duyệt đề → xuất bản snapshot → mã đề khóa → ZIP.
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path "src").Path
+python -m pytest -q src\tests\test_math6_mvp_vertical_slice.py
+streamlit run scripts\math6_mvp_streamlit.py
+python scripts\math6_mvp_demo.py
+```
+
+Xem phạm vi, lệnh compile và giới hạn tích hợp production tại
+[`docs/math6-mvp-vertical-slice.md`](docs/math6-mvp-vertical-slice.md).

@@ -952,65 +952,51 @@ def render_admin_assignment_workspace(
         for assignment in assignments
     }
 
-    selected_assignment_id = (
-        st.selectbox(
-            "\u0050\u0068\u00e2\u006e "
-            "\u0063\u00f4\u006e\u0067 "
-            "\u0063\u1ea7\u006e "
-            "\u0071\u0075\u1ea3\u006e "
-            "\u006c\u00fd",
-            options=tuple(
-                assignment_by_id.keys()
-            ),
-            format_func=lambda value: (
-                " | ".join(
-                    part
-                    for part in (
-                        value,
-                        assignment_by_id[
-                            value
-                        ].class_id,
-                        (
-                            subject_by_id.get(
-                                assignment_by_id[
-                                    value
-                                ].subject_ref
-                            ).name
-                            if (
-                                assignment_by_id[
-                                    value
-                                ].subject_ref
-                                in subject_by_id
-                            )
-                            else (
-                                assignment_by_id[
-                                    value
-                                ].subject_ref
-                                or ""
-                            )
-                        ),
-                        assignment_by_id[
-                            value
-                        ].status.value,
-                    )
-                    if part
-                )
-            ),
-            key=(
-                "admin_assignment_manage_id"
-            ),
+    # R4A2C3A1_VIETNAMESE_ASSIGNMENT_DISPLAY
+    # Presentation-only labels. IDs and enum values remain unchanged.
+    def _assignment_display_label(assignment_id):
+        assignment = assignment_by_id[assignment_id]
+        class_item = class_by_id.get(assignment.class_id)
+        class_display = (
+            str(class_item.class_code or "").strip()
+            if class_item is not None
+            else str(assignment.class_id or "").strip()
         )
+        subject_item = subject_by_id.get(assignment.subject_ref)
+        subject_display = (
+            str(subject_item.name or "").strip()
+            if subject_item is not None
+            else str(assignment.subject_ref or "").strip()
+        )
+        status_display = {
+            "ACTIVE": "\u0110ang hi\u1ec7u l\u1ef1c",
+            "INACTIVE": "Ng\u1eebng hi\u1ec7u l\u1ef1c",
+        }.get(
+            str(assignment.status.value or "").upper(),
+            str(assignment.status.value or "").strip(),
+        )
+        return " | ".join(
+            part
+            for part in (
+                "L\u1edbp " + class_display if class_display else "",
+                "M\u00f4n " + subject_display if subject_display else "",
+                status_display,
+            )
+            if part
+        )
+
+    selected_assignment_id = st.selectbox(
+        "Ph\u00e2n c\u00f4ng c\u1ea7n qu\u1ea3n l\u00fd",
+        options=tuple(assignment_by_id.keys()),
+        format_func=_assignment_display_label,
+        key="admin_assignment_manage_id",
     )
 
-    selected_assignment = (
-        assignment_by_id[
-            selected_assignment_id
-        ]
-    )
+    selected_assignment = assignment_by_id[selected_assignment_id]
 
     st.caption(
-        f"Assignment ID: "
-        f"{selected_assignment.assignment_id}"
+        "M\u00e3 ph\u00e2n c\u00f4ng: "
+        + str(selected_assignment.assignment_id)
     )
 
     action_columns = st.columns(
