@@ -123,6 +123,7 @@ def _blueprint_rows(
         {
             "Mã": item.blueprint_code,
             "Tên": item.title,
+            "Cấu hình": item.config_code,
             "Số câu": item.question_count,
             "Tổng điểm": str(item.total_score),
             "Chủ đề": ", ".join(item.topic_codes),
@@ -553,6 +554,11 @@ def _render_blueprint(
 ) -> None:
     st.header("2. Ma trận")
     status = workflow_status(workflow)
+    config = st.session_state.get(SESSION_CONFIG_KEY)
+    has_config = isinstance(config, Math6AssessmentConfig)
+    can_create_blueprint = (
+        bool(status["can_create_blueprint"]) and has_config
+    )
     if not workflow.blueprints:
         with st.form("math6_mvp_create_blueprint"):
             code = st.text_input("Mã ma trận", value="M6-DEMO-BP-001")
@@ -563,7 +569,15 @@ def _render_blueprint(
                 "Số câu", min_value=1, value=2, step=1
             )
             total_score = st.number_input(
-                "Tổng điểm", min_value=0.25, value=2.0, step=0.25
+                "Tổng điểm (theo cấu hình)",
+                min_value=0.25,
+                value=(
+                    float(config.total_score)
+                    if has_config
+                    else 10.0
+                ),
+                step=0.25,
+                disabled=True,
             )
             topic_codes = st.text_input(
                 "Mã chủ đề",
@@ -574,15 +588,18 @@ def _render_blueprint(
                 "Tạo ma trận",
                 type="primary",
                 use_container_width=True,
-                disabled=not bool(status["can_create_blueprint"]),
+                disabled=not can_create_blueprint,
             )
-        if not status["can_create_blueprint"]:
+        if not has_config:
+            st.info("Cần lưu cấu hình bài kiểm tra trước khi tạo ma trận.")
+        elif not status["can_create_blueprint"]:
             st.info("Cần ít nhất 2 câu hỏi đã khóa trước khi tạo ma trận.")
         if create_blueprint:
             try:
                 workflow.create_blueprint(
                     blueprint_code=code,
                     title=title,
+                    assessment_config=config,
                     question_count=int(question_count),
                     total_score=total_score,
                     topic_codes=tuple(
