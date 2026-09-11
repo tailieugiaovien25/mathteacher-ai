@@ -24,6 +24,13 @@ from assessment_generation_v2.services.blueprint_requirement_link_service import
 from assessment_generation_v2.services.canonical_assessment_selection_service import (
     CanonicalAssessmentSelection,
 )
+from assessment_generation_v2.services.assessment_matrix_cell_authoring import (
+    AssessmentMatrixCell,
+    AssessmentProfileSectionOption,
+    CognitiveLevelOption,
+    ProfileLevelAllocation,
+    build_default_matrix_cells,
+)
 
 
 DRAFT = "DRAFT"
@@ -163,6 +170,10 @@ class Math6Blueprint:
     canonical_topic_codes: tuple[str, ...] = ()
     canonical_requirement_codes: tuple[str, ...] = ()
     requirement_assignments: tuple[BlueprintRequirementAssignment, ...] = ()
+    matrix_sections: tuple[AssessmentProfileSectionOption, ...] = ()
+    matrix_cognitive_levels: tuple[CognitiveLevelOption, ...] = ()
+    matrix_level_allocations: tuple[ProfileLevelAllocation, ...] = ()
+    matrix_cells: tuple[AssessmentMatrixCell, ...] = ()
     review_status: str = DRAFT
     locked: bool = False
     review_note: str = ""
@@ -497,6 +508,67 @@ class InMemoryMath6MvpWorkflow:
         self._blueprints[updated.blueprint_code] = updated
         return updated
 
+    def build_matrix_authoring(
+        self,
+        blueprint_code: str,
+        *,
+        sections: Iterable[AssessmentProfileSectionOption],
+        cognitive_levels: Iterable[CognitiveLevelOption],
+        level_allocations: Iterable[ProfileLevelAllocation],
+    ) -> Math6Blueprint:
+        blueprint = self._blueprint(blueprint_code)
+        if blueprint.locked or blueprint.review_status not in {
+            DRAFT,
+            REVISION_REQUIRED,
+        }:
+            raise Math6MvpWorkflowError(
+                "matrix authoring requires an editable blueprint"
+            )
+        if not blueprint.canonical_topic_codes:
+            raise Math6MvpWorkflowError(
+                "matrix authoring requires canonical curriculum coverage"
+            )
+
+        section_rows = tuple(sections)
+        level_rows = tuple(cognitive_levels)
+        allocation_rows = tuple(level_allocations)
+
+        if sum(
+            (row.section_score for row in section_rows),
+            Decimal("0"),
+        ) != blueprint.total_score:
+            raise Math6MvpWorkflowError(
+                "matrix section scores must match blueprint total_score"
+            )
+        if sum(row.question_count for row in section_rows) != (
+            blueprint.question_count
+        ):
+            raise Math6MvpWorkflowError(
+                "matrix section question counts must match blueprint"
+            )
+
+        try:
+            cells = build_default_matrix_cells(
+                sections=section_rows,
+                topic_codes=blueprint.canonical_topic_codes,
+                cognitive_levels=level_rows,
+                level_allocations=allocation_rows,
+            )
+        except ValueError as error:
+            raise Math6MvpWorkflowError(
+                f"cannot build matrix authoring: {error}"
+            ) from error
+
+        updated = replace(
+            blueprint,
+            matrix_sections=section_rows,
+            matrix_cognitive_levels=level_rows,
+            matrix_level_allocations=allocation_rows,
+            matrix_cells=cells,
+        )
+        self._blueprints[updated.blueprint_code] = updated
+        return updated
+
     def submit_blueprint(self, blueprint_code: str) -> Math6Blueprint:
         blueprint = self._blueprint(blueprint_code)
         if blueprint.locked or blueprint.review_status not in {
@@ -662,6 +734,28 @@ class InMemoryMath6MvpWorkflow:
                         ],
                     }
                     if blueprint.canonical_subject_code
+                    else None
+                ),
+                "matrix_authoring": (
+                    {
+                        "sections": [
+                            row.as_snapshot_record()
+                            for row in blueprint.matrix_sections
+                        ],
+                        "cognitive_levels": [
+                            row.as_snapshot_record()
+                            for row in blueprint.matrix_cognitive_levels
+                        ],
+                        "level_allocations": [
+                            row.as_snapshot_record()
+                            for row in blueprint.matrix_level_allocations
+                        ],
+                        "matrix_cells": [
+                            row.as_payload_record()
+                            for row in blueprint.matrix_cells
+                        ],
+                    }
+                    if blueprint.matrix_cells
                     else None
                 ),
             },

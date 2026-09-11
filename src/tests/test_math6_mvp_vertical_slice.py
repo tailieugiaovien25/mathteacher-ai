@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import sys
 from hashlib import sha256
 from io import BytesIO
@@ -24,6 +25,11 @@ from assessment_generation_v2.services.blueprint_requirement_link_service import
 )
 from assessment_generation_v2.services.canonical_assessment_selection_service import (
     CanonicalAssessmentSelection,
+)
+from assessment_generation_v2.services.assessment_matrix_cell_authoring import (
+    AssessmentProfileSectionOption,
+    CognitiveLevelOption,
+    ProfileLevelAllocation,
 )
 from portal_v2.ui.math6_mvp_demo_streamlit import (
     parse_question_import_json,
@@ -465,3 +471,141 @@ def test_blueprint_canonical_coverage_requires_finalized_matching_selection() ->
         "YCCD-MATH-06-0001",
     )
     assert updated.requirement_assignments == (assignment,)
+
+
+
+def test_math6_blueprint_builds_real_3223_403030_matrix_cells() -> None:
+    workflow = InMemoryMath6MvpWorkflow()
+    config = Math6AssessmentConfig(
+        config_code="M6-MIDTERM-MATRIX",
+        title="Ma tr?n To?n 6 3-2-2-3",
+        academic_year="2026-2027",
+        semester="HK1",
+        test_type="MIDTERM",
+        duration_minutes=90,
+        total_score="10",
+        variant_count=2,
+    )
+    workflow.create_blueprint(
+        blueprint_code="M6-BP-MATRIX",
+        title="Ma tr?n To?n 6 chu?n",
+        assessment_config=config,
+        question_count=20,
+        total_score="10",
+        topic_codes=("M6-NATURAL-NUMBERS",),
+    )
+    selection = CanonicalAssessmentSelection(
+        subject_code="MATH",
+        grade_level=6,
+        program_code="CT2018-MATH",
+        selected_topic_codes=("CURR-NODE-MATH-G6-003",),
+        selected_requirement_codes=("YCCD-MATH-06-0001",),
+        finalized=True,
+    )
+    workflow.bind_canonical_coverage(
+        "M6-BP-MATRIX",
+        selection=selection,
+        assignments=(
+            BlueprintRequirementAssignment(
+                requirement_code="YCCD-MATH-06-0001",
+                coverage_role="PRIMARY",
+                target_question_count=20,
+                sequence_number=10,
+                target_score="10",
+            ),
+        ),
+    )
+
+    sections = (
+        AssessmentProfileSectionOption(
+            "MCQ", "Nhi?u l?a ch?n", "MULTIPLE_CHOICE",
+            10, 12, 12, "3",
+        ),
+        AssessmentProfileSectionOption(
+            "TF", "??ng sai", "TRUE_FALSE",
+            20, 2, 8, "2",
+        ),
+        AssessmentProfileSectionOption(
+            "SHORT", "Tr? l?i ng?n", "SHORT_RESPONSE",
+            30, 4, 4, "2",
+        ),
+        AssessmentProfileSectionOption(
+            "ESSAY", "T? lu?n", "ESSAY",
+            40, 2, 2, "3",
+        ),
+    )
+    levels = (
+        CognitiveLevelOption("KNOW", "Nh?n bi?t", 10),
+        CognitiveLevelOption("UNDERSTAND", "Th?ng hi?u", 20),
+        CognitiveLevelOption("APPLY", "V?n d?ng", 30),
+    )
+    allocations = (
+        ProfileLevelAllocation("KNOW", "4", "40"),
+        ProfileLevelAllocation("UNDERSTAND", "3", "30"),
+        ProfileLevelAllocation("APPLY", "3", "30"),
+    )
+
+    blueprint = workflow.build_matrix_authoring(
+        "M6-BP-MATRIX",
+        sections=sections,
+        cognitive_levels=levels,
+        level_allocations=allocations,
+    )
+
+    assert len(blueprint.matrix_cells) == 5
+    assert sum(
+        (cell.target_score for cell in blueprint.matrix_cells),
+        Decimal("0"),
+    ) == Decimal("10")
+
+    by_level = {
+        level: sum(
+            (
+                cell.target_score
+                for cell in blueprint.matrix_cells
+                if cell.cognitive_level_code == level
+            ),
+            Decimal("0"),
+        )
+        for level in ("KNOW", "UNDERSTAND", "APPLY")
+    }
+    assert by_level == {
+        "KNOW": Decimal("4"),
+        "UNDERSTAND": Decimal("3"),
+        "APPLY": Decimal("3"),
+    }
+
+    by_section = {
+        section.section_code: (
+            sum(
+                cell.question_count
+                for cell in blueprint.matrix_cells
+                if cell.section_code == section.section_code
+            ),
+            sum(
+                cell.response_count
+                for cell in blueprint.matrix_cells
+                if cell.section_code == section.section_code
+            ),
+            sum(
+                (
+                    cell.target_score
+                    for cell in blueprint.matrix_cells
+                    if cell.section_code == section.section_code
+                ),
+                Decimal("0"),
+            ),
+        )
+        for section in sections
+    }
+    assert by_section == {
+        "MCQ": (12, 12, Decimal("3")),
+        "TF": (2, 8, Decimal("2")),
+        "SHORT": (4, 4, Decimal("2")),
+        "ESSAY": (2, 2, Decimal("3")),
+    }
+
+    assert all(
+        cell.topic_code == "CURR-NODE-MATH-G6-003"
+        for cell in blueprint.matrix_cells
+    )
