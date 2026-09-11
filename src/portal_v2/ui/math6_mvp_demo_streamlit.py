@@ -13,11 +13,13 @@ from assessment_generation_v2.services.math6_mvp_workflow import (
     PUBLISHED,
     REVISION_REQUIRED,
     InMemoryMath6MvpWorkflow,
+    Math6AssessmentConfig,
 )
 
 
 SESSION_WORKFLOW_KEY = "math6_mvp_demo_workflow"
 SESSION_BUNDLE_KEY = "math6_mvp_demo_bundle"
+SESSION_CONFIG_KEY = "math6_mvp_assessment_config"
 
 
 def sample_question_rows() -> tuple[dict[str, object], ...]:
@@ -177,6 +179,156 @@ def _render_summary(st: Any, workflow: InMemoryMath6MvpWorkflow) -> None:
     )
 
 
+def _assessment_config_row(
+    config: Math6AssessmentConfig,
+) -> dict[str, object]:
+    type_labels = {
+        "REGULAR": "Kiá»ƒm tra thÆ°á»ng xuyÃªn",
+        "MIDTERM": "Giá»¯a há»c ká»³",
+        "FINAL": "Cuá»‘i há»c ká»³",
+    }
+    semester_labels = {
+        "HK1": "Há»c ká»³ I",
+        "HK2": "Há»c ká»³ II",
+    }
+    return {
+        "MÃ´n": "ToÃ¡n",
+        "Khá»‘i": 6,
+        "MÃ£ cáº¥u hÃ¬nh": config.config_code,
+        "TÃªn bÃ i kiá»ƒm tra": config.title,
+        "NÄƒm há»c": config.academic_year,
+        "Há»c ká»³": semester_labels.get(config.semester, config.semester),
+        "Loáº¡i kiá»ƒm tra": type_labels.get(config.test_type, config.test_type),
+        "Thá»i gian (phÃºt)": config.duration_minutes,
+        "Tá»•ng Ä‘iá»ƒm": str(config.total_score),
+        "Sá»‘ mÃ£ Ä‘á»": config.variant_count,
+    }
+
+
+def _render_assessment_config(
+    st: Any,
+    *,
+    role: str,
+) -> None:
+    st.header("0. Cáº¥u hÃ¬nh bÃ i kiá»ƒm tra")
+    st.caption(
+        "MÃ´n ToÃ¡n Â· Lá»›p 6. Cáº¥u hÃ¬nh hiá»‡n chá»‰ lÆ°u trong phiÃªn "
+        "Streamlit; chÆ°a ghi Supabase vÃ  chÆ°a rÃ ng buá»™c ma tráº­n/Ä‘á»."
+    )
+
+    config = st.session_state.get(SESSION_CONFIG_KEY)
+    if config is not None and not isinstance(config, Math6AssessmentConfig):
+        st.session_state.pop(SESSION_CONFIG_KEY, None)
+        config = None
+
+    if role == "admin":
+        if config is None:
+            st.info("GiÃ¡o viÃªn chÆ°a lÆ°u cáº¥u hÃ¬nh bÃ i kiá»ƒm tra trong phiÃªn nÃ y.")
+        else:
+            st.dataframe(
+                [_assessment_config_row(config)],
+                hide_index=True,
+                use_container_width=True,
+            )
+        return
+
+    semester_options = ("HK1", "HK2")
+    test_type_options = ("REGULAR", "MIDTERM", "FINAL")
+    test_type_labels = {
+        "REGULAR": "Kiá»ƒm tra thÆ°á»ng xuyÃªn",
+        "MIDTERM": "Giá»¯a há»c ká»³",
+        "FINAL": "Cuá»‘i há»c ká»³",
+    }
+    current_semester = (
+        config.semester
+        if isinstance(config, Math6AssessmentConfig)
+        and config.semester in semester_options
+        else "HK1"
+    )
+    current_test_type = (
+        config.test_type
+        if isinstance(config, Math6AssessmentConfig)
+        and config.test_type in test_type_options
+        else "MIDTERM"
+    )
+
+    with st.form("math6_mvp_assessment_config"):
+        config_code = st.text_input(
+            "MÃ£ cáº¥u hÃ¬nh",
+            value=(config.config_code if isinstance(config, Math6AssessmentConfig) else "M6-2026-HK1-MIDTERM"),
+        )
+        title = st.text_input(
+            "TÃªn bÃ i kiá»ƒm tra",
+            value=(config.title if isinstance(config, Math6AssessmentConfig) else "Kiá»ƒm tra giá»¯a há»c ká»³ I - ToÃ¡n 6"),
+        )
+        academic_year = st.text_input(
+            "NÄƒm há»c",
+            value=(config.academic_year if isinstance(config, Math6AssessmentConfig) else "2026-2027"),
+        )
+        semester = st.selectbox(
+            "Há»c ká»³",
+            semester_options,
+            index=semester_options.index(current_semester),
+            format_func=lambda value: {"HK1": "Há»c ká»³ I", "HK2": "Há»c ká»³ II"}[value],
+        )
+        test_type = st.selectbox(
+            "Loáº¡i kiá»ƒm tra",
+            test_type_options,
+            index=test_type_options.index(current_test_type),
+            format_func=lambda value: test_type_labels[value],
+        )
+        duration_minutes = st.number_input(
+            "Thá»i gian lÃ m bÃ i (phÃºt)",
+            min_value=1,
+            value=(config.duration_minutes if isinstance(config, Math6AssessmentConfig) else 90),
+            step=1,
+        )
+        total_score = st.number_input(
+            "Tá»•ng Ä‘iá»ƒm",
+            min_value=0.25,
+            value=(float(config.total_score) if isinstance(config, Math6AssessmentConfig) else 10.0),
+            step=0.25,
+        )
+        variant_count = st.number_input(
+            "Sá»‘ mÃ£ Ä‘á» tÆ°Æ¡ng Ä‘Æ°Æ¡ng",
+            min_value=1,
+            value=(config.variant_count if isinstance(config, Math6AssessmentConfig) else 2),
+            step=1,
+        )
+        save_config = st.form_submit_button(
+            "LÆ°u cáº¥u hÃ¬nh bÃ i kiá»ƒm tra",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if save_config:
+        try:
+            saved = Math6AssessmentConfig(
+                config_code=config_code,
+                title=title,
+                academic_year=academic_year,
+                semester=semester,
+                test_type=test_type,
+                duration_minutes=duration_minutes,
+                total_score=total_score,
+                variant_count=variant_count,
+            )
+        except Exception as error:
+            _show_error(st, "KhÃ´ng thá»ƒ lÆ°u cáº¥u hÃ¬nh bÃ i kiá»ƒm tra", error)
+        else:
+            st.session_state[SESSION_CONFIG_KEY] = saved
+            st.success("ÄÃ£ lÆ°u cáº¥u hÃ¬nh bÃ i kiá»ƒm tra trong phiÃªn hiá»‡n táº¡i.")
+            _rerun(st)
+
+    config = st.session_state.get(SESSION_CONFIG_KEY)
+    if isinstance(config, Math6AssessmentConfig):
+        st.dataframe(
+            [_assessment_config_row(config)],
+            hide_index=True,
+            use_container_width=True,
+        )
+
+
 def _render_question_bank(
     st: Any,
     workflow: InMemoryMath6MvpWorkflow,
@@ -209,6 +361,7 @@ def _render_question_bank(
     ):
         st.session_state[SESSION_WORKFLOW_KEY] = InMemoryMath6MvpWorkflow()
         st.session_state.pop(SESSION_BUNDLE_KEY, None)
+        st.session_state.pop(SESSION_CONFIG_KEY, None)
         _rerun(st)
 
     with st.expander("Import câu hỏi bằng JSON", expanded=False):
@@ -677,6 +830,8 @@ def render_math6_mvp_demo_role(
         st.session_state[SESSION_WORKFLOW_KEY] = workflow
 
     _render_summary(st, workflow)
+    _render_assessment_config(st, role=role)
+    st.divider()
     _render_question_bank(st, workflow, role=role)
     st.divider()
     _render_blueprint(st, workflow, role=role)
@@ -692,6 +847,7 @@ def render_math6_mvp_demo(st: Any) -> None:
 
 __all__ = [
     "SESSION_BUNDLE_KEY",
+    "SESSION_CONFIG_KEY",
     "SESSION_WORKFLOW_KEY",
     "parse_question_import_json",
     "render_math6_mvp_demo",
