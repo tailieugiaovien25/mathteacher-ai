@@ -61,6 +61,11 @@ def test_shared_renderer_propagates_teacher_role(monkeypatch):
     )
     monkeypatch.setattr(
         math6_ui,
+        "_render_assessment_config",
+        lambda st, *, role: calls.append(("assessment_config", role)),
+    )
+    monkeypatch.setattr(
+        math6_ui,
         "_render_question_bank",
         lambda st, workflow, *, role: calls.append(
             ("question_bank", role)
@@ -85,6 +90,7 @@ def test_shared_renderer_propagates_teacher_role(monkeypatch):
 
     assert calls == [
         ("summary", None),
+        ("assessment_config", "teacher"),
         ("question_bank", "teacher"),
         ("blueprint", "teacher"),
         ("exam", "teacher"),
@@ -186,3 +192,20 @@ def test_admin_navigation_and_existing_pages_preserved():
     )
     assert ADMIN_PAGE_ASSESSMENT_TEMPLATES in pages
     assert ADMIN_PAGE_ASSESSMENT_REVIEWS in pages
+
+
+def test_assessment_config_ui_is_session_only_and_role_aware():
+    source = inspect.getsource(math6_ui._render_assessment_config)
+
+    assert 'st.header("0. Cáº¥u hÃ¬nh bÃ i kiá»ƒm tra")' in source
+    assert "Math6AssessmentConfig(" in source
+    assert "SESSION_CONFIG_KEY" in source
+    assert 'if role == "admin":' in source
+    assert '"LÆ°u cáº¥u hÃ¬nh bÃ i kiá»ƒm tra"' in source
+    assert "Supabase" in source
+
+
+def test_reset_demo_also_clears_assessment_config():
+    source = inspect.getsource(math6_ui._render_question_bank)
+
+    assert "st.session_state.pop(SESSION_CONFIG_KEY, None)" in source
