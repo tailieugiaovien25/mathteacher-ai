@@ -19,6 +19,12 @@ from assessment_generation_v2.services.math6_mvp_workflow import (
     Math6AssessmentConfig,
     Math6MvpWorkflowError,
 )
+from assessment_generation_v2.services.blueprint_requirement_link_service import (
+    BlueprintRequirementAssignment,
+)
+from assessment_generation_v2.services.canonical_assessment_selection_service import (
+    CanonicalAssessmentSelection,
+)
 from portal_v2.ui.math6_mvp_demo_streamlit import (
     parse_question_import_json,
     sample_import_json,
@@ -87,6 +93,28 @@ def test_math6_mvp_vertical_slice_reaches_locked_zip() -> None:
         total_score="2",
         topic_codes=("M6-NATURAL-NUMBERS",),
     )
+    canonical_selection = CanonicalAssessmentSelection(
+        subject_code="MATH",
+        grade_level=6,
+        program_code="CT2018-MATH",
+        selected_topic_codes=("CURR-NODE-MATH-G6-003",),
+        selected_requirement_codes=("YCCD-MATH-06-0001",),
+        finalized=True,
+    )
+    workflow.bind_canonical_coverage(
+        "M6-BP-001",
+        selection=canonical_selection,
+        assignments=(
+            BlueprintRequirementAssignment(
+                requirement_code="YCCD-MATH-06-0001",
+                coverage_role="PRIMARY",
+                target_question_count=2,
+                sequence_number=10,
+                target_score="2",
+                specification_note="Ph?m vi MVP To?n 6",
+            ),
+        ),
+    )
     workflow.submit_blueprint("M6-BP-001")
     assert len(workflow.blueprint_review_queue) == 1
     blueprint = workflow.review_blueprint(
@@ -117,6 +145,20 @@ def test_math6_mvp_vertical_slice_reaches_locked_zip() -> None:
         published.snapshot()["blueprint"]["config_code"]
         == assessment_config.config_code
     )
+    canonical_coverage = published.snapshot()["blueprint"][
+        "canonical_coverage"
+    ]
+    assert canonical_coverage["subject_code"] == "MATH"
+    assert canonical_coverage["program_code"] == "CT2018-MATH"
+    assert canonical_coverage["topic_codes"] == [
+        "CURR-NODE-MATH-G6-003"
+    ]
+    assert canonical_coverage["requirement_codes"] == [
+        "YCCD-MATH-06-0001"
+    ]
+    assert canonical_coverage["requirement_assignments"][0][
+        "target_score"
+    ] == "2"
 
     bundle = workflow.export_zip(exam.exam_code)
     assert bundle.startswith(b"PK")
@@ -333,3 +375,93 @@ def test_blueprint_requires_config_and_matching_total_score() -> None:
 
     assert blueprint.config_code == config.config_code
     assert blueprint.total_score == config.total_score
+
+
+
+def test_blueprint_canonical_coverage_requires_finalized_matching_selection() -> None:
+    workflow = InMemoryMath6MvpWorkflow()
+    config = Math6AssessmentConfig(
+        config_code="M6-MIDTERM-CANONICAL",
+        title="Canonical coverage foundation",
+        academic_year="2026-2027",
+        semester="HK1",
+        test_type="MIDTERM",
+        duration_minutes=90,
+        total_score="10",
+        variant_count=2,
+    )
+    workflow.create_blueprint(
+        blueprint_code="M6-BP-CANONICAL",
+        title="Canonical blueprint foundation",
+        assessment_config=config,
+        question_count=2,
+        total_score="10",
+        topic_codes=("M6-NATURAL-NUMBERS",),
+    )
+
+    editing_selection = CanonicalAssessmentSelection(
+        subject_code="MATH",
+        grade_level=6,
+        program_code="CT2018-MATH",
+        selected_topic_codes=("CURR-NODE-MATH-G6-003",),
+        selected_requirement_codes=("YCCD-MATH-06-0001",),
+        finalized=False,
+    )
+    assignment = BlueprintRequirementAssignment(
+        requirement_code="YCCD-MATH-06-0001",
+        coverage_role="PRIMARY",
+        target_question_count=2,
+        sequence_number=10,
+        target_score="10",
+    )
+
+    with pytest.raises(
+        Math6MvpWorkflowError,
+        match="must be finalized",
+    ):
+        workflow.bind_canonical_coverage(
+            "M6-BP-CANONICAL",
+            selection=editing_selection,
+            assignments=(assignment,),
+        )
+
+    finalized = CanonicalAssessmentSelection(
+        subject_code="MATH",
+        grade_level=6,
+        program_code="CT2018-MATH",
+        selected_topic_codes=("CURR-NODE-MATH-G6-003",),
+        selected_requirement_codes=("YCCD-MATH-06-0001",),
+        finalized=True,
+    )
+    wrong_assignment = BlueprintRequirementAssignment(
+        requirement_code="YCCD-MATH-06-9999",
+        coverage_role="PRIMARY",
+        target_question_count=2,
+        sequence_number=10,
+        target_score="10",
+    )
+
+    with pytest.raises(
+        Math6MvpWorkflowError,
+        match="must match selection",
+    ):
+        workflow.bind_canonical_coverage(
+            "M6-BP-CANONICAL",
+            selection=finalized,
+            assignments=(wrong_assignment,),
+        )
+
+    updated = workflow.bind_canonical_coverage(
+        "M6-BP-CANONICAL",
+        selection=finalized,
+        assignments=(assignment,),
+    )
+    assert updated.canonical_subject_code == "MATH"
+    assert updated.canonical_program_code == "CT2018-MATH"
+    assert updated.canonical_topic_codes == (
+        "CURR-NODE-MATH-G6-003",
+    )
+    assert updated.canonical_requirement_codes == (
+        "YCCD-MATH-06-0001",
+    )
+    assert updated.requirement_assignments == (assignment,)
