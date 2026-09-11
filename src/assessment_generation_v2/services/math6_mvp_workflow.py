@@ -48,6 +48,24 @@ def _score(value: object) -> Decimal:
     return result
 
 
+def _positive_int(value: object, field_name: str) -> int:
+    if isinstance(value, bool):
+        raise Math6MvpWorkflowError(
+            f"{field_name} must be a positive integer"
+        )
+    try:
+        numeric = Decimal(str(value))
+    except (InvalidOperation, ValueError) as error:
+        raise Math6MvpWorkflowError(
+            f"{field_name} must be a positive integer"
+        ) from error
+    if numeric != numeric.to_integral_value() or numeric <= 0:
+        raise Math6MvpWorkflowError(
+            f"{field_name} must be a positive integer"
+        )
+    return int(numeric)
+
+
 def _admin(role: str) -> None:
     if str(role).strip().upper() != ADMIN:
         raise PermissionError("this transition requires ADMIN")
@@ -60,6 +78,56 @@ def _json_bytes(value: object) -> bytes:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+@dataclass(frozen=True, slots=True)
+class Math6AssessmentConfig:
+    config_code: str
+    title: str
+    academic_year: str
+    semester: str
+    test_type: str
+    duration_minutes: int
+    total_score: Decimal
+    variant_count: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "config_code",
+            _text(self.config_code, "config_code").upper(),
+        )
+        object.__setattr__(self, "title", _text(self.title, "title"))
+        object.__setattr__(
+            self,
+            "academic_year",
+            _text(self.academic_year, "academic_year"),
+        )
+        object.__setattr__(
+            self,
+            "semester",
+            _text(self.semester, "semester").upper(),
+        )
+        object.__setattr__(
+            self,
+            "test_type",
+            _text(self.test_type, "test_type").upper(),
+        )
+        object.__setattr__(
+            self,
+            "duration_minutes",
+            _positive_int(self.duration_minutes, "duration_minutes"),
+        )
+        object.__setattr__(
+            self,
+            "total_score",
+            _score(self.total_score),
+        )
+        object.__setattr__(
+            self,
+            "variant_count",
+            _positive_int(self.variant_count, "variant_count"),
+        )
 
 
 @dataclass(frozen=True, slots=True)

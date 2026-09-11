@@ -16,6 +16,7 @@ from assessment_generation_v2.services.math6_mvp_workflow import (
     APPROVED,
     PENDING_REVIEW,
     InMemoryMath6MvpWorkflow,
+    Math6AssessmentConfig,
     Math6MvpWorkflowError,
 )
 from portal_v2.ui.math6_mvp_demo_streamlit import (
@@ -208,3 +209,58 @@ def test_streamlit_status_tracks_guarded_workflow_transitions() -> None:
     ready = workflow_status(workflow)
     assert ready["question_locked"] == 2
     assert ready["can_create_blueprint"] is True
+
+
+def test_math6_assessment_config_normalizes_core_fields() -> None:
+    config = Math6AssessmentConfig(
+        config_code="m6-midterm-2026-hk1",
+        title="Math 6 midterm",
+        academic_year="2026-2027",
+        semester="hk1",
+        test_type="midterm",
+        duration_minutes="90",
+        total_score="10",
+        variant_count="2",
+    )
+    assert config.config_code == "M6-MIDTERM-2026-HK1"
+    assert config.title == "Math 6 midterm"
+    assert config.academic_year == "2026-2027"
+    assert config.semester == "HK1"
+    assert config.test_type == "MIDTERM"
+    assert config.duration_minutes == 90
+    assert str(config.total_score) == "10"
+    assert config.variant_count == 2
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    (
+        ("config_code", ""),
+        ("title", " "),
+        ("academic_year", ""),
+        ("semester", ""),
+        ("test_type", ""),
+        ("duration_minutes", 0),
+        ("duration_minutes", "1.5"),
+        ("total_score", 0),
+        ("variant_count", 0),
+        ("variant_count", False),
+    ),
+)
+def test_math6_assessment_config_rejects_invalid_values(
+    field_name: str,
+    invalid_value: object,
+) -> None:
+    values = {
+        "config_code": "M6-MIDTERM-2026-HK1",
+        "title": "Math 6 midterm",
+        "academic_year": "2026-2027",
+        "semester": "HK1",
+        "test_type": "MIDTERM",
+        "duration_minutes": 90,
+        "total_score": "10",
+        "variant_count": 2,
+    }
+    values[field_name] = invalid_value
+    with pytest.raises(Math6MvpWorkflowError):
+        Math6AssessmentConfig(**values)
