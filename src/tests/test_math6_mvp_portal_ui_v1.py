@@ -209,3 +209,15 @@ def test_reset_demo_also_clears_assessment_config():
     source = inspect.getsource(math6_ui._render_question_bank)
 
     assert "st.session_state.pop(SESSION_CONFIG_KEY, None)" in source
+
+
+
+def test_blueprint_ui_requires_saved_config_and_uses_config_score():
+    source = inspect.getsource(math6_ui._render_blueprint)
+
+    assert "SESSION_CONFIG_KEY" in source
+    assert "has_config = isinstance(config, Math6AssessmentConfig)" in source
+    assert "can_create_blueprint = (" in source
+    assert "assessment_config=config" in source
+    assert "float(config.total_score)" in source
+    assert "disabled=not can_create_blueprint" in source

@@ -69,9 +69,20 @@ def test_math6_mvp_vertical_slice_reaches_locked_zip() -> None:
     _seed_questions(workflow)
     assert not workflow.question_review_queue
 
+    assessment_config = Math6AssessmentConfig(
+        config_code="M6-MIDTERM-2026-HK1",
+        title="Kiểm tra giữa học kỳ I - Toán 6",
+        academic_year="2026-2027",
+        semester="HK1",
+        test_type="MIDTERM",
+        duration_minutes=90,
+        total_score="2",
+        variant_count=2,
+    )
     workflow.create_blueprint(
         blueprint_code="M6-BP-001",
         title="Ma trận Toán 6 tối thiểu",
+        assessment_config=assessment_config,
         question_count=2,
         total_score="2",
         topic_codes=("M6-NATURAL-NUMBERS",),
@@ -83,6 +94,7 @@ def test_math6_mvp_vertical_slice_reaches_locked_zip() -> None:
     )
     assert blueprint.review_status == APPROVED
     assert blueprint.locked
+    assert blueprint.config_code == assessment_config.config_code
     assert not workflow.blueprint_review_queue
 
     exam = workflow.generate_exam(
@@ -101,6 +113,10 @@ def test_math6_mvp_vertical_slice_reaches_locked_zip() -> None:
     assert published.snapshot_hash == sha256(
         published.snapshot_json.encode("utf-8")
     ).hexdigest()
+    assert (
+        published.snapshot()["blueprint"]["config_code"]
+        == assessment_config.config_code
+    )
 
     bundle = workflow.export_zip(exam.exam_code)
     assert bundle.startswith(b"PK")
@@ -264,3 +280,56 @@ def test_math6_assessment_config_rejects_invalid_values(
     values[field_name] = invalid_value
     with pytest.raises(Math6MvpWorkflowError):
         Math6AssessmentConfig(**values)
+
+
+
+def test_blueprint_requires_config_and_matching_total_score() -> None:
+    workflow = InMemoryMath6MvpWorkflow()
+    config = Math6AssessmentConfig(
+        config_code="M6-FINAL-2026-HK1",
+        title="Kiểm tra cuối học kỳ I - Toán 6",
+        academic_year="2026-2027",
+        semester="HK1",
+        test_type="FINAL",
+        duration_minutes=90,
+        total_score="10",
+        variant_count=2,
+    )
+
+    with pytest.raises(
+        Math6MvpWorkflowError,
+        match="assessment_config is required",
+    ):
+        workflow.create_blueprint(
+            blueprint_code="M6-BP-NO-CONFIG",
+            title="No config",
+            assessment_config=None,
+            question_count=2,
+            total_score="10",
+            topic_codes=("M6-NATURAL-NUMBERS",),
+        )
+
+    with pytest.raises(
+        Math6MvpWorkflowError,
+        match="blueprint total_score must match assessment config",
+    ):
+        workflow.create_blueprint(
+            blueprint_code="M6-BP-MISMATCH",
+            title="Score mismatch",
+            assessment_config=config,
+            question_count=2,
+            total_score="9",
+            topic_codes=("M6-NATURAL-NUMBERS",),
+        )
+
+    blueprint = workflow.create_blueprint(
+        blueprint_code="M6-BP-MATCH",
+        title="Score match",
+        assessment_config=config,
+        question_count=2,
+        total_score="10",
+        topic_codes=("M6-NATURAL-NUMBERS",),
+    )
+
+    assert blueprint.config_code == config.config_code
+    assert blueprint.total_score == config.total_score

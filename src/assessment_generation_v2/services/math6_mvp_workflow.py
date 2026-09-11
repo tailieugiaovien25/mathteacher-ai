@@ -147,6 +147,7 @@ class Math6Question:
 class Math6Blueprint:
     blueprint_code: str
     title: str
+    config_code: str
     question_count: int
     total_score: Decimal
     topic_codes: tuple[str, ...]
@@ -379,10 +380,18 @@ class InMemoryMath6MvpWorkflow:
         *,
         blueprint_code: str,
         title: str,
+        assessment_config: Math6AssessmentConfig,
         question_count: int,
         total_score: object,
         topic_codes: Iterable[str],
     ) -> Math6Blueprint:
+        if not isinstance(assessment_config, Math6AssessmentConfig):
+            raise Math6MvpWorkflowError("assessment_config is required")
+        normalized_total_score = _score(total_score)
+        if normalized_total_score != assessment_config.total_score:
+            raise Math6MvpWorkflowError(
+                "blueprint total_score must match assessment config"
+            )
         code = _text(blueprint_code, "blueprint_code").upper()
         if code in self._blueprints:
             raise Math6MvpWorkflowError(f"blueprint already exists: {code}")
@@ -399,8 +408,9 @@ class InMemoryMath6MvpWorkflow:
         blueprint = Math6Blueprint(
             blueprint_code=code,
             title=_text(title, "title"),
+            config_code=assessment_config.config_code,
             question_count=int(question_count),
-            total_score=_score(total_score),
+            total_score=normalized_total_score,
             topic_codes=topics,
         )
         self._blueprints[code] = blueprint
@@ -551,6 +561,7 @@ class InMemoryMath6MvpWorkflow:
             "blueprint": {
                 "blueprint_code": blueprint.blueprint_code,
                 "title": blueprint.title,
+                "config_code": blueprint.config_code,
                 "question_count": blueprint.question_count,
                 "total_score": str(blueprint.total_score),
                 "topic_codes": list(blueprint.topic_codes),
