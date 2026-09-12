@@ -822,6 +822,88 @@ def _mt_iter_all_paragraphs(document):
 
 
 # R4A2C2B1_ISOLATED_CANONICAL_FIELD_REPAIR
+def _repair_missing_confirmed_class(document, value):
+    """Repair an English class label, or insert at a unique planning header."""
+    from copy import deepcopy
+
+    if not re.fullmatch(r"[0-9]{1,2}[A-Za-z][0-9A-Za-z._-]*", value):
+        return False
+    paragraphs = []
+    seen = set()
+    for paragraph in _mt_iter_all_paragraphs(document):
+        if paragraph._p not in seen:
+            seen.add(paragraph._p)
+            paragraphs.append(paragraph)
+    labels = []
+    for paragraph in paragraphs:
+        match = re.search(r"(?im)^\s*(?:class|l\u1edbp)\s*:\s*([^\r\n]*)", paragraph.text)
+        if match:
+            labels.append((paragraph, match))
+    if labels:
+        if len(labels) != 1:
+            return False
+        paragraph, match = labels[0]
+        old_value = match.group(1).strip()
+        if not re.fullmatch(r"[0-9]{1,2}[A-Za-z][0-9A-Za-z._-]*", old_value):
+            return False
+        start = match.start(1)
+        return _mt_replace_span_preserving_runs(paragraph, start, match.end(1), value)
+    return False
+
+
+def _insert_missing_system_field(document, field_name, value):
+    """Insert only a missing metadata label; value comes from canonical UI evidence."""
+    from copy import deepcopy
+    from docx.oxml import OxmlElement
+    from docx.text.paragraph import Paragraph
+
+    patterns = {
+        "class_id": r"(?:class|lớp)",
+        "curriculum_period": r"(?:period|tiết(?:\s+ppct)?|ppct)",
+        "lesson_title": r"(?:unit\s*\d+|lesson\s*\d+|tên\s+bài|bài)",
+        "drafting_date": r"(?:date\s+of\s+planning|date\s+of\s+preparation|ngày\s+soạn)",
+        "teaching_date": r"(?:date\s+of\s+teaching|teaching\s+date|ngày\s+(?:dạy|giảng))",
+    }
+    if field_name not in patterns or not str(value).strip():
+        return False
+    # Inspect nested tables and text boxes too before declaring a field absent.
+    texts = ["".join(p.xpath('.//w:t/text()')) for p in document.element.body.xpath('.//w:p')]
+    if any(re.search(r"(?im)^\s*" + patterns[field_name] + r"\b", text) for text in texts):
+        return False
+    paragraphs = list(_mt_iter_all_paragraphs(document))
+    anchors = []
+    seen = set()
+    for p in paragraphs:
+        if p._p in seen:
+            continue
+        seen.add(p._p)
+        if re.search(r"(?im)^\s*(?:date\s+of\s+planning|ngày\s+soạn)\s*:", p.text):
+            anchors.append(p)
+    if len(anchors) > 1:
+        return False
+    english = any(re.search(r"(?i)date\s+of\s+(?:planning|teaching)|\bunit\s+\d+", t) for t in texts)
+    labels = {
+        "class_id": ("Class", "Lớp"),
+        "curriculum_period": ("Period", "Tiết PPCT"),
+        "lesson_title": ("Tên bài", "Tên bài"),
+        "drafting_date": ("Date of planning", "Ngày soạn"),
+        "teaching_date": ("Date of teaching", "Ngày dạy"),
+    }
+    label = labels[field_name][0 if english else 1]
+    if anchors:
+        paragraph = anchors[0]
+        run = paragraph.add_run("\n" + label + ": " + value)
+        template = next((r for r in paragraph.runs if r._r is not run._r and r._r.rPr is not None), None)
+        if template is not None:
+            run._r.insert(0, deepcopy(template._r.rPr))
+    else:
+        # No planning header: insert before the first body block, never inside lesson content.
+        p = OxmlElement('w:p')
+        document.element.body.insert(0, p)
+        paragraph = Paragraph(p, document._body)
+        paragraph.add_run(label + ": " + value)
+    return True
+
 def repair_lesson_plan_canonical_field(
     source,
     output,
@@ -865,10 +947,13 @@ def repair_lesson_plan_canonical_field(
 
         document.save(output)
 
-        return _mt_overlay_multiclass_teaching_date(
-            output,
-            context,
-        )
+        changed = _mt_overlay_multiclass_teaching_date(output, context)
+        if changed:
+            return True
+        if _insert_missing_system_field(document, field_name, value):
+            document.save(output)
+            return True
+        return False
 
     changed = applier._apply_field(
         document,
@@ -877,6 +962,10 @@ def repair_lesson_plan_canonical_field(
         context=context,
     )
 
+    if not changed and field_name == "class_id":
+        changed = _repair_missing_confirmed_class(document, value)
+    if not changed:
+        changed = _insert_missing_system_field(document, field_name, value)
     if not changed:
         return False
 
