@@ -1328,7 +1328,7 @@ def render_standardized_lesson_plan_authoring_v2(
                     "message": (
                         "Chuẩn hóa và kiểm duyệt giáo án đã đạt PASS."
                         if release_status == "pass"
-                        else "Pipeline đã tạo DOCX nhưng cổng kiểm duyệt chưa đạt; hệ thống đã khóa Lưu/Tải/Gộp."
+                        else "Pipeline da tao DOCX; kiem duyet chua dat. Luu, Tai xuong, Danh sach quan ly va Gop giao an van kha dung."
                     ),
                 }
                 st.rerun()
@@ -1986,7 +1986,8 @@ def render_standardized_lesson_plan_authoring_v2(
     # G1B_13H1R4B5J_TOP_SAVE_RUNTIME_WIRING
     if actions[1].button(
         "Lưu hệ thống",
-        disabled=(save_handler is None or not standardized_content or audit_blocks_save),
+        # R4A2C2B2C2D2_SAVE_NOT_BLOCKED_BY_AUDIT
+        disabled=(save_handler is None or not standardized_content),
         use_container_width=True,
     ):
         if save_handler is not None:
@@ -2016,7 +2017,8 @@ def render_standardized_lesson_plan_authoring_v2(
             if isinstance(standardized, Mapping)
             else "giao-an-da-chuan.docx"
         ),
-        disabled=(not standardized_content or audit_blocks_save),
+        # R4A2C2B2C2D2_DOWNLOAD_NOT_BLOCKED_BY_AUDIT
+        disabled=(not standardized_content),
         mime=(
             "application/vnd.openxmlformats-officedocument."
             "wordprocessingml.document"
@@ -2070,32 +2072,35 @@ def render_standardized_lesson_plan_authoring_v2(
             empty_message="Chưa có giáo án đã chuẩn hóa.",
         )
     # G1B_13H1R4B_STANDARDIZED_LIST_WIRING
+    # R4A2C2B2C2D2_MANAGEMENT_MERGE_NOT_BLOCKED_BY_AUDIT
+    # Canonical/Admin audit is supervisory only.
+    # Once standardized DOCX bytes exist, teacher actions stay available.
     if standardized_content:
-        if not audit_blocks_save:
-            from portal_v2.ui.standardized_lesson_plan_management_streamlit import (
-                render_standardized_lesson_plan_management,
+        from portal_v2.ui.standardized_lesson_plan_management_streamlit import (
+            render_standardized_lesson_plan_management,
+        )
+
+        if audit_blocks_save:
+            st.warning(
+                "Kiem duyet hien chua dat. Day chi la canh bao giam sat; "
+                "Luu, Tai xuong, Danh sach quan ly va Gop giao an van duoc mo."
             )
 
-            render_standardized_lesson_plan_management(
-                current_file_name=(
-                    str(
-                        standardized.get(
-                            "file_name",
-                            "standardized-lesson-plan.docx",
-                        )
+        render_standardized_lesson_plan_management(
+            current_file_name=(
+                str(
+                    standardized.get(
+                        "file_name",
+                        "standardized-lesson-plan.docx",
                     )
-                    if isinstance(standardized, Mapping)
-                    else "standardized-lesson-plan.docx"
-                ),
-                current_content=standardized_content,
-                preview_html_builder=preview_html_builder,
-                save_handler=save_handler if not audit_blocks_save else None,
-            )
-        else:
-            st.error(
-                "Tệp chưa đạt ADMIN Configuration Enforcement Gate nên chưa được "
-                "đưa vào danh sách Lưu/Tải/Gộp."
-            )
+                )
+                if isinstance(standardized, Mapping)
+                else "standardized-lesson-plan.docx"
+            ),
+            current_content=standardized_content,
+            preview_html_builder=preview_html_builder,
+            save_handler=save_handler,
+        )
 
     # G1B_13H1R4B4J_SAVE_AND_BACK_NAV
     st.markdown("---")
