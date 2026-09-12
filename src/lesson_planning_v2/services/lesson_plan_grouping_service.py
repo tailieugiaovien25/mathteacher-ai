@@ -153,6 +153,8 @@ class LessonPlanGroupingService:
                     timetable_period=getattr(row, "timetable_period", None),
                     timetable_slot_id=self._text(row, "timetable_slot_id") or None,
                     curriculum_period=getattr(row, "curriculum_period", None),
+                    session=getattr(row, "session", None),
+                    period_in_lesson=getattr(row, "period_in_lesson", None),
                 )
                 for row_index, row, _ in members
             )

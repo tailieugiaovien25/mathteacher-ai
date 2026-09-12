@@ -119,6 +119,8 @@ class WeeklyLessonPlanGroupProvider:
                 class_id=str(e.class_id or "").strip(),
                 teaching_date=e.teaching_date,
                 timetable_period=e.timetable_period,
+                session=getattr(e, "session", None),
+                period_in_lesson=getattr(e, "period_in_lesson", None),
                 timetable_slot_id=None,
                 teaching_equipment=tuple(e.teaching_equipment or ()),
             )

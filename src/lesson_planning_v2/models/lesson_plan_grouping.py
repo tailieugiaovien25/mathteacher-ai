@@ -24,6 +24,8 @@ class TeachingOccurrence:
     timetable_period: int | Any | None
     timetable_slot_id: str | None
     curriculum_period: int | Any | None
+    session: Any | None = None
+    period_in_lesson: int | Any | None = None
 
 
 @dataclass(frozen=True, slots=True)
