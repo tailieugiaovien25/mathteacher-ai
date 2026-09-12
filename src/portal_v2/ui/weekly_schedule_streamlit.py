@@ -1426,6 +1426,33 @@ def _teacher_options(intake) -> tuple[str, ...]:
     )
 
 
+def _localized_lbg_download(*, client, user_id, view):
+    from educational_planning_v2.exporters.weekly_schedule_download_localizer import localize_download
+    classes, subjects, components = _resolve_lbg_display_names(client=client, view=view)
+    profile = {}
+    if client is not None and user_id:
+        try:
+            response = (client.table("teacher_profiles")
+                .select("full_name,school_name,show_teacher_name,show_school_name")
+                .eq("user_id", str(user_id)).limit(1).execute())
+            profiles = getattr(response, "data", None) or []
+            if profiles:
+                profile = profiles[0]
+        except Exception:
+            st.warning("Không đọc được hồ sơ giáo viên; file xuất không hiển thị mã tài khoản.")
+    sessions = {}
+    for row in view.rows:
+        key = (row.teaching_date, str(row.class_id), row.timetable_period,
+               str(row.subject_ref), row.curriculum_period)
+        value = str(getattr(row.session, "value", row.session))
+        if key in sessions and sessions[key] != value:
+            raise ValueError("Không xác định duy nhất buổi dạy cho file Excel.")
+        sessions[key] = value
+    return localize_download(view.download.content, class_names=classes,
+        subject_names=subjects, component_names=components,
+        teacher_profile=profile, sessions=sessions)
+
+
 def _resolve_lbg_display_names(
     *,
     client,
@@ -6804,8 +6831,8 @@ def _render_weekly_schedule_technical_workspace(
             "\u0062\u00e1\u006f "
             "\u0067\u0069\u1ea3\u006e\u0067 "
             "\u0045\u0078\u0063\u0065\u006c",
-            data=view.download.content,
-            file_name=view.download.file_name,
+            data=_localized_lbg_download(client=client, user_id=user_id, view=view),
+            file_name=f"lich-bao-giang-tuan-{view.week_number}.xlsx",
             mime=view.download.mime_type,
             use_container_width=True,
             key="system_weekly_download",
@@ -6943,8 +6970,8 @@ def _render_weekly_schedule_technical_workspace(
 
     st.download_button(
         "Tải lịch báo giảng Excel",
-        data=view.download.content,
-        file_name=view.download.file_name,
+        data=_localized_lbg_download(client=client, user_id=user_id, view=view),
+        file_name=f"lich-bao-giang-tuan-{view.week_number}.xlsx",
         mime=view.download.mime_type,
         use_container_width=True,
         key="weekly_schedule_download",
