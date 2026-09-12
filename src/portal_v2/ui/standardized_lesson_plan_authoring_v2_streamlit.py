@@ -1642,13 +1642,14 @@ def render_standardized_lesson_plan_authoring_v2(
                             input_key = f"g1b_v2_teacher_value_{group_id}_{field_key}"
                             proposed_teacher_value = st.text_input(
                                 "Gi\u00e1 tr\u1ecb gi\u00e1o vi\u00ean x\u00e1c nh\u1eadn",
-                                value=(teacher_value or expected_text),
-                                key=input_key,
+                                value=expected_text,
+                                key=input_key + "_system_overlay",
+                                disabled=True,
                             )
                             if st.button(
-                                "X\u00e1c nh\u1eadn l\u00e0 \u0111\u00fang",
+                                "Dán theo hệ thống",
                                 key=f"g1b_v2_teacher_confirm_{group_id}_{field_key}",
-                                disabled=not str(proposed_teacher_value or "").strip(),
+                                disabled=expected in (None, ""),
                             ):
                                 # R4A2C2B2C2B2B_ATOMIC_TEACHER_CONFIRM_REPAIR_REAUDIT
                                 # Repair and re-audit complete before session state is committed.
@@ -1677,22 +1678,26 @@ def render_standardized_lesson_plan_authoring_v2(
                                             "Khong con DOCX goc de tai kiem duyet."
                                         )
 
+                                    if expected in (None, ""):
+                                        raise ValueError("Hệ thống chưa có giá trị để dán.")
+                                    st.info("Đang dán giá trị hệ thống vào DOCX…")
                                     repair_result = repair_canonical_field_bytes(
                                         repair_source_content,
                                         group_context=context,
                                         field_key=field_key,
                                         teacher_value=str(
-                                            proposed_teacher_value or ""
+                                            expected
                                         ).strip(),
                                     )
                                     if not repair_result.changed:
                                         raise RuntimeError(
-                                            "Khong tim thay vi tri can sua trong DOCX."
+                                            "Không xác định được vị trí sửa an toàn; tài liệu chưa thay đổi."
                                         )
 
                                     pipeline_evidence = st.session_state.get(
                                         "_g1b_v2_pipeline_evidence"
                                     )
+                                    st.info("Đang kiểm duyệt lại tài liệu sau khi dán…")
                                     repaired_audit = audit_repaired_content(
                                         original_content=original_content,
                                         repaired_content=repair_result.content,
@@ -1761,8 +1766,8 @@ def render_standardized_lesson_plan_authoring_v2(
                                     ] = {
                                         "level": "success",
                                         "message": (
-                                            "Da sua truong giao vien xac nhan "
-                                            "va tai kiem duyet DOCX."
+                                            "Đã dán giá trị theo hệ thống "
+                                            "và kiểm duyệt lại DOCX. Xem trạng thái từng trường bên dưới."
                                         ),
                                     }
                                 except Exception as repair_error:
@@ -1772,7 +1777,7 @@ def render_standardized_lesson_plan_authoring_v2(
                                     ] = {
                                         "level": "error",
                                         "message": (
-                                            "Khong the sua truong da xac nhan: "
+                                            "Không thể dán giá trị hệ thống: "
                                             + str(repair_error)
                                         ),
                                     }
