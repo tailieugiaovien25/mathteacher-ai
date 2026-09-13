@@ -366,7 +366,16 @@ class AssessmentExamGenerationGateway(Protocol):
         self,
         *,
         exam_version_id: str,
-    ) -> AssessmentValidationReport:
+    ) -> AssessmentValidationReport | ValidationResult:
+        ...
+
+    def confirm_validation_warnings(
+        self,
+        *,
+        exam_version_id: str,
+        validation_evidence_digest: str,
+        confirmed_warnings: tuple[str, ...],
+    ) -> None:
         ...
 
 
@@ -492,6 +501,18 @@ class AssessmentExamGenerationService:
         state = ExamGenerationState.READY_FOR_REVIEW
 
         if request.submit_for_review:
+            if (
+                canonical_result.requires_teacher_confirmation
+                and accepted_confirmation is not None
+                and canonical_result.evidence_identity is not None
+            ):
+                self._gateway.confirm_validation_warnings(
+                    exam_version_id=draft.exam_version_id,
+                    validation_evidence_digest=(
+                        canonical_result.evidence_identity.evidence_digest
+                    ),
+                    confirmed_warnings=canonical_result.warnings,
+                )
             self._gateway.submit_exam_for_review(
                 exam_version_id=draft.exam_version_id,
             )

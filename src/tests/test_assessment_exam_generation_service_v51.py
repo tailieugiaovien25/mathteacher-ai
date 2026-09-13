@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from datetime import datetime, timezone
+import inspect
 
 import pytest
 
 from assessment_generation_v2.services.assessment_foundation import (
+    ValidationEvidenceIdentity,
     ValidationResult,
     ValidationStatus,
 )
@@ -29,6 +32,9 @@ EXAM_ID = "33333333-3333-4333-8333-333333333333"
 EXAM_VERSION_ID = (
     "44444444-4444-4444-8444-444444444444"
 )
+EVIDENCE_DIGEST = "b" * 64
+
+
 class FakeAssessmentGenerationGateway:
     def __init__(
         self,
@@ -51,6 +57,9 @@ class FakeAssessmentGenerationGateway:
             )
         )
         self.calls: list[str] = []
+        self.confirmation_calls: list[
+            tuple[str, str, tuple[str, ...]]
+        ] = []
 
     def find_active_approved_blueprint(
         self,
@@ -88,6 +97,22 @@ class FakeAssessmentGenerationGateway:
         self.calls.append("validate")
         return self.report
 
+    def confirm_validation_warnings(
+        self,
+        *,
+        exam_version_id: str,
+        validation_evidence_digest: str,
+        confirmed_warnings: tuple[str, ...],
+    ) -> None:
+        self.calls.append("confirm_warnings")
+        self.confirmation_calls.append(
+            (
+                exam_version_id,
+                validation_evidence_digest,
+                confirmed_warnings,
+            )
+        )
+
     def submit_exam_for_review(
         self,
         *,
@@ -112,11 +137,33 @@ def _request(
     )
 
 
-def _warning_result() -> ValidationResult:
+def _warning_result(
+    *,
+    with_evidence: bool = False,
+) -> ValidationResult:
+    evidence_identity = None
+    if with_evidence:
+        evidence_identity = ValidationEvidenceIdentity(
+            validation_evidence_id=(
+                "55555555-5555-4555-8555-555555555555"
+            ),
+            validation_input_digest="a" * 64,
+            evidence_digest=EVIDENCE_DIGEST,
+            validation_schema_version=1,
+            validated_at=datetime(
+                2026,
+                9,
+                13,
+                3,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
     return ValidationResult(
         status=ValidationStatus.WARNING,
         warnings=("Review the score distribution.",),
         metrics={"total_score": 10, "warning_count": 1},
+        evidence_identity=evidence_identity,
     )
 
 
