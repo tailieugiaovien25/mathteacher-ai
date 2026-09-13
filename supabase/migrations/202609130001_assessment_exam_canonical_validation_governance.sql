@@ -924,7 +924,7 @@ set search_path = ''
 as $$
 declare
     current_exam_id uuid;
-    current_version_number integer;
+    current_exam_version_number integer;
     current_owner_user_id uuid;
     current_status text;
     new_publication_id uuid;
@@ -938,7 +938,7 @@ begin
         exam_version.assembly_status
     into
         current_exam_id,
-        current_version_number,
+        current_exam_version_number,
         current_owner_user_id,
         current_status
     from public.assessment_exam_versions exam_version
@@ -960,7 +960,7 @@ begin
         select 1
         from public.assessment_exams exam
         where exam.exam_id = current_exam_id
-          and exam.current_version_number = current_version_number
+          and exam.current_version_number = current_exam_version_number
     ) then
         raise exception
             'Only the current approved exam version may be published.';

@@ -384,3 +384,15 @@ def test_migration_does_not_modify_legacy_migration_files() -> None:
     assert "202608250013_assessment_exam_immutable_snapshots.sql" not in text
     assert "202608250019_assessment_snapshot_schema_v2.sql" not in text
     assert "update public.assessment_exam_snapshots" not in text.lower()
+
+def test_publish_current_version_guard_is_unambiguous() -> None:
+    publish = _function(_text(), "publish_assessment_exam")
+    assert "current_exam_version_number integer;" in publish
+    assert (
+        "exam.current_version_number = current_exam_version_number"
+        in publish
+    )
+    assert (
+        "exam.current_version_number = current_version_number"
+        not in publish
+    )
