@@ -3,8 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
-from typing import Mapping, Protocol
+from typing import TYPE_CHECKING, Mapping, Protocol
 from uuid import UUID
+
+
+if TYPE_CHECKING:
+    from assessment_generation_v2.services.assessment_foundation import (
+        ValidationResult,
+    )
 
 
 class AssessmentGenerationValidationError(ValueError):
@@ -48,6 +54,55 @@ def _required_uuid(value: object, field_name: str) -> str:
     return normalized
 
 
+def _canonical_validation_result(
+    evidence: object,
+) -> ValidationResult:
+    from assessment_generation_v2.services.assessment_foundation import (
+        ValidationResult,
+        validation_result_from_legacy,
+    )
+
+    if isinstance(evidence, AssessmentValidationReport):
+        return validation_result_from_legacy(evidence)
+    if isinstance(evidence, ValidationResult):
+        return evidence
+    raise TypeError(
+        "validation evidence must be AssessmentValidationReport "
+        "or ValidationResult"
+    )
+
+
+@dataclass(frozen=True)
+class TeacherValidationConfirmation:
+    teacher_user_id: str
+    confirmed_warnings: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "teacher_user_id",
+            _required_uuid(
+                self.teacher_user_id,
+                "teacher_user_id",
+            ),
+        )
+        if not isinstance(self.confirmed_warnings, tuple):
+            raise TypeError("confirmed_warnings must be a tuple")
+        normalized_warnings = tuple(
+            _required_text(warning, "confirmed_warnings")
+            for warning in self.confirmed_warnings
+        )
+        if not normalized_warnings:
+            raise AssessmentGenerationValidationError(
+                "confirmed_warnings must not be empty"
+            )
+        object.__setattr__(
+            self,
+            "confirmed_warnings",
+            normalized_warnings,
+        )
+
+
 @dataclass(frozen=True)
 class AssessmentExamGenerationRequest:
     blueprint_code: str
@@ -56,6 +111,7 @@ class AssessmentExamGenerationRequest:
     title: str
     submit_for_review: bool = True
     idempotency_key: str = ""
+    teacher_confirmation: TeacherValidationConfirmation | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -104,6 +160,17 @@ class AssessmentExamGenerationRequest:
             raise TypeError(
                 "submit_for_review must be a boolean"
             )
+        if (
+            self.teacher_confirmation is not None
+            and not isinstance(
+                self.teacher_confirmation,
+                TeacherValidationConfirmation,
+            )
+        ):
+            raise TypeError(
+                "teacher_confirmation must be "
+                "TeacherValidationConfirmation or None"
+            )
 
 
 @dataclass(frozen=True)
@@ -151,7 +218,8 @@ class AssessmentExamGenerationResult:
     exam_version_id: str
     blueprint_version_id: str
     state: ExamGenerationState
-    validation_report: AssessmentValidationReport
+    validation_report: AssessmentValidationReport | ValidationResult
+    teacher_confirmation: TeacherValidationConfirmation | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -179,14 +247,24 @@ class AssessmentExamGenerationResult:
             raise TypeError(
                 "state must be ExamGenerationState"
             )
-        if not isinstance(
-            self.validation_report,
-            AssessmentValidationReport,
+        _canonical_validation_result(self.validation_report)
+        if (
+            self.teacher_confirmation is not None
+            and not isinstance(
+                self.teacher_confirmation,
+                TeacherValidationConfirmation,
+            )
         ):
             raise TypeError(
-                "validation_report must be "
-                "AssessmentValidationReport"
+                "teacher_confirmation must be "
+                "TeacherValidationConfirmation or None"
             )
+
+    @property
+    def canonical_validation_result(self) -> ValidationResult:
+        return _canonical_validation_result(
+            self.validation_report
+        )
 
 
 
@@ -375,8 +453,9 @@ class AssessmentExamGenerationService:
         report = self._gateway.validate_exam_version(
             exam_version_id=draft.exam_version_id,
         )
+        canonical_result = _canonical_validation_result(report)
 
-        if not report.is_valid:
+        if canonical_result.blocked:
             return AssessmentExamGenerationResult(
                 exam_id=draft.exam_id,
                 exam_version_id=draft.exam_version_id,
@@ -388,6 +467,27 @@ class AssessmentExamGenerationService:
                 ),
                 validation_report=report,
             )
+
+        accepted_confirmation = None
+        if canonical_result.requires_teacher_confirmation:
+            confirmation = request.teacher_confirmation
+            if (
+                confirmation is None
+                or confirmation.teacher_user_id
+                != request.owner_user_id
+                or confirmation.confirmed_warnings
+                != canonical_result.warnings
+            ):
+                return AssessmentExamGenerationResult(
+                    exam_id=draft.exam_id,
+                    exam_version_id=draft.exam_version_id,
+                    blueprint_version_id=(
+                        blueprint.blueprint_version_id
+                    ),
+                    state=ExamGenerationState.DRAFT,
+                    validation_report=report,
+                )
+            accepted_confirmation = confirmation
 
         state = ExamGenerationState.READY_FOR_REVIEW
 
@@ -405,4 +505,5 @@ class AssessmentExamGenerationService:
             ),
             state=state,
             validation_report=report,
+            teacher_confirmation=accepted_confirmation,
         )
