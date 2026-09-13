@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Mapping
 from uuid import UUID
 
@@ -12,6 +12,26 @@ from assessment_generation_v2.adapters import (
 from assessment_generation_v2.services import (
     AssessmentExamGenerationRequest,
     AssessmentExamGenerationService,
+    TeacherValidationConfirmation,
+    ValidationStatus,
+)
+
+
+_RESULT_KEY = "assessment_exam_generation_result"
+_PENDING_REQUEST_KEY = (
+    "assessment_exam_generation_pending_warning_request"
+)
+_PENDING_RESULT_KEY = (
+    "assessment_exam_generation_pending_warning_result"
+)
+_PENDING_OWNER_KEY = (
+    "assessment_exam_generation_pending_warning_owner_user_id"
+)
+_ACKNOWLEDGEMENT_KEY = (
+    "assessment_exam_generation_warning_acknowledged"
+)
+_CONFIRMATION_ACCEPTED_KEY = (
+    "assessment_exam_generation_warning_confirmation_accepted"
 )
 
 
@@ -171,6 +191,51 @@ def _default_service(*, client: Any, user_id: str):
     return AssessmentExamGenerationService(gateway=gateway)
 
 
+def _clear_pending_warning_state(st: Any) -> None:
+    for key in (
+        _PENDING_REQUEST_KEY,
+        _PENDING_RESULT_KEY,
+        _PENDING_OWNER_KEY,
+        _ACKNOWLEDGEMENT_KEY,
+    ):
+        st.session_state.pop(key, None)
+
+
+def _render_generation_result(
+    *,
+    st: Any,
+    result: Any,
+    confirmation_accepted: bool = False,
+) -> None:
+    canonical = result.canonical_validation_result
+
+    if canonical.status is ValidationStatus.PASS:
+        st.success("Bản nháp đã được tạo và xác thực thành công.")
+    elif canonical.status is ValidationStatus.FAIL:
+        st.error("Không đạt — cần chỉnh sửa trước khi gửi duyệt")
+        for error in canonical.errors:
+            st.write(error)
+    else:
+        st.warning(
+            "Cảnh báo — cần giáo viên xác nhận\n\n"
+            "Kết quả này không phải Đạt (PASS) và cũng không phải "
+            "Không đạt (FAIL).\n"
+            "Bản nháp chưa được tiếp tục/gửi duyệt."
+        )
+        for warning in canonical.warnings:
+            st.write(warning)
+        if confirmation_accepted:
+            st.success(
+                "Giáo viên đã xác nhận cảnh báo; hệ thống đã chấp nhận "
+                "xác nhận và hoàn tất bước tiếp tục theo yêu cầu."
+            )
+
+    st.caption(f"Trạng thái tạo đề: {result.state.value}.")
+    st.caption(f"Exam version ID: {result.exam_version_id}")
+    if canonical.metrics:
+        st.json(dict(canonical.metrics))
+
+
 def render_assessment_exam_generation_page(
     *,
     st: Any,
@@ -255,41 +320,112 @@ def render_assessment_exam_generation_page(
             use_container_width=True,
         )
 
-    if not submitted:
+    if submitted:
+        _clear_pending_warning_state(st)
+        st.session_state.pop(_RESULT_KEY, None)
+        st.session_state.pop(_CONFIRMATION_ACCEPTED_KEY, None)
+        try:
+            request = AssessmentExamGenerationRequest(
+                blueprint_code=selected.blueprint_code,
+                owner_user_id=user_id,
+                exam_code=exam_code,
+                title=title,
+                submit_for_review=submit_for_review,
+                idempotency_key=idempotency_key,
+            )
+            result = service_factory(
+                client=client,
+                user_id=user_id,
+            ).generate(request=request)
+        except Exception as error:
+            _clear_pending_warning_state(st)
+            st.error(f"Không thể tạo bản nháp đề: {error}")
+            return
+
+        st.session_state[_RESULT_KEY] = result
+        canonical = result.canonical_validation_result
+        if canonical.status is ValidationStatus.WARNING:
+            st.session_state[_PENDING_REQUEST_KEY] = request
+            st.session_state[_PENDING_RESULT_KEY] = result
+            st.session_state[_PENDING_OWNER_KEY] = user_id
+
+    result = st.session_state.get(_RESULT_KEY)
+    if result is None:
         return
 
-    try:
-        request = AssessmentExamGenerationRequest(
-            blueprint_code=selected.blueprint_code,
-            owner_user_id=user_id,
-            exam_code=exam_code,
-            title=title,
-            submit_for_review=submit_for_review,
-            idempotency_key=idempotency_key,
+    _render_generation_result(
+        st=st,
+        result=result,
+        confirmation_accepted=st.session_state.get(
+            _CONFIRMATION_ACCEPTED_KEY,
+            False,
+        ),
+    )
+
+    original_request = st.session_state.get(_PENDING_REQUEST_KEY)
+    pending_result = st.session_state.get(_PENDING_RESULT_KEY)
+    stored_owner_user_id = st.session_state.get(_PENDING_OWNER_KEY)
+    if original_request is None or pending_result is None:
+        return
+
+    if (
+        user_id != original_request.owner_user_id
+        or stored_owner_user_id != original_request.owner_user_id
+    ):
+        _clear_pending_warning_state(st)
+        st.session_state.pop(_CONFIRMATION_ACCEPTED_KEY, None)
+        st.error(
+            "Tài khoản đã xác thực đã thay đổi. Xác nhận cảnh báo cũ "
+            "không còn hợp lệ; vui lòng tạo lại yêu cầu."
         )
-        result = service_factory(
+        return
+
+    acknowledged = st.checkbox(
+        "Tôi đã đọc và chấp nhận các cảnh báo trên",
+        value=False,
+        key=_ACKNOWLEDGEMENT_KEY,
+    )
+    confirm_requested = st.button(
+        "Xác nhận cảnh báo và tiếp tục",
+        type="primary",
+    )
+    if not confirm_requested:
+        return
+    if not acknowledged:
+        st.warning(
+            "Vui lòng đánh dấu xác nhận đã đọc cảnh báo trước khi tiếp tục."
+        )
+        return
+
+    current_canonical = pending_result.canonical_validation_result
+    confirmation = TeacherValidationConfirmation(
+        teacher_user_id=user_id,
+        confirmed_warnings=current_canonical.warnings,
+    )
+    retry_request = replace(
+        original_request,
+        teacher_confirmation=confirmation,
+    )
+    try:
+        retry_result = service_factory(
             client=client,
             user_id=user_id,
-        ).generate(request=request)
+        ).generate(request=retry_request)
     except Exception as error:
-        st.session_state.pop("assessment_generation_result", None)
-        st.error(f"Không thể tạo bản nháp đề: {error}")
+        _clear_pending_warning_state(st)
+        st.session_state.pop(_CONFIRMATION_ACCEPTED_KEY, None)
+        st.error(f"Không thể tiếp tục sau khi xác nhận cảnh báo: {error}")
         return
 
-    st.session_state["assessment_generation_result"] = result
-    if result.validation_report.is_valid:
-        st.success(
-            "Bản nháp đã được tạo và xác thực thành công. "
-            f"Trạng thái: {result.state.value}."
-        )
-    else:
-        st.warning(
-            "Bản nháp đã được tạo nhưng cần sửa trước "
-            "khi gửi duyệt."
-        )
-        for violation in result.validation_report.violations:
-            st.write(f"- {violation}")
-
-    st.caption(f"Exam version ID: {result.exam_version_id}")
-    if result.validation_report.metrics:
-        st.json(dict(result.validation_report.metrics))
+    st.session_state[_RESULT_KEY] = retry_result
+    st.session_state[_CONFIRMATION_ACCEPTED_KEY] = (
+        retry_result.teacher_confirmation is not None
+    )
+    _clear_pending_warning_state(st)
+    _render_generation_result(
+        st=st,
+        result=retry_result,
+        confirmation_accepted=st.session_state[
+            _CONFIRMATION_ACCEPTED_KEY
+        ],
+    )
