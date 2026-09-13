@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -8,6 +9,10 @@ import pytest
 from assessment_generation_v2.adapters.supabase_exam_generation_gateway import (
     AssessmentGatewayResponseError,
     SupabaseAssessmentExamGenerationGateway,
+)
+from assessment_generation_v2.services.assessment_foundation import (
+    ValidationResult,
+    ValidationStatus,
 )
 from assessment_generation_v2.services.exam_generation_service import (
     AssessmentExamGenerationRequest,
@@ -22,6 +27,9 @@ EXAM_ID = "33333333-3333-4333-8333-333333333333"
 EXAM_VERSION_ID = (
     "44444444-4444-4444-8444-444444444444"
 )
+EVIDENCE_ID = "55555555-5555-4555-8555-555555555555"
+VALIDATION_INPUT_DIGEST = "a" * 64
+EVIDENCE_DIGEST = "b" * 64
 
 
 @dataclass
@@ -191,6 +199,7 @@ class FakeClient:
                     "expected_score": 10,
                 },
             },
+            "confirm_assessment_exam_validation_warnings": None,
             "submit_assessment_exam_for_review": None,
         }
         self.table_calls: list[
@@ -246,6 +255,42 @@ def _request(
         title="Kiem tra giua hoc ky I mon Toan 6",
         submit_for_review=True,
         idempotency_key="teacher-1-toan6-ghk1-001",
+    )
+
+
+def _canonical_payload(
+    *,
+    status: object = "PASS",
+    errors: object = None,
+    warnings: object = None,
+    metrics: object = None,
+    include_evidence: bool = True,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "status": status,
+        "errors": [] if errors is None else errors,
+        "warnings": [] if warnings is None else warnings,
+        "metrics": {} if metrics is None else metrics,
+    }
+    if include_evidence:
+        payload.update(
+            {
+                "validation_evidence_id": EVIDENCE_ID,
+                "validation_input_digest": VALIDATION_INPUT_DIGEST,
+                "evidence_digest": EVIDENCE_DIGEST,
+                "validation_schema_version": 1,
+                "validated_at": "2026-09-13T10:00:00+07:00",
+            }
+        )
+    return payload
+
+
+def _validate_payload(payload: dict[str, object]) -> object:
+    client = FakeClient()
+    client.rpc_data["assessment_exam_validation_report"] = payload
+    gateway, _ = _gateway(client)
+    return gateway.validate_exam_version(
+        exam_version_id=EXAM_VERSION_ID
     )
 
 
@@ -434,6 +479,253 @@ def test_validation_report_maps_rpc_payload() -> None:
     assert client.rpc_calls[0][0] == (
         "assessment_exam_validation_report"
     )
+
+
+def test_legacy_fail_validation_report_is_unchanged() -> None:
+    report = _validate_payload(
+        {
+            "is_valid": False,
+            "violations": ["First failure.", "Second failure."],
+            "metrics": {"failure_count": 2},
+        }
+    )
+
+    assert report.is_valid is False
+    assert report.violations == (
+        "First failure.",
+        "Second failure.",
+    )
+    assert report.metrics == {"failure_count": 2}
+
+
+@pytest.mark.parametrize(
+    ("status", "errors", "warnings"),
+    (
+        ("PASS", [], []),
+        ("FAIL", ["Canonical failure."], []),
+        (
+            "WARNING",
+            [],
+            ["First warning.", "Second warning."],
+        ),
+    ),
+)
+def test_canonical_validation_preserves_status_messages_and_evidence(
+    status: str,
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    result = _validate_payload(
+        _canonical_payload(
+            status=status,
+            errors=errors,
+            warnings=warnings,
+            metrics={"question_count": 26},
+        )
+    )
+
+    assert isinstance(result, ValidationResult)
+    assert result.status is ValidationStatus(status)
+    assert result.errors == tuple(errors)
+    assert result.warnings == tuple(warnings)
+    assert result.metrics == {"question_count": 26}
+    assert result.evidence_identity is not None
+    assert result.evidence_identity.validation_evidence_id == EVIDENCE_ID
+    assert result.evidence_identity.validation_input_digest == (
+        VALIDATION_INPUT_DIGEST
+    )
+    assert result.evidence_identity.evidence_digest == EVIDENCE_DIGEST
+    assert result.evidence_identity.validation_schema_version == 1
+
+
+def test_canonical_validation_allows_absent_evidence_identity() -> None:
+    result = _validate_payload(
+        _canonical_payload(include_evidence=False)
+    )
+
+    assert isinstance(result, ValidationResult)
+    assert result.evidence_identity is None
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    (
+        "validation_evidence_id",
+        "validation_input_digest",
+        "evidence_digest",
+        "validation_schema_version",
+        "validated_at",
+    ),
+)
+def test_partial_canonical_evidence_identity_is_rejected(
+    missing_field: str,
+) -> None:
+    payload = _canonical_payload()
+    del payload[missing_field]
+
+    with pytest.raises(AssessmentGatewayResponseError):
+        _validate_payload(payload)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    (
+        ("validation_evidence_id", "not-a-uuid"),
+        ("validation_input_digest", "A" * 64),
+        ("evidence_digest", "b" * 63),
+        ("validation_schema_version", 0),
+        ("validation_schema_version", True),
+    ),
+)
+def test_invalid_canonical_evidence_value_is_gateway_error(
+    field_name: str,
+    invalid_value: object,
+) -> None:
+    payload = _canonical_payload()
+    payload[field_name] = invalid_value
+
+    with pytest.raises(AssessmentGatewayResponseError):
+        _validate_payload(payload)
+
+
+@pytest.mark.parametrize("status", ("UNKNOWN", "pass", " PASS", 1))
+def test_invalid_canonical_status_is_gateway_error(status: object) -> None:
+    with pytest.raises(AssessmentGatewayResponseError):
+        _validate_payload(_canonical_payload(status=status))
+
+
+@pytest.mark.parametrize(
+    ("status", "errors", "warnings"),
+    (
+        ("PASS", ["Unexpected error."], []),
+        ("PASS", [], ["Unexpected warning."]),
+        ("WARNING", ["Unexpected error."], ["Warning."]),
+        ("WARNING", [], []),
+        ("FAIL", [], []),
+    ),
+)
+def test_invalid_canonical_status_message_state_is_gateway_error(
+    status: str,
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    with pytest.raises(AssessmentGatewayResponseError):
+        _validate_payload(
+            _canonical_payload(
+                status=status,
+                errors=errors,
+                warnings=warnings,
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    (
+        ("errors", "not-a-list"),
+        ("warnings", ("not", "a", "list")),
+        ("metrics", []),
+    ),
+)
+def test_invalid_canonical_collection_type_is_gateway_error(
+    field_name: str,
+    invalid_value: object,
+) -> None:
+    payload = _canonical_payload()
+    payload[field_name] = invalid_value
+
+    with pytest.raises(AssessmentGatewayResponseError):
+        _validate_payload(payload)
+
+
+def test_canonical_aware_offset_timestamp_is_preserved() -> None:
+    result = _validate_payload(_canonical_payload())
+
+    assert isinstance(result, ValidationResult)
+    assert result.evidence_identity is not None
+    assert result.evidence_identity.validated_at.utcoffset() == timedelta(
+        hours=7
+    )
+
+
+def test_canonical_z_timestamp_is_aware() -> None:
+    payload = _canonical_payload()
+    payload["validated_at"] = "2026-09-13T03:00:00Z"
+
+    result = _validate_payload(payload)
+
+    assert isinstance(result, ValidationResult)
+    assert result.evidence_identity is not None
+    assert result.evidence_identity.validated_at.utcoffset() == timedelta(0)
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    (
+        "2026-09-13T10:00:00",
+        "not-a-timestamp",
+        "",
+        None,
+    ),
+)
+def test_invalid_canonical_timestamp_is_gateway_error(
+    timestamp: object,
+) -> None:
+    payload = _canonical_payload()
+    payload["validated_at"] = timestamp
+
+    with pytest.raises(AssessmentGatewayResponseError):
+        _validate_payload(payload)
+
+
+def test_canonical_marker_wins_over_legacy_aliases() -> None:
+    payload = _canonical_payload(
+        status="FAIL",
+        errors=["Canonical failure."],
+    )
+    payload.update({"is_valid": True, "violations": []})
+
+    result = _validate_payload(payload)
+
+    assert isinstance(result, ValidationResult)
+    assert result.status is ValidationStatus.FAIL
+
+
+def test_zero_canonical_markers_uses_legacy_parser() -> None:
+    result = _validate_payload(
+        {
+            "is_valid": True,
+            "violations": [],
+            "metrics": {},
+            "unknown_field": "ignored",
+        }
+    )
+
+    assert result.is_valid is True
+
+
+def test_confirmation_rpc_uses_exact_payload_and_warning_order() -> None:
+    gateway, client = _gateway()
+
+    gateway.confirm_validation_warnings(
+        exam_version_id=EXAM_VERSION_ID,
+        validation_evidence_digest=EVIDENCE_DIGEST,
+        confirmed_warnings=("First warning.", "Second warning."),
+    )
+
+    assert client.rpc_calls == [
+        (
+            "confirm_assessment_exam_validation_warnings",
+            {
+                "target_exam_version_id": EXAM_VERSION_ID,
+                "target_validation_evidence_digest": EVIDENCE_DIGEST,
+                "target_confirmed_warnings": [
+                    "First warning.",
+                    "Second warning.",
+                ],
+            },
+        )
+    ]
 
 
 def test_invalid_validation_contract_is_rejected() -> None:
