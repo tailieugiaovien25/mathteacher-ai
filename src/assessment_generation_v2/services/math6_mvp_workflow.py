@@ -18,6 +18,14 @@ from json import dumps, loads
 from typing import Iterable, Mapping
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
+from assessment_generation_v2.services.assessment_foundation import (
+    AssessmentConfig,
+    AssessmentSpecification,
+    AssessmentStructure,
+    CompetencyRequirement,
+    QuestionRequirement,
+    validate_math_assessment_config,
+)
 from assessment_generation_v2.services.blueprint_requirement_link_service import (
     BlueprintRequirementAssignment,
 )
@@ -143,6 +151,26 @@ class Math6AssessmentConfig:
             _positive_int(self.variant_count, "variant_count"),
         )
 
+    def to_canonical(self) -> AssessmentConfig:
+        """Project the legacy Math6 config without changing its constructor."""
+
+        return validate_math_assessment_config(
+            AssessmentConfig(
+                config_code=self.config_code,
+                title=self.title,
+                subject_code="MATH",
+                grade_level=6,
+                academic_year=self.academic_year,
+                semester=self.semester,
+                test_type=self.test_type,
+                duration_minutes=self.duration_minutes,
+                total_score=self.total_score,
+                variant_count=self.variant_count,
+            )
+        )
+
+    as_assessment_config = to_canonical
+
 
 @dataclass(frozen=True, slots=True)
 class Math6Question:
@@ -177,6 +205,53 @@ class Math6Blueprint:
     review_status: str = DRAFT
     locked: bool = False
     review_note: str = ""
+
+    def to_canonical(
+        self,
+        *,
+        config: AssessmentConfig,
+        competency_requirements: Iterable[CompetencyRequirement],
+        question_requirements: Iterable[QuestionRequirement],
+        specification_code: str | None = None,
+    ) -> AssessmentSpecification:
+        """Project governed Math6 blueprint data to the canonical contract."""
+
+        if config.config_code != self.config_code:
+            raise Math6MvpWorkflowError(
+                "canonical config must match blueprint config_code"
+            )
+        validate_math_assessment_config(config)
+        requirements = tuple(competency_requirements)
+        selection = CanonicalAssessmentSelection(
+            subject_code=config.subject_code,
+            grade_level=config.grade_level,
+            program_code=self.canonical_program_code,
+            selected_topic_codes=self.canonical_topic_codes,
+            selected_requirement_codes=self.canonical_requirement_codes,
+            selected_requirements=requirements,
+            finalized=True,
+        )
+        try:
+            return AssessmentSpecification(
+                specification_code=(
+                    specification_code or f"{self.blueprint_code}-SPEC"
+                ),
+                title=self.title,
+                config=config,
+                scope=selection,
+                structure=AssessmentStructure(self.matrix_sections),
+                cognitive_allocations=self.matrix_level_allocations,
+                competency_requirements=requirements,
+                requirement_assignments=self.requirement_assignments,
+                matrix_cells=self.matrix_cells,
+                question_requirements=tuple(question_requirements),
+            )
+        except (TypeError, ValueError) as error:
+            raise Math6MvpWorkflowError(
+                f"cannot project canonical specification: {error}"
+            ) from error
+
+    as_assessment_specification = to_canonical
 
 
 @dataclass(frozen=True, slots=True)
@@ -879,3 +954,10 @@ class InMemoryMath6MvpWorkflow:
             raise Math6MvpWorkflowError(
                 f"unknown exam: {normalized}"
             ) from error
+
+
+# Additive descriptive aliases; legacy class identities and constructors remain.
+Math6AssessmentQuestion = Math6Question
+Math6AssessmentBlueprint = Math6Blueprint
+Math6AssessmentExam = Math6Exam
+Math6PublishedAssessmentPackage = Math6PublishedPackage
