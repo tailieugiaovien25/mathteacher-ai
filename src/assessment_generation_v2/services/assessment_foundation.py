@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from types import MappingProxyType
 from typing import Iterable, Mapping
+from uuid import UUID
 
 from assessment_generation_v2.services.assessment_curriculum_query_service import (
     AssessmentLearningRequirement,
@@ -60,6 +62,38 @@ def _positive_int(value: object, field_name: str) -> int:
         raise TypeError(f"{field_name} must be an integer")
     if value < 1:
         raise AssessmentFoundationError(f"{field_name} must be positive")
+    return value
+
+
+def _sha256_digest(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{field_name} must be a string")
+    if len(value) != 64 or any(
+        character not in "0123456789abcdef" for character in value
+    ):
+        raise AssessmentFoundationError(
+            f"{field_name} must be a lowercase hexadecimal SHA-256 digest"
+        )
+    return value
+
+
+def _uuid(value: object, field_name: str) -> str:
+    normalized = _text(value, field_name)
+    try:
+        return str(UUID(normalized))
+    except ValueError as error:
+        raise AssessmentFoundationError(
+            f"{field_name} must be a valid UUID"
+        ) from error
+
+
+def _aware_datetime(value: object, field_name: str) -> datetime:
+    if not isinstance(value, datetime):
+        raise TypeError(f"{field_name} must be a datetime")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise AssessmentFoundationError(
+            f"{field_name} must be timezone-aware"
+        )
     return value
 
 
@@ -436,15 +470,68 @@ class ValidationStatus(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class ValidationEvidenceIdentity:
+    validation_evidence_id: str
+    validation_input_digest: str
+    evidence_digest: str
+    validation_schema_version: int
+    validated_at: datetime
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "validation_evidence_id",
+            _uuid(self.validation_evidence_id, "validation_evidence_id"),
+        )
+        object.__setattr__(
+            self,
+            "validation_input_digest",
+            _sha256_digest(
+                self.validation_input_digest,
+                "validation_input_digest",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "evidence_digest",
+            _sha256_digest(self.evidence_digest, "evidence_digest"),
+        )
+        object.__setattr__(
+            self,
+            "validation_schema_version",
+            _positive_int(
+                self.validation_schema_version,
+                "validation_schema_version",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "validated_at",
+            _aware_datetime(self.validated_at, "validated_at"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ValidationResult:
     status: ValidationStatus
     errors: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     metrics: Mapping[str, object] | None = None
+    evidence_identity: ValidationEvidenceIdentity | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.status, ValidationStatus):
             raise TypeError("status must be ValidationStatus")
+        if (
+            self.evidence_identity is not None
+            and not isinstance(
+                self.evidence_identity,
+                ValidationEvidenceIdentity,
+            )
+        ):
+            raise TypeError(
+                "evidence_identity must be ValidationEvidenceIdentity or None"
+            )
         errors = self._messages(self.errors, "errors")
         warnings = self._messages(self.warnings, "warnings")
         if self.status is ValidationStatus.PASS and (errors or warnings):
@@ -540,6 +627,7 @@ __all__ = [
     "MathAssessmentPolicyError",
     "MatrixCell",
     "QuestionRequirement",
+    "ValidationEvidenceIdentity",
     "ValidationResult",
     "ValidationSemanticsLossError",
     "ValidationStatus",
