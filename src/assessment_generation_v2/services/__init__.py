@@ -29,6 +29,7 @@ from assessment_generation_v2.services.exam_generation_service import (
     AssessmentGenerationValidationError,
     AssessmentValidationReport,
     ExamGenerationState,
+    TeacherValidationConfirmation,
 )
 from assessment_generation_v2.services.assessment_document_export_service import (
     ApprovedAssessmentTemplate,
@@ -88,6 +89,7 @@ __all__ = [
     "QuestionRequirement",
     "RenderedAssessmentDocument",
     "SupabaseAssessmentRuntimeReadinessService",
+    "TeacherValidationConfirmation",
     "ValidationResult",
     "ValidationSemanticsLossError",
     "ValidationStatus",

@@ -4,6 +4,10 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
+from assessment_generation_v2.services.assessment_foundation import (
+    ValidationResult,
+    ValidationStatus,
+)
 from assessment_generation_v2.services.exam_generation_service import (
     AssessmentBlueprintSelection,
     AssessmentBlueprintUnavailableError,
@@ -13,6 +17,7 @@ from assessment_generation_v2.services.exam_generation_service import (
     AssessmentGenerationValidationError,
     AssessmentValidationReport,
     ExamGenerationState,
+    TeacherValidationConfirmation,
 )
 
 
@@ -28,7 +33,7 @@ class FakeAssessmentGenerationGateway:
     def __init__(
         self,
         *,
-        report: AssessmentValidationReport | None = None,
+        report: AssessmentValidationReport | ValidationResult | None = None,
         blueprint: AssessmentBlueprintSelection | None = None,
     ) -> None:
         self.report = report or AssessmentValidationReport(
@@ -79,7 +84,7 @@ class FakeAssessmentGenerationGateway:
         self,
         *,
         exam_version_id: str,
-    ) -> AssessmentValidationReport:
+    ) -> AssessmentValidationReport | ValidationResult:
         self.calls.append("validate")
         return self.report
 
@@ -94,6 +99,7 @@ class FakeAssessmentGenerationGateway:
 def _request(
     *,
     submit_for_review: bool = True,
+    teacher_confirmation: TeacherValidationConfirmation | None = None,
 ) -> AssessmentExamGenerationRequest:
     return AssessmentExamGenerationRequest(
         blueprint_code="TOAN6_GIUA_HK1",
@@ -102,6 +108,15 @@ def _request(
         title="Kiá»ƒm tra giá»¯a há»c ká»³ I mÃ´n ToÃ¡n 6",
         submit_for_review=submit_for_review,
         idempotency_key="teacher-1-toan6-ghk1-001",
+        teacher_confirmation=teacher_confirmation,
+    )
+
+
+def _warning_result() -> ValidationResult:
+    return ValidationResult(
+        status=ValidationStatus.WARNING,
+        warnings=("Review the score distribution.",),
+        metrics={"total_score": 10, "warning_count": 1},
     )
 
 
@@ -158,6 +173,199 @@ def test_invalid_exam_stops_before_variant_generation() -> None:
         is ExamGenerationState.REVISION_REQUIRED
     )
     assert "submit_review" not in gateway.calls
+
+
+def test_legacy_validation_evidence_remains_backward_compatible() -> None:
+    valid_report = AssessmentValidationReport(is_valid=True)
+    valid_result = AssessmentExamGenerationService(
+        gateway=FakeAssessmentGenerationGateway(report=valid_report)
+    ).generate(request=_request())
+
+    invalid_report = AssessmentValidationReport(
+        is_valid=False,
+        violations=("Invalid blueprint coverage.",),
+    )
+    invalid_gateway = FakeAssessmentGenerationGateway(
+        report=invalid_report
+    )
+    invalid_result = AssessmentExamGenerationService(
+        gateway=invalid_gateway
+    ).generate(request=_request())
+
+    assert valid_result.validation_report is valid_report
+    assert valid_result.validation_report.is_valid
+    assert valid_result.state is ExamGenerationState.PENDING_REVIEW
+    assert invalid_result.validation_report is invalid_report
+    assert not invalid_result.validation_report.is_valid
+    assert invalid_result.state is ExamGenerationState.REVISION_REQUIRED
+    assert "submit_review" not in invalid_gateway.calls
+
+
+def test_canonical_pass_continues_without_accepting_stale_confirmation() -> None:
+    report = ValidationResult(
+        status=ValidationStatus.PASS,
+        metrics={"total_score": 10},
+    )
+    confirmation = TeacherValidationConfirmation(
+        teacher_user_id=OWNER_ID,
+        confirmed_warnings=("Stale warning.",),
+    )
+    gateway = FakeAssessmentGenerationGateway(report=report)
+
+    result = AssessmentExamGenerationService(
+        gateway=gateway
+    ).generate(
+        request=_request(teacher_confirmation=confirmation)
+    )
+
+    assert result.state is ExamGenerationState.PENDING_REVIEW
+    assert result.validation_report is report
+    assert result.teacher_confirmation is None
+    assert "submit_review" in gateway.calls
+
+
+def test_canonical_warning_without_confirmation_stays_draft() -> None:
+    report = _warning_result()
+    gateway = FakeAssessmentGenerationGateway(report=report)
+
+    result = AssessmentExamGenerationService(
+        gateway=gateway
+    ).generate(request=_request())
+
+    assert result.state is ExamGenerationState.DRAFT
+    assert result.validation_report is report
+    assert result.validation_report.status is ValidationStatus.WARNING
+    assert result.teacher_confirmation is None
+    assert "submit_review" not in gateway.calls
+
+
+@pytest.mark.parametrize("submit_for_review", (False, True))
+def test_matching_warning_confirmation_continues_and_preserves_evidence(
+    submit_for_review: bool,
+) -> None:
+    report = _warning_result()
+    confirmation = TeacherValidationConfirmation(
+        teacher_user_id=OWNER_ID,
+        confirmed_warnings=("  Review the score distribution.  ",),
+    )
+    gateway = FakeAssessmentGenerationGateway(report=report)
+
+    result = AssessmentExamGenerationService(
+        gateway=gateway
+    ).generate(
+        request=_request(
+            submit_for_review=submit_for_review,
+            teacher_confirmation=confirmation,
+        )
+    )
+
+    expected_state = (
+        ExamGenerationState.PENDING_REVIEW
+        if submit_for_review
+        else ExamGenerationState.READY_FOR_REVIEW
+    )
+    assert result.state is expected_state
+    assert result.validation_report is report
+    assert result.validation_report.status is ValidationStatus.WARNING
+    assert result.validation_report.warnings == report.warnings
+    assert result.validation_report.metrics is report.metrics
+    assert result.teacher_confirmation is confirmation
+    assert ("submit_review" in gateway.calls) is submit_for_review
+
+
+@pytest.mark.parametrize(
+    "confirmation",
+    (
+        TeacherValidationConfirmation(
+            teacher_user_id="55555555-5555-4555-8555-555555555555",
+            confirmed_warnings=("Review the score distribution.",),
+        ),
+        TeacherValidationConfirmation(
+            teacher_user_id=OWNER_ID,
+            confirmed_warnings=("Different warning.",),
+        ),
+    ),
+)
+def test_mismatched_warning_confirmation_cannot_authorize(
+    confirmation: TeacherValidationConfirmation,
+) -> None:
+    gateway = FakeAssessmentGenerationGateway(report=_warning_result())
+
+    result = AssessmentExamGenerationService(
+        gateway=gateway
+    ).generate(
+        request=_request(teacher_confirmation=confirmation)
+    )
+
+    assert result.state is ExamGenerationState.DRAFT
+    assert result.teacher_confirmation is None
+    assert "submit_review" not in gateway.calls
+
+
+def test_canonical_fail_cannot_be_overridden_by_confirmation() -> None:
+    report = ValidationResult(
+        status=ValidationStatus.FAIL,
+        errors=("Blueprint coverage failed.",),
+        metrics={"total_score": 9},
+    )
+    confirmation = TeacherValidationConfirmation(
+        teacher_user_id=OWNER_ID,
+        confirmed_warnings=("Blueprint coverage failed.",),
+    )
+    gateway = FakeAssessmentGenerationGateway(report=report)
+
+    result = AssessmentExamGenerationService(
+        gateway=gateway
+    ).generate(
+        request=_request(teacher_confirmation=confirmation)
+    )
+
+    assert result.state is ExamGenerationState.REVISION_REQUIRED
+    assert result.validation_report is report
+    assert result.teacher_confirmation is None
+    assert "submit_review" not in gateway.calls
+
+
+def test_old_request_constructor_still_defaults_confirmation_to_none() -> None:
+    request = AssessmentExamGenerationRequest(
+        blueprint_code="TOAN6_GIUA_HK1",
+        owner_user_id=OWNER_ID,
+        exam_code="KT01",
+        title="Legacy request",
+        submit_for_review=False,
+        idempotency_key="legacy-request-1",
+    )
+
+    assert request.teacher_confirmation is None
+
+
+def test_canonical_validation_result_normalizes_legacy_and_preserves_canonical() -> None:
+    legacy_pass = AssessmentValidationReport(is_valid=True)
+    legacy_fail = AssessmentValidationReport(
+        is_valid=False,
+        violations=("Invalid coverage.",),
+    )
+    warning = _warning_result()
+
+    pass_result = AssessmentExamGenerationService(
+        gateway=FakeAssessmentGenerationGateway(report=legacy_pass)
+    ).generate(request=_request(submit_for_review=False))
+    fail_result = AssessmentExamGenerationService(
+        gateway=FakeAssessmentGenerationGateway(report=legacy_fail)
+    ).generate(request=_request())
+    warning_result = AssessmentExamGenerationService(
+        gateway=FakeAssessmentGenerationGateway(report=warning)
+    ).generate(request=_request())
+
+    assert (
+        pass_result.canonical_validation_result.status
+        is ValidationStatus.PASS
+    )
+    assert (
+        fail_result.canonical_validation_result.status
+        is ValidationStatus.FAIL
+    )
+    assert warning_result.canonical_validation_result is warning
 
 
 def test_missing_blueprint_is_rejected() -> None:
