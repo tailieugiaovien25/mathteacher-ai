@@ -16,6 +16,10 @@ from portal_v2.authorization import (
     SupabaseTrustedPortalRoleSource,
     build_portal_authorization_context,
 )
+from portal_v2.authorization.supabase_session_guard import (
+    PortalSessionValidationError,
+    validate_supabase_portal_session,
+)
 from portal_v2.ui import render_admin_shell
 from portal_v2.ui.user_registration_streamlit import render_user_registration
 from portal_v2.ui.teacher_workspace_styles import apply_teacher_workspace_styles
@@ -948,6 +952,37 @@ def main() -> None:
             settings,
         )
         return
+
+    # P3A: a cached Streamlit session marker is not proof that Supabase Auth
+    # still accepts the session. Validate identity with the Auth server and
+    # re-resolve the trusted database role before rendering any protected UI.
+    try:
+        validated_session = validate_supabase_portal_session(
+            client=client,
+            expected_user_id=str(user_id),
+        )
+    except PortalSessionValidationError:
+        try:
+            client.auth.sign_out()
+        except Exception:
+            pass
+        clear_portal_session(
+            st.session_state
+        )
+        st.warning(
+            "Phi??n ????ng nh???p kh??ng c??n h???p l??? ho???c quy???n truy c???p "
+            "???? thay ?????i. Vui l??ng ????ng nh???p l???i."
+        )
+        render_login(
+            st,
+            settings,
+        )
+        return
+
+    user_id = validated_session.user_id
+    st.session_state["portal_user_id"] = validated_session.user_id
+    st.session_state["portal_user_email"] = validated_session.email
+    st.session_state["portal_user_role"] = validated_session.role
 
     # Rebind feature adapters on every authenticated rerun.
     # Streamlit can retain old Python objects in session_state
