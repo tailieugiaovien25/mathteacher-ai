@@ -970,8 +970,10 @@ def main() -> None:
             st.session_state
         )
         st.warning(
-            "Phi??n ????ng nh???p kh??ng c??n h???p l??? ho???c quy???n truy c???p "
-            "???? thay ?????i. Vui l??ng ????ng nh???p l???i."
+            "Phi\u00ean \u0111\u0103ng nh\u1eadp kh\u00f4ng c\u00f2n "
+            "h\u1ee3p l\u1ec7 ho\u1eb7c quy\u1ec1n truy c\u1eadp "
+            "\u0111\u00e3 thay \u0111\u1ed5i. Vui l\u00f2ng "
+            "\u0111\u0103ng nh\u1eadp l\u1ea1i."
         )
         render_login(
             st,
