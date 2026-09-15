@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import sys
 from hashlib import sha256
 from io import BytesIO
@@ -16,7 +17,19 @@ from assessment_generation_v2.services.math6_mvp_workflow import (
     APPROVED,
     PENDING_REVIEW,
     InMemoryMath6MvpWorkflow,
+    Math6AssessmentConfig,
     Math6MvpWorkflowError,
+)
+from assessment_generation_v2.services.blueprint_requirement_link_service import (
+    BlueprintRequirementAssignment,
+)
+from assessment_generation_v2.services.canonical_assessment_selection_service import (
+    CanonicalAssessmentSelection,
+)
+from assessment_generation_v2.services.assessment_matrix_cell_authoring import (
+    AssessmentProfileSectionOption,
+    CognitiveLevelOption,
+    ProfileLevelAllocation,
 )
 from portal_v2.ui.math6_mvp_demo_streamlit import (
     parse_question_import_json,
@@ -68,12 +81,45 @@ def test_math6_mvp_vertical_slice_reaches_locked_zip() -> None:
     _seed_questions(workflow)
     assert not workflow.question_review_queue
 
+    assessment_config = Math6AssessmentConfig(
+        config_code="M6-MIDTERM-2026-HK1",
+        title="Kiểm tra giữa học kỳ I - Toán 6",
+        academic_year="2026-2027",
+        semester="HK1",
+        test_type="MIDTERM",
+        duration_minutes=90,
+        total_score="2",
+        variant_count=2,
+    )
     workflow.create_blueprint(
         blueprint_code="M6-BP-001",
         title="Ma trận Toán 6 tối thiểu",
+        assessment_config=assessment_config,
         question_count=2,
         total_score="2",
         topic_codes=("M6-NATURAL-NUMBERS",),
+    )
+    canonical_selection = CanonicalAssessmentSelection(
+        subject_code="MATH",
+        grade_level=6,
+        program_code="CT2018-MATH",
+        selected_topic_codes=("CURR-NODE-MATH-G6-003",),
+        selected_requirement_codes=("YCCD-MATH-06-0001",),
+        finalized=True,
+    )
+    workflow.bind_canonical_coverage(
+        "M6-BP-001",
+        selection=canonical_selection,
+        assignments=(
+            BlueprintRequirementAssignment(
+                requirement_code="YCCD-MATH-06-0001",
+                coverage_role="PRIMARY",
+                target_question_count=2,
+                sequence_number=10,
+                target_score="2",
+                specification_note="Ph?m vi MVP To?n 6",
+            ),
+        ),
     )
     workflow.submit_blueprint("M6-BP-001")
     assert len(workflow.blueprint_review_queue) == 1
@@ -82,6 +128,7 @@ def test_math6_mvp_vertical_slice_reaches_locked_zip() -> None:
     )
     assert blueprint.review_status == APPROVED
     assert blueprint.locked
+    assert blueprint.config_code == assessment_config.config_code
     assert not workflow.blueprint_review_queue
 
     exam = workflow.generate_exam(
@@ -100,6 +147,24 @@ def test_math6_mvp_vertical_slice_reaches_locked_zip() -> None:
     assert published.snapshot_hash == sha256(
         published.snapshot_json.encode("utf-8")
     ).hexdigest()
+    assert (
+        published.snapshot()["blueprint"]["config_code"]
+        == assessment_config.config_code
+    )
+    canonical_coverage = published.snapshot()["blueprint"][
+        "canonical_coverage"
+    ]
+    assert canonical_coverage["subject_code"] == "MATH"
+    assert canonical_coverage["program_code"] == "CT2018-MATH"
+    assert canonical_coverage["topic_codes"] == [
+        "CURR-NODE-MATH-G6-003"
+    ]
+    assert canonical_coverage["requirement_codes"] == [
+        "YCCD-MATH-06-0001"
+    ]
+    assert canonical_coverage["requirement_assignments"][0][
+        "target_score"
+    ] == "2"
 
     bundle = workflow.export_zip(exam.exam_code)
     assert bundle.startswith(b"PK")
@@ -208,3 +273,339 @@ def test_streamlit_status_tracks_guarded_workflow_transitions() -> None:
     ready = workflow_status(workflow)
     assert ready["question_locked"] == 2
     assert ready["can_create_blueprint"] is True
+
+
+def test_math6_assessment_config_normalizes_core_fields() -> None:
+    config = Math6AssessmentConfig(
+        config_code="m6-midterm-2026-hk1",
+        title="Math 6 midterm",
+        academic_year="2026-2027",
+        semester="hk1",
+        test_type="midterm",
+        duration_minutes="90",
+        total_score="10",
+        variant_count="2",
+    )
+    assert config.config_code == "M6-MIDTERM-2026-HK1"
+    assert config.title == "Math 6 midterm"
+    assert config.academic_year == "2026-2027"
+    assert config.semester == "HK1"
+    assert config.test_type == "MIDTERM"
+    assert config.duration_minutes == 90
+    assert str(config.total_score) == "10"
+    assert config.variant_count == 2
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    (
+        ("config_code", ""),
+        ("title", " "),
+        ("academic_year", ""),
+        ("semester", ""),
+        ("test_type", ""),
+        ("duration_minutes", 0),
+        ("duration_minutes", "1.5"),
+        ("total_score", 0),
+        ("variant_count", 0),
+        ("variant_count", False),
+    ),
+)
+def test_math6_assessment_config_rejects_invalid_values(
+    field_name: str,
+    invalid_value: object,
+) -> None:
+    values = {
+        "config_code": "M6-MIDTERM-2026-HK1",
+        "title": "Math 6 midterm",
+        "academic_year": "2026-2027",
+        "semester": "HK1",
+        "test_type": "MIDTERM",
+        "duration_minutes": 90,
+        "total_score": "10",
+        "variant_count": 2,
+    }
+    values[field_name] = invalid_value
+    with pytest.raises(Math6MvpWorkflowError):
+        Math6AssessmentConfig(**values)
+
+
+
+def test_blueprint_requires_config_and_matching_total_score() -> None:
+    workflow = InMemoryMath6MvpWorkflow()
+    config = Math6AssessmentConfig(
+        config_code="M6-FINAL-2026-HK1",
+        title="Kiểm tra cuối học kỳ I - Toán 6",
+        academic_year="2026-2027",
+        semester="HK1",
+        test_type="FINAL",
+        duration_minutes=90,
+        total_score="10",
+        variant_count=2,
+    )
+
+    with pytest.raises(
+        Math6MvpWorkflowError,
+        match="assessment_config is required",
+    ):
+        workflow.create_blueprint(
+            blueprint_code="M6-BP-NO-CONFIG",
+            title="No config",
+            assessment_config=None,
+            question_count=2,
+            total_score="10",
+            topic_codes=("M6-NATURAL-NUMBERS",),
+        )
+
+    with pytest.raises(
+        Math6MvpWorkflowError,
+        match="blueprint total_score must match assessment config",
+    ):
+        workflow.create_blueprint(
+            blueprint_code="M6-BP-MISMATCH",
+            title="Score mismatch",
+            assessment_config=config,
+            question_count=2,
+            total_score="9",
+            topic_codes=("M6-NATURAL-NUMBERS",),
+        )
+
+    blueprint = workflow.create_blueprint(
+        blueprint_code="M6-BP-MATCH",
+        title="Score match",
+        assessment_config=config,
+        question_count=2,
+        total_score="10",
+        topic_codes=("M6-NATURAL-NUMBERS",),
+    )
+
+    assert blueprint.config_code == config.config_code
+    assert blueprint.total_score == config.total_score
+
+
+
+def test_blueprint_canonical_coverage_requires_finalized_matching_selection() -> None:
+    workflow = InMemoryMath6MvpWorkflow()
+    config = Math6AssessmentConfig(
+        config_code="M6-MIDTERM-CANONICAL",
+        title="Canonical coverage foundation",
+        academic_year="2026-2027",
+        semester="HK1",
+        test_type="MIDTERM",
+        duration_minutes=90,
+        total_score="10",
+        variant_count=2,
+    )
+    workflow.create_blueprint(
+        blueprint_code="M6-BP-CANONICAL",
+        title="Canonical blueprint foundation",
+        assessment_config=config,
+        question_count=2,
+        total_score="10",
+        topic_codes=("M6-NATURAL-NUMBERS",),
+    )
+
+    editing_selection = CanonicalAssessmentSelection(
+        subject_code="MATH",
+        grade_level=6,
+        program_code="CT2018-MATH",
+        selected_topic_codes=("CURR-NODE-MATH-G6-003",),
+        selected_requirement_codes=("YCCD-MATH-06-0001",),
+        finalized=False,
+    )
+    assignment = BlueprintRequirementAssignment(
+        requirement_code="YCCD-MATH-06-0001",
+        coverage_role="PRIMARY",
+        target_question_count=2,
+        sequence_number=10,
+        target_score="10",
+    )
+
+    with pytest.raises(
+        Math6MvpWorkflowError,
+        match="must be finalized",
+    ):
+        workflow.bind_canonical_coverage(
+            "M6-BP-CANONICAL",
+            selection=editing_selection,
+            assignments=(assignment,),
+        )
+
+    finalized = CanonicalAssessmentSelection(
+        subject_code="MATH",
+        grade_level=6,
+        program_code="CT2018-MATH",
+        selected_topic_codes=("CURR-NODE-MATH-G6-003",),
+        selected_requirement_codes=("YCCD-MATH-06-0001",),
+        finalized=True,
+    )
+    wrong_assignment = BlueprintRequirementAssignment(
+        requirement_code="YCCD-MATH-06-9999",
+        coverage_role="PRIMARY",
+        target_question_count=2,
+        sequence_number=10,
+        target_score="10",
+    )
+
+    with pytest.raises(
+        Math6MvpWorkflowError,
+        match="must match selection",
+    ):
+        workflow.bind_canonical_coverage(
+            "M6-BP-CANONICAL",
+            selection=finalized,
+            assignments=(wrong_assignment,),
+        )
+
+    updated = workflow.bind_canonical_coverage(
+        "M6-BP-CANONICAL",
+        selection=finalized,
+        assignments=(assignment,),
+    )
+    assert updated.canonical_subject_code == "MATH"
+    assert updated.canonical_program_code == "CT2018-MATH"
+    assert updated.canonical_topic_codes == (
+        "CURR-NODE-MATH-G6-003",
+    )
+    assert updated.canonical_requirement_codes == (
+        "YCCD-MATH-06-0001",
+    )
+    assert updated.requirement_assignments == (assignment,)
+
+
+
+def test_math6_blueprint_builds_real_3223_403030_matrix_cells() -> None:
+    workflow = InMemoryMath6MvpWorkflow()
+    config = Math6AssessmentConfig(
+        config_code="M6-MIDTERM-MATRIX",
+        title="Ma tr?n To?n 6 3-2-2-3",
+        academic_year="2026-2027",
+        semester="HK1",
+        test_type="MIDTERM",
+        duration_minutes=90,
+        total_score="10",
+        variant_count=2,
+    )
+    workflow.create_blueprint(
+        blueprint_code="M6-BP-MATRIX",
+        title="Ma tr?n To?n 6 chu?n",
+        assessment_config=config,
+        question_count=20,
+        total_score="10",
+        topic_codes=("M6-NATURAL-NUMBERS",),
+    )
+    selection = CanonicalAssessmentSelection(
+        subject_code="MATH",
+        grade_level=6,
+        program_code="CT2018-MATH",
+        selected_topic_codes=("CURR-NODE-MATH-G6-003",),
+        selected_requirement_codes=("YCCD-MATH-06-0001",),
+        finalized=True,
+    )
+    workflow.bind_canonical_coverage(
+        "M6-BP-MATRIX",
+        selection=selection,
+        assignments=(
+            BlueprintRequirementAssignment(
+                requirement_code="YCCD-MATH-06-0001",
+                coverage_role="PRIMARY",
+                target_question_count=20,
+                sequence_number=10,
+                target_score="10",
+            ),
+        ),
+    )
+
+    sections = (
+        AssessmentProfileSectionOption(
+            "MCQ", "Nhi?u l?a ch?n", "MULTIPLE_CHOICE",
+            10, 12, 12, "3",
+        ),
+        AssessmentProfileSectionOption(
+            "TF", "??ng sai", "TRUE_FALSE",
+            20, 2, 8, "2",
+        ),
+        AssessmentProfileSectionOption(
+            "SHORT", "Tr? l?i ng?n", "SHORT_RESPONSE",
+            30, 4, 4, "2",
+        ),
+        AssessmentProfileSectionOption(
+            "ESSAY", "T? lu?n", "ESSAY",
+            40, 2, 2, "3",
+        ),
+    )
+    levels = (
+        CognitiveLevelOption("KNOW", "Nh?n bi?t", 10),
+        CognitiveLevelOption("UNDERSTAND", "Th?ng hi?u", 20),
+        CognitiveLevelOption("APPLY", "V?n d?ng", 30),
+    )
+    allocations = (
+        ProfileLevelAllocation("KNOW", "4", "40"),
+        ProfileLevelAllocation("UNDERSTAND", "3", "30"),
+        ProfileLevelAllocation("APPLY", "3", "30"),
+    )
+
+    blueprint = workflow.build_matrix_authoring(
+        "M6-BP-MATRIX",
+        sections=sections,
+        cognitive_levels=levels,
+        level_allocations=allocations,
+    )
+
+    assert len(blueprint.matrix_cells) == 5
+    assert sum(
+        (cell.target_score for cell in blueprint.matrix_cells),
+        Decimal("0"),
+    ) == Decimal("10")
+
+    by_level = {
+        level: sum(
+            (
+                cell.target_score
+                for cell in blueprint.matrix_cells
+                if cell.cognitive_level_code == level
+            ),
+            Decimal("0"),
+        )
+        for level in ("KNOW", "UNDERSTAND", "APPLY")
+    }
+    assert by_level == {
+        "KNOW": Decimal("4"),
+        "UNDERSTAND": Decimal("3"),
+        "APPLY": Decimal("3"),
+    }
+
+    by_section = {
+        section.section_code: (
+            sum(
+                cell.question_count
+                for cell in blueprint.matrix_cells
+                if cell.section_code == section.section_code
+            ),
+            sum(
+                cell.response_count
+                for cell in blueprint.matrix_cells
+                if cell.section_code == section.section_code
+            ),
+            sum(
+                (
+                    cell.target_score
+                    for cell in blueprint.matrix_cells
+                    if cell.section_code == section.section_code
+                ),
+                Decimal("0"),
+            ),
+        )
+        for section in sections
+    }
+    assert by_section == {
+        "MCQ": (12, 12, Decimal("3")),
+        "TF": (2, 8, Decimal("2")),
+        "SHORT": (4, 4, Decimal("2")),
+        "ESSAY": (2, 2, Decimal("3")),
+    }
+
+    assert all(
+        cell.topic_code == "CURR-NODE-MATH-G6-003"
+        for cell in blueprint.matrix_cells
+    )

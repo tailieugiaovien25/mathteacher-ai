@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime
 from hashlib import sha256
 from typing import Any
 from uuid import UUID
 
+from assessment_generation_v2.services.assessment_foundation import (
+    ValidationEvidenceIdentity,
+    ValidationResult,
+    ValidationStatus,
+)
 from assessment_generation_v2.services.exam_generation_service import (
     AssessmentBlueprintSelection,
     AssessmentDraftIdentity,
@@ -135,7 +141,32 @@ class SupabaseAssessmentExamGenerationGateway:
     VALIDATION_RPC = (
         "assessment_exam_validation_report"
     )
+    CONFIRM_WARNINGS_RPC = (
+        "confirm_assessment_exam_validation_warnings"
+    )
     SUBMIT_RPC = "submit_assessment_exam_for_review"
+
+    CANONICAL_VALIDATION_MARKERS = frozenset(
+        {
+            "status",
+            "errors",
+            "warnings",
+            "validation_evidence_id",
+            "validation_input_digest",
+            "evidence_digest",
+            "validation_schema_version",
+            "validated_at",
+        }
+    )
+    EVIDENCE_IDENTITY_KEYS = frozenset(
+        {
+            "validation_evidence_id",
+            "validation_input_digest",
+            "evidence_digest",
+            "validation_schema_version",
+            "validated_at",
+        }
+    )
 
     def __init__(
         self,
@@ -441,7 +472,7 @@ class SupabaseAssessmentExamGenerationGateway:
         self,
         *,
         exam_version_id: str,
-    ) -> AssessmentValidationReport:
+    ) -> AssessmentValidationReport | ValidationResult:
         normalized_exam_version_id = _required_uuid(
             exam_version_id,
             "exam_version_id",
@@ -466,6 +497,9 @@ class SupabaseAssessmentExamGenerationGateway:
         )
 
         assert row is not None
+
+        if self.CANONICAL_VALIDATION_MARKERS.intersection(row):
+            return self._canonical_validation_result(row)
 
         is_valid = row.get("is_valid")
 
@@ -503,6 +537,145 @@ class SupabaseAssessmentExamGenerationGateway:
             violations=tuple(violations),
             metrics=dict(raw_metrics),
         )
+
+    def confirm_validation_warnings(
+        self,
+        *,
+        exam_version_id: str,
+        validation_evidence_digest: str,
+        confirmed_warnings: tuple[str, ...],
+    ) -> None:
+        normalized_exam_version_id = _required_uuid(
+            exam_version_id,
+            "exam_version_id",
+        )
+        normalized_validation_evidence_digest = _required_text(
+            validation_evidence_digest,
+            "validation_evidence_digest",
+        )
+        if not isinstance(confirmed_warnings, tuple):
+            raise TypeError("confirmed_warnings must be a tuple")
+        normalized_confirmed_warnings = tuple(
+            _required_text(warning, "confirmed_warnings")
+            for warning in confirmed_warnings
+        )
+
+        (
+            self._client
+            .rpc(
+                self.CONFIRM_WARNINGS_RPC,
+                {
+                    "target_exam_version_id": (
+                        normalized_exam_version_id
+                    ),
+                    "target_validation_evidence_digest": (
+                        normalized_validation_evidence_digest
+                    ),
+                    "target_confirmed_warnings": list(
+                        normalized_confirmed_warnings
+                    ),
+                },
+            )
+            .execute()
+        )
+
+    def _canonical_validation_result(
+        self,
+        row: dict[str, Any],
+    ) -> ValidationResult:
+        try:
+            raw_status = row.get("status")
+            if not isinstance(raw_status, str):
+                raise AssessmentGatewayResponseError(
+                    "validation status must be a string"
+                )
+            status = ValidationStatus(raw_status)
+
+            raw_errors = row.get("errors")
+            if not isinstance(raw_errors, list):
+                raise AssessmentGatewayResponseError(
+                    "validation errors must be a list"
+                )
+            errors = tuple(
+                _required_text(error, "validation error")
+                for error in raw_errors
+            )
+
+            raw_warnings = row.get("warnings")
+            if not isinstance(raw_warnings, list):
+                raise AssessmentGatewayResponseError(
+                    "validation warnings must be a list"
+                )
+            warnings = tuple(
+                _required_text(warning, "validation warning")
+                for warning in raw_warnings
+            )
+
+            raw_metrics = row.get("metrics")
+            if not isinstance(raw_metrics, dict):
+                raise AssessmentGatewayResponseError(
+                    "validation metrics must be an object"
+                )
+
+            present_identity_keys = (
+                self.EVIDENCE_IDENTITY_KEYS.intersection(row)
+            )
+            if present_identity_keys and (
+                present_identity_keys != self.EVIDENCE_IDENTITY_KEYS
+            ):
+                raise AssessmentGatewayResponseError(
+                    "validation evidence identity must be complete"
+                )
+
+            evidence_identity = None
+            if present_identity_keys:
+                raw_validated_at = row["validated_at"]
+                if not isinstance(raw_validated_at, str):
+                    raise AssessmentGatewayResponseError(
+                        "validated_at must be an ISO-8601 string"
+                    )
+                if not raw_validated_at:
+                    raise AssessmentGatewayResponseError(
+                        "validated_at must not be empty"
+                    )
+                validated_at = datetime.fromisoformat(
+                    raw_validated_at
+                )
+                if (
+                    validated_at.tzinfo is None
+                    or validated_at.utcoffset() is None
+                ):
+                    raise AssessmentGatewayResponseError(
+                        "validated_at must be timezone-aware"
+                    )
+
+                evidence_identity = ValidationEvidenceIdentity(
+                    validation_evidence_id=row[
+                        "validation_evidence_id"
+                    ],
+                    validation_input_digest=row[
+                        "validation_input_digest"
+                    ],
+                    evidence_digest=row["evidence_digest"],
+                    validation_schema_version=row[
+                        "validation_schema_version"
+                    ],
+                    validated_at=validated_at,
+                )
+
+            return ValidationResult(
+                status=status,
+                errors=errors,
+                warnings=warnings,
+                metrics=dict(raw_metrics),
+                evidence_identity=evidence_identity,
+            )
+        except AssessmentGatewayResponseError:
+            raise
+        except (TypeError, ValueError) as error:
+            raise AssessmentGatewayResponseError(
+                "canonical validation response is invalid"
+            ) from error
 
     def submit_exam_for_review(
         self,
