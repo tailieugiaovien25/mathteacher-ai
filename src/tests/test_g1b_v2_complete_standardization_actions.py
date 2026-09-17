@@ -33,5 +33,18 @@ def test_merged_artifact_can_use_shared_system_save_handler():
 
 def test_v2_visible_text_has_no_known_mojibake_markers():
     text = _text(V2)
-    for marker in ("Ã", "Ä", "Æ", "â†", "á»", "áº"):
+    malformed_markers = (
+        "â†",
+        "á»",
+        "áº",
+        "Ä‘",
+        "Ã¡",
+        "Ã¢",
+        "Ãª",
+        "Ã´",
+        "Æ°",
+        "Æ¡",
+        "\ufffd",
+    )
+    for marker in malformed_markers:
         assert marker not in text

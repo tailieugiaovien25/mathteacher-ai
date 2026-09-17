@@ -40,7 +40,7 @@ def test_workspace_has_class_display_resolver():
 
 
 def test_summary_does_not_directly_display_class_id():
-    text = ui_source()
+    text = ui_source().lstrip("\ufeff")
     tree = ast.parse(text)
 
     resolver_calls = []
@@ -48,45 +48,24 @@ def test_summary_does_not_directly_display_class_id():
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-
-        if not isinstance(
-            node.func,
-            ast.Name,
-        ):
+        if not isinstance(node.func, ast.Name):
             continue
-
-        if (
-            node.func.id
-            != "_class_display_name"
-        ):
+        if node.func.id != "_class_display_name":
             continue
-
         resolver_calls.append(node)
 
     assert resolver_calls
 
     call_sources = [
-        ast.get_source_segment(
-            text,
-            call,
-        )
-        or ""
+        ast.get_source_segment(text, call) or ""
         for call in resolver_calls
     ]
 
     assert any(
-        (
-            "class_id" in source
-            or "selected_row.class_id"
-            in source
-        )
+        ("class_id" in source or "selected_row.class_id" in source)
         for source in call_sources
     )
-
-    assert any(
-        "client=client" in source
-        for source in call_sources
-    )
+    assert any("client=client" in source for source in call_sources)
 
 def test_canonical_class_uses_display_name():
     text = ui_source()

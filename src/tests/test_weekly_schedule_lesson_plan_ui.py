@@ -39,7 +39,7 @@ def test_lesson_plan_workspace_uses_schedule_rows():
 
 
 def test_lesson_plan_workspace_accepts_docx():
-    source = _source()
+    source = _source().lstrip("\ufeff")
     tree = ast.parse(source)
 
     uploader_calls = []
@@ -47,44 +47,25 @@ def test_lesson_plan_workspace_accepts_docx():
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-
-        if not isinstance(
-            node.func,
-            ast.Attribute,
-        ):
+        if not isinstance(node.func, ast.Attribute):
             continue
-
         if node.func.attr != "file_uploader":
             continue
-
         uploader_calls.append(node)
 
     assert uploader_calls
 
     has_docx = False
-
     for call in uploader_calls:
         for keyword in call.keywords:
             if keyword.arg != "type":
                 continue
-
-            segment = ast.get_source_segment(
-                source,
-                keyword.value,
-            )
-
-            if (
-                segment
-                and "docx" in segment.casefold()
-            ):
+            segment = ast.get_source_segment(source, keyword.value)
+            if segment and "docx" in segment.casefold():
                 has_docx = True
 
     assert has_docx
-
-    assert (
-        "uploaded.getvalue()"
-        in source
-    )
+    assert "uploaded.getvalue()" in source
 
 def test_lesson_plan_workspace_is_rendered_from_lbg():
     source = _source()

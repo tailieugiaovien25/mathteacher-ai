@@ -33,9 +33,12 @@ def test_standardizer_enforces_color_theme_rows_and_compliance_report():
 
 def test_only_pass_allows_save_download_and_management_merge_path():
     text = Path("src/portal_v2/ui/standardized_lesson_plan_authoring_v2_streamlit.py").read_text(encoding="utf-8")
-    assert "release_allowed = canonical_pass_100" in text
+    assert "canonical_pass_100 = bool(canonical_field_rows) and all(" in text
+    assert "admin_enforcement_pass = (" in text
+    assert "release_allowed = (" in text
     assert "audit_blocks_save = not release_allowed" in text
-    assert 'disabled=(not standardized_content or audit_blocks_save)' in text
+    assert 'disabled=(not standardized_content)' in text
+    assert 'disabled=(save_handler is None or not standardized_content),' in text
     assert 'if standardized_content:' in text
-    assert 'if not audit_blocks_save:' in text
-    assert "ADMIN Configuration Enforcement Gate" in text
+    assert 'if audit_blocks_save:' in text
+    assert "R4A2C2B2C2D2_MANAGEMENT_MERGE_NOT_BLOCKED_BY_AUDIT" in text

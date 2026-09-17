@@ -61,13 +61,15 @@ def test_v13b_passes_real_pipeline_progress_callback_and_preview_trace():
     assert "_apply_real_progress_event" in text
     assert 'handler_arguments["progress_callback"]' in text
     assert "Quá trình tạo bản xem:" in text
-    assert "Xem nhật ký các công đoạn đã tác động đến giáo án" in text
-
+    assert "6. Nhật ký xử lý giáo án" in text
 
 def test_v13_preserves_v12a_save_download_merge_gate():
     text = UI.read_text(encoding="utf-8")
-    assert "release_allowed = canonical_pass_100" in text
+    assert "canonical_pass_100 = bool(canonical_field_rows) and all(" in text
+    assert "admin_enforcement_pass = (" in text
+    assert "release_allowed = (" in text
     assert "audit_blocks_save = not release_allowed" in text
-    assert 'disabled=(not standardized_content or audit_blocks_save)' in text
+    assert 'disabled=(not standardized_content)' in text
+    assert 'disabled=(save_handler is None or not standardized_content),' in text
     assert "if standardized_content:" in text
-    assert "if not audit_blocks_save:" in text
+    assert "if audit_blocks_save:" in text

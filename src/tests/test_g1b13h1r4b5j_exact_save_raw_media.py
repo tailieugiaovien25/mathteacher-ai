@@ -19,7 +19,7 @@ def _text(path):
 def test_top_save_uses_existing_callback_contract():
     text = _text(AUTHORING)
     assert "G1B_13H1R4B5J_TOP_SAVE_RUNTIME_WIRING" in text
-    assert "disabled=(save_handler is None or not standardized_content or audit_blocks_save)" in text
+    assert "disabled=(save_handler is None or not standardized_content)," in text
     assert "artifact_file_name=(" in text
     assert "artifact_content=standardized_content" in text
 

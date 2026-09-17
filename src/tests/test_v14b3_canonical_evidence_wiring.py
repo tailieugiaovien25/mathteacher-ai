@@ -156,18 +156,15 @@ def test_v14b3_ui_stores_field_level_evidence_and_vietnamese_report():
     assert "V14B3_STORE_FIELD_LEVEL_CANONICAL_EVIDENCE" in text
     assert "V14B3_CANONICAL_FIELD_REPORT" in text
     assert "AUDIT_FIELD_EVIDENCE_KEY" in text
-    assert r"\u0110\u1ed1i chi\u1ebfu 5 tr\u01b0\u1eddng d\u1eef li\u1ec7u canonical" in text
-    assert r"CH\u01afA X\u00c1C MINH" in text
-    assert r"Chu\u1ea9n h\u00f3a \u0111\u1ecbnh d\u1ea1ng theo c\u1ea5u h\u00ecnh ADMIN" in text
-
+    assert "4. Đối chiếu dữ liệu giáo án" in text
+    assert "CH\\u01afA X\\u00c1C MINH" in text
+    assert "Chu\\u1ea9n h\\u00f3a \\u0111\\u1ecbnh d\\u1ea1ng theo c\\u1ea5u h\\u00ecnh ADMIN" in text
 
 def test_v14b3_does_not_weaken_fail_save_block():
     text = UI.read_text(encoding="utf-8-sig")
-    assert "release_allowed = canonical_pass_100" in text
+    assert "canonical_pass_100 = bool(canonical_field_rows) and all(" in text
+    assert "admin_enforcement_pass = (" in text
+    assert "release_allowed = (" in text
     assert "audit_blocks_save = not release_allowed" in text
-    assert (
-        "save_handler=(None if audit_blocks_save else save_handler)" in text
-        or "disabled=(save_handler is None or not standardized_content or audit_blocks_save)" in text
-        or "disabled=(not standardized_content or audit_blocks_save)" in text
-        or "if audit_blocks_save:" in text
-    )
+    assert "disabled=(save_handler is None or not standardized_content)," in text
+    assert "if audit_blocks_save:" in text

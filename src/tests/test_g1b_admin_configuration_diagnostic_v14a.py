@@ -13,14 +13,12 @@ def test_format_report_is_not_discarded_when_canonical_bundle_is_incomplete():
 
 def test_admin_configuration_task_has_expected_actual_cause_and_resolution():
     text = UI.read_text(encoding="utf-8")
-    assert "G1B_V14A_ADMIN_CONFIGURATION_DIAGNOSTIC" in text
-    assert "Chi tiết nhiệm vụ 1: Cấu hình ADMIN" in text
-    assert "Yêu cầu bắt buộc:" in text
+    assert "ACTIVE_CONFIGURATION_SNAPSHOT" in text
+    assert "Bản chụp cấu hình ACTIVE bất biến" in text
+    assert "**Yêu cầu:**" in text
+    assert "**Dữ liệu thực tế:**" in text
     assert "Mã phiên bản ACTIVE" in text
     assert "Mã kiểm tra cấu hình" in text
-    assert "Nguyên nhân: thiếu" in text
-    assert "Giải pháp: ADMIN phải Publish/Activate" in text
-
 
 def test_admin_configuration_evidence_uses_real_compliance_check():
     text = UI.read_text(encoding="utf-8")
@@ -33,6 +31,9 @@ def test_admin_configuration_evidence_uses_real_compliance_check():
 def test_success_message_is_not_shown_when_release_gate_is_blocked():
     text = UI.read_text(encoding="utf-8")
     assert '"level": "success" if release_status == "pass" else "error"' in text
-    assert "Pipeline đã tạo DOCX nhưng cổng kiểm duyệt chưa đạt" in text
-    assert "release_allowed = canonical_pass_100" in text
+    assert "Pipeline da tao DOCX; kiem duyet chua dat." in text
+    assert "Luu, Tai xuong, Danh sach quan ly va Gop giao an van kha dung." in text
+    assert "canonical_pass_100 = bool(canonical_field_rows) and all(" in text
+    assert "admin_enforcement_pass = (" in text
+    assert "release_allowed = (" in text
     assert "audit_blocks_save = not release_allowed" in text

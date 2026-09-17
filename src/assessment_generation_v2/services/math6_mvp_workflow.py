@@ -18,6 +18,28 @@ from json import dumps, loads
 from typing import Iterable, Mapping
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
+from assessment_generation_v2.services.assessment_foundation import (
+    AssessmentConfig,
+    AssessmentSpecification,
+    AssessmentStructure,
+    CompetencyRequirement,
+    QuestionRequirement,
+    validate_math_assessment_config,
+)
+from assessment_generation_v2.services.blueprint_requirement_link_service import (
+    BlueprintRequirementAssignment,
+)
+from assessment_generation_v2.services.canonical_assessment_selection_service import (
+    CanonicalAssessmentSelection,
+)
+from assessment_generation_v2.services.assessment_matrix_cell_authoring import (
+    AssessmentMatrixCell,
+    AssessmentProfileSectionOption,
+    CognitiveLevelOption,
+    ProfileLevelAllocation,
+    build_default_matrix_cells,
+)
+
 
 DRAFT = "DRAFT"
 PENDING_REVIEW = "PENDING_REVIEW"
@@ -48,6 +70,24 @@ def _score(value: object) -> Decimal:
     return result
 
 
+def _positive_int(value: object, field_name: str) -> int:
+    if isinstance(value, bool):
+        raise Math6MvpWorkflowError(
+            f"{field_name} must be a positive integer"
+        )
+    try:
+        numeric = Decimal(str(value))
+    except (InvalidOperation, ValueError) as error:
+        raise Math6MvpWorkflowError(
+            f"{field_name} must be a positive integer"
+        ) from error
+    if numeric != numeric.to_integral_value() or numeric <= 0:
+        raise Math6MvpWorkflowError(
+            f"{field_name} must be a positive integer"
+        )
+    return int(numeric)
+
+
 def _admin(role: str) -> None:
     if str(role).strip().upper() != ADMIN:
         raise PermissionError("this transition requires ADMIN")
@@ -60,6 +100,76 @@ def _json_bytes(value: object) -> bytes:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+@dataclass(frozen=True, slots=True)
+class Math6AssessmentConfig:
+    config_code: str
+    title: str
+    academic_year: str
+    semester: str
+    test_type: str
+    duration_minutes: int
+    total_score: Decimal
+    variant_count: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "config_code",
+            _text(self.config_code, "config_code").upper(),
+        )
+        object.__setattr__(self, "title", _text(self.title, "title"))
+        object.__setattr__(
+            self,
+            "academic_year",
+            _text(self.academic_year, "academic_year"),
+        )
+        object.__setattr__(
+            self,
+            "semester",
+            _text(self.semester, "semester").upper(),
+        )
+        object.__setattr__(
+            self,
+            "test_type",
+            _text(self.test_type, "test_type").upper(),
+        )
+        object.__setattr__(
+            self,
+            "duration_minutes",
+            _positive_int(self.duration_minutes, "duration_minutes"),
+        )
+        object.__setattr__(
+            self,
+            "total_score",
+            _score(self.total_score),
+        )
+        object.__setattr__(
+            self,
+            "variant_count",
+            _positive_int(self.variant_count, "variant_count"),
+        )
+
+    def to_canonical(self) -> AssessmentConfig:
+        """Project the legacy Math6 config without changing its constructor."""
+
+        return validate_math_assessment_config(
+            AssessmentConfig(
+                config_code=self.config_code,
+                title=self.title,
+                subject_code="MATH",
+                grade_level=6,
+                academic_year=self.academic_year,
+                semester=self.semester,
+                test_type=self.test_type,
+                duration_minutes=self.duration_minutes,
+                total_score=self.total_score,
+                variant_count=self.variant_count,
+            )
+        )
+
+    as_assessment_config = to_canonical
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,12 +189,69 @@ class Math6Question:
 class Math6Blueprint:
     blueprint_code: str
     title: str
+    config_code: str
     question_count: int
     total_score: Decimal
     topic_codes: tuple[str, ...]
+    canonical_subject_code: str = ""
+    canonical_program_code: str = ""
+    canonical_topic_codes: tuple[str, ...] = ()
+    canonical_requirement_codes: tuple[str, ...] = ()
+    requirement_assignments: tuple[BlueprintRequirementAssignment, ...] = ()
+    matrix_sections: tuple[AssessmentProfileSectionOption, ...] = ()
+    matrix_cognitive_levels: tuple[CognitiveLevelOption, ...] = ()
+    matrix_level_allocations: tuple[ProfileLevelAllocation, ...] = ()
+    matrix_cells: tuple[AssessmentMatrixCell, ...] = ()
     review_status: str = DRAFT
     locked: bool = False
     review_note: str = ""
+
+    def to_canonical(
+        self,
+        *,
+        config: AssessmentConfig,
+        competency_requirements: Iterable[CompetencyRequirement],
+        question_requirements: Iterable[QuestionRequirement],
+        specification_code: str | None = None,
+    ) -> AssessmentSpecification:
+        """Project governed Math6 blueprint data to the canonical contract."""
+
+        if config.config_code != self.config_code:
+            raise Math6MvpWorkflowError(
+                "canonical config must match blueprint config_code"
+            )
+        validate_math_assessment_config(config)
+        requirements = tuple(competency_requirements)
+        selection = CanonicalAssessmentSelection(
+            subject_code=config.subject_code,
+            grade_level=config.grade_level,
+            program_code=self.canonical_program_code,
+            selected_topic_codes=self.canonical_topic_codes,
+            selected_requirement_codes=self.canonical_requirement_codes,
+            selected_requirements=requirements,
+            finalized=True,
+        )
+        try:
+            return AssessmentSpecification(
+                specification_code=(
+                    specification_code or f"{self.blueprint_code}-SPEC"
+                ),
+                title=self.title,
+                config=config,
+                scope=selection,
+                structure=AssessmentStructure(self.matrix_sections),
+                cognitive_allocations=self.matrix_level_allocations,
+                competency_requirements=requirements,
+                requirement_assignments=self.requirement_assignments,
+                matrix_cells=self.matrix_cells,
+                question_requirements=tuple(question_requirements),
+            )
+        except (TypeError, ValueError) as error:
+            raise Math6MvpWorkflowError(
+                f"cannot project canonical specification: {error}"
+            ) from error
+
+    as_assessment_specification = to_canonical
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,10 +478,18 @@ class InMemoryMath6MvpWorkflow:
         *,
         blueprint_code: str,
         title: str,
+        assessment_config: Math6AssessmentConfig,
         question_count: int,
         total_score: object,
         topic_codes: Iterable[str],
     ) -> Math6Blueprint:
+        if not isinstance(assessment_config, Math6AssessmentConfig):
+            raise Math6MvpWorkflowError("assessment_config is required")
+        normalized_total_score = _score(total_score)
+        if normalized_total_score != assessment_config.total_score:
+            raise Math6MvpWorkflowError(
+                "blueprint total_score must match assessment config"
+            )
         code = _text(blueprint_code, "blueprint_code").upper()
         if code in self._blueprints:
             raise Math6MvpWorkflowError(f"blueprint already exists: {code}")
@@ -331,12 +506,143 @@ class InMemoryMath6MvpWorkflow:
         blueprint = Math6Blueprint(
             blueprint_code=code,
             title=_text(title, "title"),
+            config_code=assessment_config.config_code,
             question_count=int(question_count),
-            total_score=_score(total_score),
+            total_score=normalized_total_score,
             topic_codes=topics,
         )
         self._blueprints[code] = blueprint
         return blueprint
+
+    def bind_canonical_coverage(
+        self,
+        blueprint_code: str,
+        *,
+        selection: CanonicalAssessmentSelection,
+        assignments: Iterable[BlueprintRequirementAssignment],
+    ) -> Math6Blueprint:
+        blueprint = self._blueprint(blueprint_code)
+        if blueprint.locked or blueprint.review_status not in {
+            DRAFT,
+            REVISION_REQUIRED,
+        }:
+            raise Math6MvpWorkflowError(
+                "canonical coverage can only be bound to an editable blueprint"
+            )
+        if not isinstance(selection, CanonicalAssessmentSelection):
+            raise Math6MvpWorkflowError(
+                "canonical assessment selection is required"
+            )
+        if not selection.finalized:
+            raise Math6MvpWorkflowError(
+                "canonical assessment selection must be finalized"
+            )
+        if int(selection.grade_level) != 6:
+            raise Math6MvpWorkflowError(
+                "canonical assessment selection must target grade 6"
+            )
+
+        rows = tuple(assignments)
+        if not rows or any(
+            not isinstance(row, BlueprintRequirementAssignment)
+            for row in rows
+        ):
+            raise Math6MvpWorkflowError(
+                "canonical requirement assignments are required"
+            )
+
+        assignment_codes = tuple(row.requirement_code for row in rows)
+        if len(set(assignment_codes)) != len(assignment_codes):
+            raise Math6MvpWorkflowError(
+                "canonical requirement assignments contain duplicate codes"
+            )
+        if set(assignment_codes) != set(selection.selected_requirement_codes):
+            raise Math6MvpWorkflowError(
+                "canonical requirement assignments must match selection"
+            )
+
+        ordered_rows = tuple(
+            sorted(
+                rows,
+                key=lambda row: (
+                    row.sequence_number,
+                    row.requirement_code,
+                ),
+            )
+        )
+        updated = replace(
+            blueprint,
+            canonical_subject_code=selection.subject_code,
+            canonical_program_code=selection.program_code,
+            canonical_topic_codes=tuple(selection.selected_topic_codes),
+            canonical_requirement_codes=tuple(
+                selection.selected_requirement_codes
+            ),
+            requirement_assignments=ordered_rows,
+        )
+        self._blueprints[updated.blueprint_code] = updated
+        return updated
+
+    def build_matrix_authoring(
+        self,
+        blueprint_code: str,
+        *,
+        sections: Iterable[AssessmentProfileSectionOption],
+        cognitive_levels: Iterable[CognitiveLevelOption],
+        level_allocations: Iterable[ProfileLevelAllocation],
+    ) -> Math6Blueprint:
+        blueprint = self._blueprint(blueprint_code)
+        if blueprint.locked or blueprint.review_status not in {
+            DRAFT,
+            REVISION_REQUIRED,
+        }:
+            raise Math6MvpWorkflowError(
+                "matrix authoring requires an editable blueprint"
+            )
+        if not blueprint.canonical_topic_codes:
+            raise Math6MvpWorkflowError(
+                "matrix authoring requires canonical curriculum coverage"
+            )
+
+        section_rows = tuple(sections)
+        level_rows = tuple(cognitive_levels)
+        allocation_rows = tuple(level_allocations)
+
+        if sum(
+            (row.section_score for row in section_rows),
+            Decimal("0"),
+        ) != blueprint.total_score:
+            raise Math6MvpWorkflowError(
+                "matrix section scores must match blueprint total_score"
+            )
+        if sum(row.question_count for row in section_rows) != (
+            blueprint.question_count
+        ):
+            raise Math6MvpWorkflowError(
+                "matrix section question counts must match blueprint"
+            )
+
+        try:
+            cells = build_default_matrix_cells(
+                sections=section_rows,
+                topic_codes=blueprint.canonical_topic_codes,
+                cognitive_levels=level_rows,
+                level_allocations=allocation_rows,
+            )
+        except ValueError as error:
+            raise Math6MvpWorkflowError(
+                f"cannot build matrix authoring: {error}"
+            ) from error
+
+        updated = replace(
+            blueprint,
+            matrix_sections=section_rows,
+            matrix_cognitive_levels=level_rows,
+            matrix_level_allocations=allocation_rows,
+            matrix_cells=cells,
+        )
+        self._blueprints[updated.blueprint_code] = updated
+        return updated
 
     def submit_blueprint(self, blueprint_code: str) -> Math6Blueprint:
         blueprint = self._blueprint(blueprint_code)
@@ -483,9 +789,50 @@ class InMemoryMath6MvpWorkflow:
             "blueprint": {
                 "blueprint_code": blueprint.blueprint_code,
                 "title": blueprint.title,
+                "config_code": blueprint.config_code,
                 "question_count": blueprint.question_count,
                 "total_score": str(blueprint.total_score),
                 "topic_codes": list(blueprint.topic_codes),
+                "canonical_coverage": (
+                    {
+                        "subject_code": blueprint.canonical_subject_code,
+                        "program_code": blueprint.canonical_program_code,
+                        "topic_codes": list(
+                            blueprint.canonical_topic_codes
+                        ),
+                        "requirement_codes": list(
+                            blueprint.canonical_requirement_codes
+                        ),
+                        "requirement_assignments": [
+                            row.as_rpc_record()
+                            for row in blueprint.requirement_assignments
+                        ],
+                    }
+                    if blueprint.canonical_subject_code
+                    else None
+                ),
+                "matrix_authoring": (
+                    {
+                        "sections": [
+                            row.as_snapshot_record()
+                            for row in blueprint.matrix_sections
+                        ],
+                        "cognitive_levels": [
+                            row.as_snapshot_record()
+                            for row in blueprint.matrix_cognitive_levels
+                        ],
+                        "level_allocations": [
+                            row.as_snapshot_record()
+                            for row in blueprint.matrix_level_allocations
+                        ],
+                        "matrix_cells": [
+                            row.as_payload_record()
+                            for row in blueprint.matrix_cells
+                        ],
+                    }
+                    if blueprint.matrix_cells
+                    else None
+                ),
             },
             "questions": [
                 {
@@ -607,3 +954,10 @@ class InMemoryMath6MvpWorkflow:
             raise Math6MvpWorkflowError(
                 f"unknown exam: {normalized}"
             ) from error
+
+
+# Additive descriptive aliases; legacy class identities and constructors remain.
+Math6AssessmentQuestion = Math6Question
+Math6AssessmentBlueprint = Math6Blueprint
+Math6AssessmentExam = Math6Exam
+Math6PublishedAssessmentPackage = Math6PublishedPackage

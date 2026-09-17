@@ -29,9 +29,10 @@ def test_status_colors_remain_distinct_and_gate_is_retained():
     assert ".g1b-pass{" in text
     assert ".g1b-blocked{" in text
     assert ".g1b-review,.g1b-unverified{" in text
-    assert "release_allowed = canonical_pass_100" in text
+    assert "canonical_pass_100 = bool(canonical_field_rows) and all(" in text
+    assert "admin_enforcement_pass = (" in text
+    assert "release_allowed = (" in text
     assert "audit_blocks_save = not release_allowed" in text
-
 
 def test_non_compliant_conclusions_have_diagonal_end_marker():
     text = UI.read_text(encoding="utf-8")
