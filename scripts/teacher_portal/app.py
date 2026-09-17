@@ -46,6 +46,7 @@ PORTAL_PAGES = (
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra To\xe1n 6',
     'Xu\u1ea5t \u0111\u1ec1 ki\u1ec3m tra',
     'Thi\u1ebft \u0111\u1eb7t gi\xe1o vi\xean',
+    'Tạo đề kiểm tra Toán 6–9',
 )
 
 # The legacy authoring hub remains wired below for backward-compatible
@@ -76,6 +77,9 @@ PORTAL_SESSION_KEYS = (
     "google_drive_credentials",
     "google_oauth_url",
     "google_oauth_state",
+    "assessment_ppct_rows",
+    "assessment_ppct_evidence",
+    "assessment_ppct_scope_confirmation",
 )
 
 
@@ -2083,6 +2087,76 @@ def main() -> None:
             st=st,
             client=client,
             user_id=str(user_id),
+        )
+
+    elif selected == "Tạo đề kiểm tra Toán 6–9":
+        from educational_planning_v2.adapters.supabase_academic_year_configuration_repository import (
+            SupabaseAcademicYearConfigurationRepository,
+        )
+        from portal_v2.runtime.system_weekly_schedule_runtime import (
+            SystemWeeklyScheduleRuntime,
+        )
+        from portal_v2.runtime.assessment_ppct_session_bridge import (
+            AssessmentPpctRuntimeEvidence,
+            clear_assessment_ppct_rows,
+            inject_assessment_ppct_rows,
+        )
+        from portal_v2.ui.assessment_builder_streamlit import (
+            render_assessment_builder_page,
+        )
+
+        try:
+            current_year = (
+                SupabaseAcademicYearConfigurationRepository(
+                    client=client,
+                )
+                .get_current()
+            )
+
+            if current_year is None:
+                raise LookupError(
+                    "ADMIN chưa thiết lập năm học hiện hành."
+                )
+
+            academic_year = str(
+                current_year.academic_year
+            )
+
+            snapshot = (
+                SystemWeeklyScheduleRuntime(
+                    client=client,
+                    user_id=str(user_id),
+                )
+                .load_active_ppct_snapshot(
+                    academic_year=academic_year,
+                )
+            )
+
+            inject_assessment_ppct_rows(
+                session_state=st.session_state,
+                rows=snapshot.rows,
+                evidence=AssessmentPpctRuntimeEvidence(
+                    academic_year=snapshot.academic_year,
+                    source_id=snapshot.source_id,
+                    source_version=snapshot.source_version,
+                ),
+            )
+
+        except Exception as error:
+            clear_assessment_ppct_rows(
+                session_state=st.session_state,
+            )
+            st.title(
+                "Tạo đề kiểm tra Toán 6–9"
+            )
+            st.error(
+                "Không thể nạp PPCT cho hệ thống tạo đề: "
+                f"{error}"
+            )
+            return
+
+        render_assessment_builder_page(
+            st=st,
         )
 
     elif selected == "Tạo đề kiểm tra Toán 6":

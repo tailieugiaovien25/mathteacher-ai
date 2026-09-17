@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -83,6 +83,15 @@ class SystemWeeklyScheduleRuntimeRequest:
         PPCTScopeMappingRule,
         ...,
     ]
+
+
+
+@dataclass(frozen=True)
+class SystemActivePpctSnapshot:
+    academic_year: str
+    source_id: str
+    source_version: str
+    rows: tuple[PPCTRow, ...]
 
 
 class SystemWeeklyScheduleRuntime:
@@ -204,11 +213,12 @@ class SystemWeeklyScheduleRuntime:
             )
         )
 
-    def _load_active_ppct_rows(
+    def load_active_ppct_snapshot(
         self,
         *,
         academic_year: str,
-    ) -> tuple[PPCTRow, ...]:
+    ) -> SystemActivePpctSnapshot:
+        """Return exactly one ACTIVE PPCT source with provenance."""
         if not isinstance(
             academic_year,
             str,
@@ -217,9 +227,7 @@ class SystemWeeklyScheduleRuntime:
                 "academic_year must be str"
             )
 
-        normalized_year = (
-            academic_year.strip()
-        )
+        normalized_year = academic_year.strip()
 
         if not normalized_year:
             raise ValueError(
@@ -243,14 +251,25 @@ class SystemWeeklyScheduleRuntime:
 
         source = sources[0]
 
+        source_id = str(source.source_id).strip()
+        source_version = str(source.source_version).strip()
+
+        if not source_id:
+            raise ValueError(
+                "ACTIVE PPCT source_id is required"
+            )
+
+        if not source_version:
+            raise ValueError(
+                "ACTIVE PPCT source_version is required"
+            )
+
         envelope = (
             self._payload_repository.get(
                 reference=OperationalPayloadReference(
-                    source_id=source.source_id,
+                    source_id=source_id,
                     data_type=OperationalDataType.PPCT,
-                    payload_version=(
-                        source.source_version
-                    ),
+                    payload_version=source_version,
                 )
             )
         )
@@ -298,7 +317,26 @@ class SystemWeeklyScheduleRuntime:
                 )
             )
 
-        return tuple(rows)
+        if not rows:
+            raise LookupError(
+                "ACTIVE PPCT payload contains no rows"
+            )
+
+        return SystemActivePpctSnapshot(
+            academic_year=normalized_year,
+            source_id=source_id,
+            source_version=source_version,
+            rows=tuple(rows),
+        )
+
+    def _load_active_ppct_rows(
+        self,
+        *,
+        academic_year: str,
+    ) -> tuple[PPCTRow, ...]:
+        return self.load_active_ppct_snapshot(
+            academic_year=academic_year,
+        ).rows
 
     def _build_auto_ppct_scope_rules(
         self,
