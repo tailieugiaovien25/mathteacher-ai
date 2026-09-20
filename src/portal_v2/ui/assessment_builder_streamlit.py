@@ -1,4 +1,4 @@
-﻿"""Source-only Streamlit prototype for the Mathematics 6-9 assessment builder.
+"""Source-only Streamlit prototype for the Mathematics 6-9 assessment builder.
 
 A2-MATH69-C5 keeps the page persistence-free and production-route-free while
 adding automatic PPCT scope suggestion when normalized PPCT rows are supplied
@@ -23,6 +23,12 @@ from assessment_generation_v2.services.assessment_builder_configuration_service 
 from assessment_generation_v2.services.assessment_builder_matrix_preview_service import (
     AssessmentBuilderMatrixPreviewService,
 )
+from assessment_generation_v2.services.assessment_builder_specification_preview_service import (
+    AssessmentBuilderSpecificationPreviewService,
+)
+from assessment_generation_v2.services.assessment_builder_canonical_scope_service import (
+    AssessmentBuilderCanonicalScopeResult,
+)
 from assessment_generation_v2.services.assessment_ppct_scope_suggestion_service import (
     AssessmentPpctScopeSuggestion,
     AssessmentPpctScopeSuggestionError,
@@ -39,6 +45,14 @@ from portal_v2.runtime.assessment_ppct_session_bridge import (
 from portal_v2.runtime.assessment_builder_governed_defaults_runtime import (
     AssessmentBuilderGovernedDefaultsRuntime,
     AssessmentBuilderGovernedDefaultsRuntimeError,
+)
+from portal_v2.runtime.assessment_builder_requirement_recommendation_runtime import (
+    AssessmentBuilderRequirementRecommendationRuntime,
+    AssessmentBuilderRequirementRecommendationRuntimeError,
+)
+from portal_v2.runtime.assessment_builder_requirement_recommendation_presentation_runtime import (
+    AssessmentBuilderRequirementRecommendationPresentationRuntime,
+    AssessmentBuilderRequirementRecommendationPresentationRuntimeError,
 )
 
 
@@ -80,6 +94,57 @@ def _codes(value: object) -> tuple[str, ...]:
 # local callers that imported the private session-key name.
 _ASSESSMENT_PPCT_ROWS_SESSION_KEY = ASSESSMENT_PPCT_ROWS_SESSION_KEY
 _ASSESSMENT_SCOPE_CONFIRMATION_SESSION_KEY = "assessment_ppct_scope_confirmation"
+_ASSESSMENT_CANONICAL_SCOPE_SESSION_KEY = "assessment_builder_canonical_scope_result_v1"
+_ASSESSMENT_REQUIREMENT_SUGGESTION_CODES_SESSION_KEY = (
+    "assessment_builder_suggested_requirement_codes_v1"
+)
+_ASSESSMENT_REQUIREMENT_SUGGESTION_SCOPE_TOKEN_SESSION_KEY = (
+    "assessment_builder_suggested_requirement_scope_token_v1"
+)
+_ASSESSMENT_TOPIC_SUGGESTION_CODES_SESSION_KEY = (
+    "assessment_builder_suggested_topic_codes_v1"
+)
+_ASSESSMENT_TOPIC_APPLIED_SCOPE_TOKEN_SESSION_KEY = (
+    "assessment_builder_applied_topic_scope_token_v1"
+)
+_ASSESSMENT_REQUIREMENT_APPLIED_SCOPE_TOKEN_SESSION_KEY = (
+    "assessment_builder_applied_requirement_scope_token_v1"
+)
+
+
+def _canonical_scope_result_from_session(
+    st: object,
+) -> AssessmentBuilderCanonicalScopeResult | None:
+    # Read a precomputed fail-closed canonical scope result from runtime.
+    session_state = getattr(
+        st,
+        "session_state",
+        None,
+    )
+
+    if session_state is None:
+        return None
+
+    try:
+        value = session_state.get(
+            _ASSESSMENT_CANONICAL_SCOPE_SESSION_KEY
+        )
+    except AttributeError:
+        return None
+
+    if value is None:
+        return None
+
+    if not isinstance(
+        value,
+        AssessmentBuilderCanonicalScopeResult,
+    ):
+        raise TypeError(
+            "assessment canonical scope session value must be "
+            "AssessmentBuilderCanonicalScopeResult"
+        )
+
+    return value
 
 
 def _ppct_rows_from_session(
@@ -277,10 +342,266 @@ def _authenticated_portal_runtime_context(
     return client, normalized_user_id
 
 
+def _requirement_recommendation_scope_token(
+    *,
+    ppct_runtime_evidence: AssessmentPpctRuntimeEvidence,
+    ppct_suggestion: AssessmentPpctScopeSuggestion,
+) -> str:
+    payload = "\n".join(
+        (
+            ppct_runtime_evidence.academic_year,
+            ppct_runtime_evidence.source_id,
+            ppct_runtime_evidence.source_version,
+            str(ppct_suggestion.grade_level),
+            ppct_suggestion.subject_grade,
+            ppct_suggestion.sub_subject or "",
+            str(ppct_suggestion.period_from),
+            str(ppct_suggestion.period_to),
+        )
+    )
+    return sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _automatic_requirement_recommendation(
+    *,
+    st: object,
+    ppct_runtime_evidence: AssessmentPpctRuntimeEvidence | None,
+    ppct_suggestion: AssessmentPpctScopeSuggestion | None,
+) -> tuple[object | None, str | None]:
+    if ppct_runtime_evidence is None or ppct_suggestion is None:
+        return None, (
+            "Chưa đủ dữ liệu để đề xuất."
+        )
+
+    if int(ppct_suggestion.grade_level) != 7:
+        return None, (
+            "Chưa đủ dữ liệu để đề xuất."
+        )
+
+    client, user_id = _authenticated_portal_runtime_context(st)
+
+    if client is None or user_id is None:
+        return None, (
+            "Chưa đủ dữ liệu để đề xuất."
+        )
+
+    try:
+        result = AssessmentBuilderRequirementRecommendationRuntime(
+            client=client,
+            user_id=user_id,
+        ).recommend(
+            source_id=ppct_runtime_evidence.source_id,
+            source_version=ppct_runtime_evidence.source_version,
+            subject_grade=ppct_suggestion.subject_grade,
+            sub_subject=ppct_suggestion.sub_subject,
+            period_from=ppct_suggestion.period_from,
+            period_to=ppct_suggestion.period_to,
+        )
+    except (
+        AssessmentBuilderRequirementRecommendationRuntimeError,
+        TypeError,
+        ValueError,
+    ) as error:
+        return None, str(error)
+
+    return result, None
+
+
+def _store_requirement_recommendation_state(
+    *,
+    st: object,
+    scope_token: str,
+    requirement_codes: tuple[str, ...],
+) -> None:
+    session_state = getattr(st, "session_state", None)
+    if session_state is None:
+        raise TypeError("st.session_state is required")
+
+    normalized_codes = tuple(
+        dict.fromkeys(
+            str(code).strip()
+            for code in requirement_codes
+            if str(code).strip()
+        )
+    )
+
+    session_state[
+        _ASSESSMENT_REQUIREMENT_SUGGESTION_CODES_SESSION_KEY
+    ] = normalized_codes
+    session_state[
+        _ASSESSMENT_REQUIREMENT_SUGGESTION_SCOPE_TOKEN_SESSION_KEY
+    ] = scope_token
+
+
+def _store_topic_recommendation_state(
+    *,
+    st: object,
+    topic_codes: tuple[str, ...],
+) -> None:
+    session_state = getattr(st, "session_state", None)
+    if session_state is None:
+        raise TypeError("st.session_state is required")
+
+    session_state[
+        _ASSESSMENT_TOPIC_SUGGESTION_CODES_SESSION_KEY
+    ] = tuple(
+        dict.fromkeys(
+            str(code).strip()
+            for code in topic_codes
+            if str(code).strip()
+        )
+    )
+
+
+def _clear_requirement_recommendation_state(
+    *,
+    st: object,
+) -> None:
+    session_state = getattr(st, "session_state", None)
+    if session_state is None:
+        return
+
+    try:
+        session_state.pop(
+            _ASSESSMENT_REQUIREMENT_SUGGESTION_CODES_SESSION_KEY,
+            None,
+        )
+        session_state.pop(
+            _ASSESSMENT_REQUIREMENT_SUGGESTION_SCOPE_TOKEN_SESSION_KEY,
+            None,
+        )
+        session_state.pop(
+            _ASSESSMENT_TOPIC_SUGGESTION_CODES_SESSION_KEY,
+            None,
+        )
+    except AttributeError:
+        return
+
+
+def _apply_topic_recommendation_state(
+    *,
+    st: object,
+    scope_token: str,
+) -> bool:
+    session_state = getattr(st, "session_state", None)
+    if session_state is None:
+        return False
+
+    try:
+        stored_token = session_state.get(
+            _ASSESSMENT_REQUIREMENT_SUGGESTION_SCOPE_TOKEN_SESSION_KEY
+        )
+        stored_codes = session_state.get(
+            _ASSESSMENT_TOPIC_SUGGESTION_CODES_SESSION_KEY
+        )
+    except AttributeError:
+        return False
+
+    if stored_token != scope_token or not stored_codes:
+        return False
+
+    session_state["math69_builder_topics"] = ", ".join(stored_codes)
+    session_state[
+        _ASSESSMENT_TOPIC_APPLIED_SCOPE_TOKEN_SESSION_KEY
+    ] = scope_token
+    return True
+
+
+def _canonical_scope_selection_is_confirmed(
+    *,
+    st: object,
+    topic_text: object,
+    requirement_text: object,
+    scope_token: str | None,
+) -> bool:
+    # The preview service remains preliminary/non-canonical. This helper only
+    # confirms that the exact-reviewed scope was explicitly applied by teacher.
+    if not scope_token:
+        return False
+
+    session_state = getattr(st, "session_state", None)
+    if session_state is None:
+        return False
+
+    try:
+        stored_scope_token = session_state.get(
+            _ASSESSMENT_REQUIREMENT_SUGGESTION_SCOPE_TOKEN_SESSION_KEY
+        )
+        topic_apply_token = session_state.get(
+            _ASSESSMENT_TOPIC_APPLIED_SCOPE_TOKEN_SESSION_KEY
+        )
+        requirement_apply_token = session_state.get(
+            _ASSESSMENT_REQUIREMENT_APPLIED_SCOPE_TOKEN_SESSION_KEY
+        )
+        suggested_topics = tuple(
+            session_state.get(
+                _ASSESSMENT_TOPIC_SUGGESTION_CODES_SESSION_KEY
+            )
+            or ()
+        )
+        suggested_requirements = tuple(
+            session_state.get(
+                _ASSESSMENT_REQUIREMENT_SUGGESTION_CODES_SESSION_KEY
+            )
+            or ()
+        )
+    except (AttributeError, TypeError):
+        return False
+
+    if (
+        stored_scope_token != scope_token
+        or topic_apply_token != scope_token
+        or requirement_apply_token != scope_token
+        or not suggested_topics
+        or not suggested_requirements
+    ):
+        return False
+
+    return (
+        _codes(topic_text) == suggested_topics
+        and _codes(requirement_text) == suggested_requirements
+    )
+
+
+def _apply_requirement_recommendation_state(
+    *,
+    st: object,
+    scope_token: str,
+) -> bool:
+    session_state = getattr(st, "session_state", None)
+    if session_state is None:
+        return False
+
+    try:
+        stored_token = session_state.get(
+            _ASSESSMENT_REQUIREMENT_SUGGESTION_SCOPE_TOKEN_SESSION_KEY
+        )
+        stored_codes = session_state.get(
+            _ASSESSMENT_REQUIREMENT_SUGGESTION_CODES_SESSION_KEY
+        )
+    except AttributeError:
+        return False
+
+    if stored_token != scope_token:
+        return False
+
+    if not isinstance(stored_codes, tuple) or not stored_codes:
+        return False
+
+    session_state["math69_builder_requirements"] = ", ".join(
+        stored_codes
+    )
+    session_state[
+        _ASSESSMENT_REQUIREMENT_APPLIED_SCOPE_TOKEN_SESSION_KEY
+    ] = scope_token
+    return True
+
+
 def _automatic_governed_defaults(
     *,
     st: object,
     grade_level: int,
+    assessment_type_code: str,
     semester_number: int,
     ppct_runtime_evidence: AssessmentPpctRuntimeEvidence | None,
 ) -> tuple[object | None, str | None]:
@@ -305,6 +626,7 @@ def _automatic_governed_defaults(
             user_id=user_id,
         ).load_defaults(
             subject_code="MATH",
+            assessment_type_code=assessment_type_code,
             grade_level=grade_level,
             academic_year=ppct_runtime_evidence.academic_year,
             semester_number=semester_number,
@@ -593,7 +915,7 @@ def render_assessment_builder_page(
     )
 
     st.info(
-        "Chế độ thử nghiệm cục bộ: UI không tự gọi Supabase, không phê duyệt, "
+        "Chế độ thử nghiệm cục bộ: UI sử dụng runtime authenticated chỉ đọc Supabase, không phê duyệt, "
         "không xuất bản và không thay route Production. PPCT chỉ được nhận "
         "qua session từ runtime bên ngoài."
     )
@@ -631,6 +953,7 @@ def render_assessment_builder_page(
             _automatic_governed_defaults(
                 st=st,
                 grade_level=grade_level,
+                assessment_type_code=assessment_type_code,
                 semester_number=semester_number,
                 ppct_runtime_evidence=ppct_runtime_evidence,
             )
@@ -854,11 +1177,231 @@ def render_assessment_builder_page(
 
     with st.container(border=True):
         st.subheader("5. Phạm vi kiến thức")
+
+        canonical_scope_error = None
+        try:
+            canonical_scope_result = (
+                _canonical_scope_result_from_session(st)
+            )
+        except TypeError as error:
+            canonical_scope_result = None
+            canonical_scope_error = str(error)
+
+        if canonical_scope_error is not None:
+            st.warning(
+                "Phạm vi canonical chưa dùng được: "
+                + canonical_scope_error
+            )
+        elif canonical_scope_result is None:
+            st.info(
+                "Runtime chưa cung cấp phạm vi canonical VERIFIED. "
+                "Giáo viên vẫn có thể nhập phạm vi thủ công; hệ thống "
+                "không tự suy đoán hoặc dùng mapping CANDIDATE."
+            )
+        elif canonical_scope_result.ready:
+            st.success(
+                "Đã nhận phạm vi canonical VERIFIED: "
+                f"{len(canonical_scope_result.topic_codes)} chủ đề, "
+                f"{len(canonical_scope_result.requirement_codes)} YCCĐ. "
+                "Trạng thái này chỉ để đối chiếu; hệ thống chưa tự điền "
+                "vào các ô nhập thủ công."
+            )
+        else:
+            reason_text = "; ".join(
+                canonical_scope_result.blocking_reasons
+            )
+            st.warning(
+                "Phạm vi canonical đang bị chặn "
+                f"({canonical_scope_result.status}). "
+                + reason_text
+            )
         st.caption(
             "Phạm vi tiết PPCT được đề xuất tự động ở phía trên. "
             "Mapping từ các bài trong phạm vi sang Chủ đề/YCCĐ canonical "
             "sẽ được nối ở bước tiếp theo; hiện chưa tự bịa mã khi dữ liệu bridge còn thiếu."
         )
+        recommendation_scope_token = None
+        recommendation_result = None
+        recommendation_error = None
+
+        recommendation_scope_confirmed = (
+            assessment_type_code != "REGULAR"
+            and ppct_suggestion is not None
+            and _ppct_scope_is_confirmed(
+                st=st,
+                suggestion=ppct_suggestion,
+            )
+        )
+
+        if not recommendation_scope_confirmed:
+            _clear_requirement_recommendation_state(
+                st=st,
+            )
+            if assessment_type_code != "REGULAR":
+                st.info(
+                    "Xác nhận phạm vi PPCT để "
+                    "hệ thống đề xuất YCCĐ."
+                )
+        else:
+            recommendation_scope_token = (
+                _requirement_recommendation_scope_token(
+                    ppct_runtime_evidence=ppct_runtime_evidence,
+                    ppct_suggestion=ppct_suggestion,
+                )
+            )
+
+            (
+                recommendation_result,
+                recommendation_error,
+            ) = _automatic_requirement_recommendation(
+                st=st,
+                ppct_runtime_evidence=ppct_runtime_evidence,
+                ppct_suggestion=ppct_suggestion,
+            )
+
+            if recommendation_result is None:
+                _clear_requirement_recommendation_state(
+                    st=st,
+                )
+                st.info(
+                    "Chưa đủ dữ liệu để đề xuất."
+                )
+                if recommendation_error:
+                    st.caption(
+                        "Chi tiết kiểm tra: "
+                        + str(recommendation_error)
+                    )
+            else:
+                suggested_requirement_codes = tuple(
+                    recommendation_result.requirement_codes
+                )
+                _store_requirement_recommendation_state(
+                    st=st,
+                    scope_token=recommendation_scope_token,
+                    requirement_codes=suggested_requirement_codes,
+                )
+
+                st.success(
+                    "Hệ thống đề xuất "
+                    f"{len(suggested_requirement_codes)} YCCĐ "
+                    "từ mapping đã được rà soát."
+                )
+                st.caption(
+                    "Nguồn đề xuất: PPCT đã xác nhận → "
+                    f"{len(recommendation_result.textbook_unit_ids)} bài SGK → "
+                    "YCCĐ exact reviewed. "
+                    "Hệ thống không tự áp dụng vào "
+                    "lựa chọn cuối cùng của giáo viên."
+                )
+                presentation_result = None
+                presentation_error = None
+                try:
+                    presentation_client = getattr(
+                        st,
+                        "session_state",
+                        {},
+                    ).get("portal_supabase_client")
+                    presentation_result = (
+                        AssessmentBuilderRequirementRecommendationPresentationRuntime(
+                            client=presentation_client,
+                        ).load(
+                            textbook_unit_ids=tuple(
+                                recommendation_result.textbook_unit_ids
+                            ),
+                            requirement_codes=suggested_requirement_codes,
+                        )
+                    )
+                except (
+                    AssessmentBuilderRequirementRecommendationPresentationRuntimeError,
+                    TypeError,
+                    ValueError,
+                ) as error:
+                    presentation_error = str(error)
+
+                if presentation_result is None:
+                    st.write(
+                        {
+                            "YCCĐ hệ thống đề xuất": list(
+                                suggested_requirement_codes
+                            )
+                        }
+                    )
+                    if presentation_error:
+                        st.caption(
+                            "Chưa tải được phần mô tả dễ đọc; "
+                            "mã YCCĐ exact reviewed vẫn được giữ nguyên."
+                        )
+                else:
+                    suggested_topic_codes = tuple(
+                        presentation_result.topic_codes
+                    )
+                    _store_topic_recommendation_state(
+                        st=st,
+                        topic_codes=suggested_topic_codes,
+                    )
+
+                    with st.expander(
+                        f"Bài SGK trong phạm vi đề xuất "
+                        f"({len(presentation_result.lessons)})",
+                        expanded=False,
+                    ):
+                        for lesson in presentation_result.lessons:
+                            chapter_suffix = (
+                                f" — {lesson.chapter_title}"
+                                if lesson.chapter_title
+                                else ""
+                            )
+                            st.write(
+                                f"- **{lesson.title}**{chapter_suffix}"
+                            )
+
+                    with st.expander(
+                        f"Chủ đề hệ thống đề xuất "
+                        f"({len(presentation_result.topics)})",
+                        expanded=True,
+                    ):
+                        for topic in presentation_result.topics:
+                            st.write(
+                                f"- **{topic.topic_code}** — "
+                                f"{topic.topic_name}"
+                            )
+
+                    st.subheader("YCCĐ hệ thống đề xuất")
+                    st.dataframe(
+                        [
+                            {
+                                "Mã YCCĐ": row.requirement_code,
+                                "Chủ đề": row.topic_name,
+                                "Yêu cầu cần đạt": row.requirement_text,
+                            }
+                            for row in presentation_result.requirements
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+                    if st.button(
+                        "Áp dụng đề xuất Chủ đề",
+                        key="math69_builder_apply_topic_suggestion",
+                        use_container_width=True,
+                    ):
+                        if _apply_topic_recommendation_state(
+                            st=st,
+                            scope_token=recommendation_scope_token,
+                        ):
+                            st.rerun()
+
+                if st.button(
+                    "Áp dụng đề xuất YCCĐ",
+                    key="math69_builder_apply_requirement_suggestion",
+                    use_container_width=True,
+                ):
+                    if _apply_requirement_recommendation_state(
+                        st=st,
+                        scope_token=recommendation_scope_token,
+                    ):
+                        st.rerun()
+
         scope_columns = st.columns(2)
         with scope_columns[0]:
             topic_text = st.text_area(
@@ -870,7 +1413,6 @@ def render_assessment_builder_page(
         with scope_columns[1]:
             requirement_text = st.text_area(
                 "Mã yêu cầu cần đạt đã chọn",
-                value="",
                 placeholder="Ví dụ: YC01, YC02, YC03",
                 key="math69_builder_requirements",
             )
@@ -975,27 +1517,96 @@ def render_assessment_builder_page(
         )
 
     with specification_tab:
-        st.info(
-            "A2-MATH69 sẽ nối chủ đề, nội dung và yêu cầu cần đạt canonical "
-            "để tạo bản đặc tả chi tiết."
+        specification_preview = (
+            AssessmentBuilderSpecificationPreviewService().build(
+                configuration=configuration,
+                matrix_preview=preview,
+            )
         )
-        st.write(
-            {
-                "Khối lớp": preview.grade_level,
-                "Loại kiểm tra": _ASSESSMENT_TYPE_LABELS[
-                    preview.assessment_type_code
-                ],
-                "Học kỳ": preview.semester_number,
-                "Thời lượng": f"{preview.duration_minutes} phút",
-                "Tổng điểm": float(preview.total_score),
-                "Số chủ đề đã chọn": len(preview.selected_topic_codes),
-                "Số YCCĐ đã chọn": len(preview.selected_requirement_codes),
-            }
+        st.warning(specification_preview.authority_label)
+        st.caption(specification_preview.authority_note)
+
+        canonical_scope_confirmed = (
+            _canonical_scope_selection_is_confirmed(
+                st=st,
+                topic_text=topic_text,
+                requirement_text=requirement_text,
+                scope_token=recommendation_scope_token,
+            )
+        )
+        if canonical_scope_confirmed:
+            st.success(
+                'Phạm vi canonical exact-reviewed đã được giáo viên xác nhận: '
+                f"{len(specification_preview.selected_topic_codes)} \u0063\u0068\u1ee7 \u0111\u1ec1, "
+                f"{len(specification_preview.selected_requirement_codes)} YCC\u0110. "
+                'Bản đặc tả vẫn là bản sơ bộ vì hệ thống chưa phân bổ nội dung/YCCĐ vào từng ô ma trận.'
+            )
+        elif (
+            specification_preview.selected_topic_codes
+            or specification_preview.selected_requirement_codes
+        ):
+            st.info(
+                'Phạm vi hiện tại là lựa chọn biên tập của giáo viên. Chỉ khi giáo viên áp dụng cả đề xuất Chủ đề và đề xuất YCCĐ exact-reviewed của đúng phạm vi PPCT hiện tại thì hệ thống mới xác nhận trạng thái phạm vi canonical.'
+            )
+
+        st.markdown("**Cấu trúc đề**")
+        st.dataframe(
+            [
+                {
+                    "Phần": row.section_code,
+                    "Dạng câu hỏi": row.question_type_name,
+                    "Số câu": row.question_count,
+                    "Số lượt trả lời": row.response_count,
+                    "Điểm": float(row.section_score),
+                    "Tỷ lệ điểm (%)": float(row.score_percentage),
+                }
+                for row in specification_preview.section_rows
+            ],
+            use_container_width=True,
+            hide_index=True,
         )
 
+        st.markdown("**Mức độ nhận thức**")
+        st.dataframe(
+            [
+                {
+                    "Mức độ": row.cognitive_level_name,
+                    "Tỷ lệ (%)": float(row.target_percentage),
+                    "Điểm mục tiêu": float(row.target_score),
+                }
+                for row in specification_preview.cognitive_rows
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("**Phạm vi đang chọn — chỉ dùng cho biên tập**")
+        st.write(
+            {
+                "Khối lớp": specification_preview.grade_level,
+                "Loại kiểm tra": _ASSESSMENT_TYPE_LABELS[
+                    specification_preview.assessment_type_code
+                ],
+                "Học kỳ": specification_preview.semester_number,
+                "Thời lượng": (
+                    f"{specification_preview.duration_minutes} phút"
+                ),
+                "Tổng điểm": float(specification_preview.total_score),
+                "Mã chủ đề do giáo viên chọn": list(
+                    specification_preview.selected_topic_codes
+                ),
+                "Mã YCCĐ do giáo viên chọn": list(
+                    specification_preview.selected_requirement_codes
+                ),
+            }
+        )
     st.caption(
         "Phạm vi đã chọn: "
         f"{len(preview.selected_topic_codes)} chủ đề, "
         f"{len(preview.selected_requirement_codes)} YCCĐ. "
         "A2 sẽ nối các dòng nội dung/YCCĐ vào ma trận chi tiết."
     )
+
+# R55C4C14_HUMAN_READABLE_RECOMMENDATION_UI
+
+# R55C4C15_R6_CANONICAL_SCOPE_STATUS_UI
