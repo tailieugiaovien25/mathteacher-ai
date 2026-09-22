@@ -17,12 +17,14 @@ def setting(
     grade=8,
     year="2026-2027",
     semester=1,
+    assessment_type="FINAL",
     score="10",
 ):
     return GovernedAssessmentSettingSnapshot(
         setting_version_id=version,
         profile_code="MATH-THCS-01",
         subject_code="MATH",
+        assessment_type_code=assessment_type,
         grade_level=grade,
         academic_year=year,
         semester_number=semester,
@@ -99,6 +101,7 @@ def test_unique_approved_setting_is_resolved_automatically():
             ),
         ),
         subject_code="math",
+        assessment_type_code="FINAL",
         grade_level=8,
         academic_year="2026-2027",
         semester_number=1,
@@ -117,6 +120,7 @@ def test_no_matching_setting_fails_closed():
         service.resolve_unique_setting(
             settings=(setting(grade=7),),
             subject_code="MATH",
+            assessment_type_code="FINAL",
             grade_level=8,
             academic_year="2026-2027",
             semester_number=1,
@@ -136,6 +140,7 @@ def test_multiple_matching_settings_fail_closed():
                 setting(version="B"),
             ),
             subject_code="MATH",
+            assessment_type_code="FINAL",
             grade_level=8,
             academic_year="2026-2027",
             semester_number=1,
@@ -259,3 +264,21 @@ def test_duplicate_section_codes_fail_closed():
                 ),
             )
         )
+
+
+def test_assessment_type_is_part_of_unique_setting_identity():
+    service = AssessmentBuilderGovernedDefaultsService()
+
+    result = service.resolve_unique_setting(
+        settings=(
+            setting(version="MID", assessment_type="MIDTERM"),
+            setting(version="FIN", assessment_type="FINAL"),
+        ),
+        subject_code="MATH",
+        assessment_type_code="MIDTERM",
+        grade_level=8,
+        academic_year="2026-2027",
+        semester_number=1,
+    )
+
+    assert result.setting_version_id == "MID"

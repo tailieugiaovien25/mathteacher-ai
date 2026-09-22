@@ -30,6 +30,7 @@ def _defaults():
             setting_version_id="SETTING-1",
             profile_code="MATH-THCS-01",
             subject_code="MATH",
+            assessment_type_code="FINAL",
             grade_level=8,
             academic_year="2026-2027",
             semester_number=1,
@@ -100,11 +101,13 @@ def test_auto_governed_defaults_uses_authenticated_session_and_ppct_year(
             self,
             *,
             subject_code,
+            assessment_type_code,
             grade_level,
             academic_year,
             semester_number,
         ):
             captured["subject_code"] = subject_code
+            captured["assessment_type_code"] = assessment_type_code
             captured["grade_level"] = grade_level
             captured["academic_year"] = academic_year
             captured["semester_number"] = semester_number
@@ -126,6 +129,7 @@ def test_auto_governed_defaults_uses_authenticated_session_and_ppct_year(
     defaults, error = ui._automatic_governed_defaults(
         st=st,
         grade_level=8,
+        assessment_type_code="FINAL",
         semester_number=1,
         ppct_runtime_evidence=evidence,
     )
@@ -138,6 +142,7 @@ def test_auto_governed_defaults_uses_authenticated_session_and_ppct_year(
     ]
     assert captured["user_id"] == USER_ID
     assert captured["subject_code"] == "MATH"
+    assert captured["assessment_type_code"] == "FINAL"
     assert captured["grade_level"] == 8
     assert captured["academic_year"] == "2026-2027"
     assert captured["semester_number"] == 1
@@ -154,6 +159,7 @@ def test_missing_portal_runtime_context_fails_closed():
     defaults, error = ui._automatic_governed_defaults(
         st=st,
         grade_level=8,
+        assessment_type_code="FINAL",
         semester_number=1,
         ppct_runtime_evidence=evidence,
     )
@@ -166,6 +172,7 @@ def test_missing_ppct_evidence_fails_closed():
     defaults, error = ui._automatic_governed_defaults(
         st=_St(),
         grade_level=8,
+        assessment_type_code="FINAL",
         semester_number=1,
         ppct_runtime_evidence=None,
     )

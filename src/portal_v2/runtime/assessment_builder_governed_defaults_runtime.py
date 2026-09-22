@@ -5,8 +5,8 @@ structure from Supabase and delegates all validation/selection rules to
 AssessmentBuilderGovernedDefaultsService.
 
 It performs no writes and does not infer an assessment type from names/codes.
-If more than one approved setting matches subject + grade + academic year +
-semester, automatic resolution fails closed.
+The selected assessment type is supplied explicitly and must match the approved
+setting row. Ambiguous or missing matches fail closed.
 """
 
 from __future__ import annotations
@@ -130,6 +130,7 @@ class AssessmentBuilderGovernedDefaultsRuntime:
         self,
         *,
         subject_code: str,
+        assessment_type_code: str,
         grade_level: int,
         academic_year: str,
         semester_number: int,
@@ -140,6 +141,7 @@ class AssessmentBuilderGovernedDefaultsRuntime:
             setting = self._service.resolve_unique_setting(
                 settings=settings,
                 subject_code=subject_code,
+                assessment_type_code=assessment_type_code,
                 grade_level=grade_level,
                 academic_year=academic_year,
                 semester_number=semester_number,
@@ -188,7 +190,7 @@ class AssessmentBuilderGovernedDefaultsRuntime:
             )
             .select(
                 "setting_version_id,profile_code,"
-                "subject_code,grade_level,academic_year,"
+                "subject_code,assessment_type_code,grade_level,academic_year,"
                 "semester_number,duration_minutes,"
                 "total_score,review_status,locked_at,"
                 "assessment_exam_setting_sets!inner("
@@ -256,6 +258,9 @@ class AssessmentBuilderGovernedDefaultsRuntime:
                     ),
                     subject_code=row.get(
                         "subject_code"
+                    ),
+                    assessment_type_code=row.get(
+                        "assessment_type_code"
                     ),
                     grade_level=row.get(
                         "grade_level"

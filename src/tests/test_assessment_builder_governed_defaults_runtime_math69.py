@@ -77,6 +77,7 @@ def _setting_row(
     setting_id="SETTING-1",
     grade=8,
     semester=1,
+    assessment_type="FINAL",
     owner=USER_ID,
     visibility="PRIVATE",
 ):
@@ -84,6 +85,7 @@ def _setting_row(
         "setting_version_id": setting_id,
         "profile_code": "MATH-THCS-01",
         "subject_code": "MATH",
+        "assessment_type_code": assessment_type,
         "grade_level": grade,
         "academic_year": "2026-2027",
         "semester_number": semester,
@@ -175,6 +177,7 @@ def test_runtime_loads_governed_defaults_end_to_end():
         )
         .load_defaults(
             subject_code="MATH",
+            assessment_type_code="FINAL",
             grade_level=8,
             academic_year="2026-2027",
             semester_number=1,
@@ -226,6 +229,7 @@ def test_shared_setting_from_other_owner_is_visible():
         )
         .load_defaults(
             subject_code="MATH",
+            assessment_type_code="FINAL",
             grade_level=8,
             academic_year="2026-2027",
             semester_number=1,
@@ -264,6 +268,7 @@ def test_private_setting_from_other_owner_is_not_visible():
             )
             .load_defaults(
                 subject_code="MATH",
+                assessment_type_code="FINAL",
                 grade_level=8,
                 academic_year="2026-2027",
                 semester_number=1,
@@ -296,6 +301,7 @@ def test_multiple_matching_approved_settings_fail_closed():
             )
             .load_defaults(
                 subject_code="MATH",
+                assessment_type_code="FINAL",
                 grade_level=8,
                 academic_year="2026-2027",
                 semester_number=1,
@@ -322,6 +328,7 @@ def test_profile_score_mismatch_fails_closed():
             )
             .load_defaults(
                 subject_code="MATH",
+                assessment_type_code="FINAL",
                 grade_level=8,
                 academic_year="2026-2027",
                 semester_number=1,
@@ -341,6 +348,7 @@ def test_runtime_is_read_only_query_contract():
         )
         .load_defaults(
             subject_code="MATH",
+            assessment_type_code="FINAL",
             grade_level=8,
             academic_year="2026-2027",
             semester_number=1,
@@ -366,3 +374,27 @@ def test_runtime_is_read_only_query_contract():
                 }
                 for call in query.calls
             )
+
+
+def test_runtime_filters_by_explicit_assessment_type():
+    client = _Client(
+        _tables(
+            settings=[
+                _setting_row(setting_id="MID", assessment_type="MIDTERM"),
+                _setting_row(setting_id="FIN", assessment_type="FINAL"),
+            ]
+        )
+    )
+
+    result = AssessmentBuilderGovernedDefaultsRuntime(
+        client=client,
+        user_id=USER_ID,
+    ).load_defaults(
+        subject_code="MATH",
+        assessment_type_code="MIDTERM",
+        grade_level=8,
+        academic_year="2026-2027",
+        semester_number=1,
+    )
+
+    assert result.setting_version_id == "MID"

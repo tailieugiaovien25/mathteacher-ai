@@ -9,9 +9,9 @@ Governed structural values such as duration, score, question-section structure,
 and cognitive allocation are not re-entered when an unambiguous approved
 setting/profile is available.
 
-The current approved-setting contract does not carry assessment_type. Therefore
-automatic setting selection is intentionally fail-closed when more than one
-approved setting matches subject + grade + academic year + semester.
+Approved setting snapshots carry assessment_type_code explicitly. Automatic
+setting selection is fail-closed unless exactly one approved setting matches
+subject + grade + assessment type + academic year + semester.
 """
 
 from __future__ import annotations
@@ -76,6 +76,7 @@ class GovernedAssessmentSettingSnapshot:
     setting_version_id: str
     profile_code: str
     subject_code: str
+    assessment_type_code: str
     grade_level: int
     academic_year: str
     semester_number: int | None
@@ -106,6 +107,20 @@ class GovernedAssessmentSettingSnapshot:
                 self.subject_code,
                 "subject_code",
             ).upper(),
+        )
+
+        assessment_type = _text(
+            self.assessment_type_code,
+            "assessment_type_code",
+        ).upper()
+        if assessment_type not in {"REGULAR", "MIDTERM", "FINAL"}:
+            raise AssessmentBuilderGovernedDefaultsError(
+                "assessment_type_code must be REGULAR, MIDTERM, or FINAL"
+            )
+        object.__setattr__(
+            self,
+            "assessment_type_code",
+            assessment_type,
         )
 
         grade = _positive_int(
@@ -313,6 +328,7 @@ class AssessmentBuilderGovernedDefaultsService:
             GovernedAssessmentSettingSnapshot
         ],
         subject_code: str,
+        assessment_type_code: str,
         grade_level: int,
         academic_year: str,
         semester_number: int,
@@ -321,6 +337,15 @@ class AssessmentBuilderGovernedDefaultsService:
             subject_code,
             "subject_code",
         ).upper()
+        assessment_type = _text(
+            assessment_type_code,
+            "assessment_type_code",
+        ).upper()
+        if assessment_type not in {"REGULAR", "MIDTERM", "FINAL"}:
+            raise AssessmentBuilderGovernedDefaultsError(
+                "assessment_type_code must be REGULAR, MIDTERM, or FINAL"
+            )
+
         year = _text(
             academic_year,
             "academic_year",
@@ -348,6 +373,7 @@ class AssessmentBuilderGovernedDefaultsService:
             for item in settings
             if (
                 item.subject_code == subject
+                and item.assessment_type_code == assessment_type
                 and item.grade_level == grade
                 and item.academic_year == year
                 and item.semester_number == semester
@@ -357,7 +383,7 @@ class AssessmentBuilderGovernedDefaultsService:
         if not matches:
             raise AssessmentBuilderGovernedDefaultsError(
                 "no approved setting matches the current "
-                "subject/grade/academic-year/semester selection"
+                "subject/grade/assessment-type/academic-year/semester selection"
             )
 
         if len(matches) != 1:
