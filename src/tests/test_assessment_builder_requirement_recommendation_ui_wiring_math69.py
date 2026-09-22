@@ -122,6 +122,196 @@ def test_unproven_grade_fails_closed_before_runtime_call():
     assert error == "Chưa đủ dữ liệu để đề xuất."
 
 
+def test_grade6_exact_reviewed_scope_reaches_runtime(monkeypatch):
+    calls = {}
+
+    class FakeRuntime:
+        def __init__(self, *, client, user_id):
+            calls["client"] = client
+            calls["user_id"] = user_id
+
+        def recommend(
+            self,
+            *,
+            source_id,
+            source_version,
+            subject_grade,
+            sub_subject,
+            period_from,
+            period_to,
+        ):
+            calls["recommend"] = {
+                "source_id": source_id,
+                "source_version": source_version,
+                "subject_grade": subject_grade,
+                "sub_subject": sub_subject,
+                "period_from": period_from,
+                "period_to": period_to,
+            }
+            return SimpleNamespace(
+                status="EXACT_REVIEWED_RECOMMENDATION"
+            )
+
+    monkeypatch.setattr(
+        ui,
+        "AssessmentBuilderRequirementRecommendationRuntime",
+        FakeRuntime,
+    )
+
+    fake_client = object()
+    st = FakeSt(
+        {
+            "portal_supabase_client": fake_client,
+            "portal_user_id":
+                "11111111-1111-4111-8111-111111111111",
+        }
+    )
+
+    result, error = ui._automatic_requirement_recommendation(
+        st=st,
+        ppct_runtime_evidence=SimpleNamespace(
+            academic_year="2026-2027",
+            source_id="source-g6",
+            source_version="1",
+        ),
+        ppct_suggestion=SimpleNamespace(
+            grade_level=6,
+            subject_grade="Toan 6",
+            sub_subject=None,
+            period_from=1,
+            period_to=128,
+        ),
+    )
+
+    assert error is None
+    assert result.status == "EXACT_REVIEWED_RECOMMENDATION"
+    assert calls["client"] is fake_client
+    assert calls["recommend"] == {
+        "source_id": "source-g6",
+        "source_version": "1",
+        "subject_grade": "Toan 6",
+        "sub_subject": None,
+        "period_from": 1,
+        "period_to": 128,
+    }
+
+
+def test_grade9_still_fails_closed_before_runtime_call():
+    st = FakeSt()
+
+    result, error = ui._automatic_requirement_recommendation(
+        st=st,
+        ppct_runtime_evidence=SimpleNamespace(
+            academic_year="2026-2027",
+            source_id="source",
+            source_version="1",
+        ),
+        ppct_suggestion=SimpleNamespace(
+            grade_level=9,
+            subject_grade="Toan 9",
+            sub_subject=None,
+            period_from=1,
+            period_to=10,
+        ),
+    )
+
+    assert result is None
+    assert error is not None
+
+
+def test_clear_removes_applied_tokens_but_preserves_teacher_final_selection():
+    st = FakeSt(
+        {
+            "math69_builder_topics": "T1, T2",
+            "math69_builder_requirements": "Y1, Y2",
+        }
+    )
+
+    ui._store_requirement_recommendation_state(
+        st=st,
+        scope_token="scope-a",
+        requirement_codes=("Y1", "Y2"),
+    )
+    ui._store_topic_recommendation_state(
+        st=st,
+        topic_codes=("T1", "T2"),
+    )
+
+    assert ui._apply_topic_recommendation_state(
+        st=st,
+        scope_token="scope-a",
+    ) is True
+    assert ui._apply_requirement_recommendation_state(
+        st=st,
+        scope_token="scope-a",
+    ) is True
+
+    assert ui._canonical_scope_selection_is_confirmed(
+        st=st,
+        topic_text="T1, T2",
+        requirement_text="Y1, Y2",
+        scope_token="scope-a",
+    ) is True
+
+    ui._clear_requirement_recommendation_state(st=st)
+
+    assert st.session_state["math69_builder_topics"] == "T1, T2"
+    assert (
+        st.session_state["math69_builder_requirements"]
+        == "Y1, Y2"
+    )
+    assert (
+        ui._ASSESSMENT_TOPIC_APPLIED_SCOPE_TOKEN_SESSION_KEY
+        not in st.session_state
+    )
+    assert (
+        ui._ASSESSMENT_REQUIREMENT_APPLIED_SCOPE_TOKEN_SESSION_KEY
+        not in st.session_state
+    )
+
+    # Regenerate the same scope. Old apply evidence must NOT revive.
+    ui._store_requirement_recommendation_state(
+        st=st,
+        scope_token="scope-a",
+        requirement_codes=("Y1", "Y2"),
+    )
+    ui._store_topic_recommendation_state(
+        st=st,
+        topic_codes=("T1", "T2"),
+    )
+
+    assert ui._canonical_scope_selection_is_confirmed(
+        st=st,
+        topic_text="T1, T2",
+        requirement_text="Y1, Y2",
+        scope_token="scope-a",
+    ) is False
+
+    assert ui._apply_topic_recommendation_state(
+        st=st,
+        scope_token="scope-a",
+    ) is True
+
+    assert ui._canonical_scope_selection_is_confirmed(
+        st=st,
+        topic_text="T1, T2",
+        requirement_text="Y1, Y2",
+        scope_token="scope-a",
+    ) is False
+
+    assert ui._apply_requirement_recommendation_state(
+        st=st,
+        scope_token="scope-a",
+    ) is True
+
+    assert ui._canonical_scope_selection_is_confirmed(
+        st=st,
+        topic_text="T1, T2",
+        requirement_text="Y1, Y2",
+        scope_token="scope-a",
+    ) is True
+
+
 def test_ui_source_keeps_teacher_selection_as_final_configuration_authority():
     source = Path(ui.__file__).read_text(
         encoding="utf-8-sig"

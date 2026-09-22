@@ -373,7 +373,7 @@ def _automatic_requirement_recommendation(
             "Chưa đủ dữ liệu để đề xuất."
         )
 
-    if int(ppct_suggestion.grade_level) != 7:
+    if int(ppct_suggestion.grade_level) not in (6, 7):
         return None, (
             "Chưa đủ dữ liệu để đề xuất."
         )
@@ -472,6 +472,14 @@ def _clear_requirement_recommendation_state(
         )
         session_state.pop(
             _ASSESSMENT_TOPIC_SUGGESTION_CODES_SESSION_KEY,
+            None,
+        )
+        session_state.pop(
+            _ASSESSMENT_TOPIC_APPLIED_SCOPE_TOKEN_SESSION_KEY,
+            None,
+        )
+        session_state.pop(
+            _ASSESSMENT_REQUIREMENT_APPLIED_SCOPE_TOKEN_SESSION_KEY,
             None,
         )
     except AttributeError:
