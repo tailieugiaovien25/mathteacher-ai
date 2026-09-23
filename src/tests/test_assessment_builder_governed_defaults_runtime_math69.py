@@ -398,3 +398,128 @@ def test_runtime_filters_by_explicit_assessment_type():
     )
 
     assert result.setting_version_id == "MID"
+
+
+def test_runtime_pushes_exact_scope_filters_to_backend_query():
+    client = _Client(
+        _tables(
+            settings=[
+                _setting_row(
+                    setting_id="MID",
+                    assessment_type="MIDTERM",
+                    grade=6,
+                    semester=1,
+                )
+            ]
+        )
+    )
+
+    AssessmentBuilderGovernedDefaultsRuntime(
+        client=client,
+        user_id=USER_ID,
+    ).load_defaults(
+        subject_code="MATH",
+        assessment_type_code="MIDTERM",
+        grade_level=6,
+        academic_year="2026-2027",
+        semester_number=1,
+    )
+
+    query = client.queries[
+        "assessment_exam_setting_versions"
+    ][0]
+
+    assert ("eq", "subject_code", "MATH") in query.calls
+    assert (
+        "eq",
+        "assessment_type_code",
+        "MIDTERM",
+    ) in query.calls
+    assert ("eq", "grade_level", 6) in query.calls
+    assert (
+        "eq",
+        "academic_year",
+        "2026-2027",
+    ) in query.calls
+    assert ("eq", "semester_number", 1) in query.calls
+
+
+def test_runtime_skips_untyped_legacy_rows_before_snapshot_construction():
+    legacy = _setting_row(
+        setting_id="LEGACY",
+        assessment_type="FINAL",
+        grade=6,
+        semester=1,
+    )
+    legacy["assessment_type_code"] = None
+
+    typed_midterm = _setting_row(
+        setting_id="MID",
+        assessment_type="MIDTERM",
+        grade=6,
+        semester=1,
+    )
+
+    client = _Client(
+        _tables(
+            settings=[
+                legacy,
+                typed_midterm,
+            ]
+        )
+    )
+
+    result = AssessmentBuilderGovernedDefaultsRuntime(
+        client=client,
+        user_id=USER_ID,
+    ).load_defaults(
+        subject_code="MATH",
+        assessment_type_code="MIDTERM",
+        grade_level=6,
+        academic_year="2026-2027",
+        semester_number=1,
+    )
+
+    assert result.setting_version_id == "MID"
+
+
+class _FailingSettingQuery(_Query):
+    def execute(self):
+        raise RuntimeError(
+            "raw backend schema detail must not reach the UI"
+        )
+
+
+class _FailingSettingClient(_Client):
+    def table(self, name):
+        if name == "assessment_exam_setting_versions":
+            query = _FailingSettingQuery([])
+            self.queries.setdefault(name, []).append(query)
+            return query
+        return super().table(name)
+
+
+def test_runtime_wraps_backend_setting_query_failure_without_raw_detail():
+    client = _FailingSettingClient(_tables())
+
+    with pytest.raises(
+        AssessmentBuilderGovernedDefaultsRuntimeError,
+        match=(
+            "could not be queried safely "
+            "for the explicit assessment type"
+        ),
+    ) as exc_info:
+        AssessmentBuilderGovernedDefaultsRuntime(
+            client=client,
+            user_id=USER_ID,
+        ).load_defaults(
+            subject_code="MATH",
+            assessment_type_code="MIDTERM",
+            grade_level=6,
+            academic_year="2026-2027",
+            semester_number=1,
+        )
+
+    assert "raw backend schema detail" not in str(
+        exc_info.value
+    )

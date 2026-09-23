@@ -135,7 +135,13 @@ class AssessmentBuilderGovernedDefaultsRuntime:
         academic_year: str,
         semester_number: int,
     ) -> AssessmentBuilderGovernedDefaultsRuntimeResult:
-        settings = self._list_visible_approved_settings()
+        settings = self._list_visible_approved_settings(
+            subject_code=subject_code,
+            assessment_type_code=assessment_type_code,
+            grade_level=grade_level,
+            academic_year=academic_year,
+            semester_number=semester_number,
+        )
 
         try:
             setting = self._service.resolve_unique_setting(
@@ -179,48 +185,123 @@ class AssessmentBuilderGovernedDefaultsRuntime:
 
     def _list_visible_approved_settings(
         self,
+        *,
+        subject_code: str,
+        assessment_type_code: str,
+        grade_level: int,
+        academic_year: str,
+        semester_number: int,
     ) -> tuple[
         GovernedAssessmentSettingSnapshot,
         ...,
     ]:
-        response = (
-            self._client
-            .table(
-                "assessment_exam_setting_versions"
+        normalized_subject = str(subject_code).strip().upper()
+        normalized_assessment_type = str(
+            assessment_type_code
+        ).strip().upper()
+        normalized_academic_year = str(
+            academic_year
+        ).strip()
+
+        try:
+            normalized_grade = int(grade_level)
+            normalized_semester = int(semester_number)
+        except (TypeError, ValueError) as error:
+            raise AssessmentBuilderGovernedDefaultsRuntimeError(
+                "governed assessment scope is invalid"
+            ) from error
+
+        try:
+            response = (
+                self._client
+                .table(
+                    "assessment_exam_setting_versions"
+                )
+                .select(
+                    "setting_version_id,profile_code,"
+                    "subject_code,assessment_type_code,grade_level,academic_year,"
+                    "semester_number,duration_minutes,"
+                    "total_score,review_status,locked_at,"
+                    "assessment_exam_setting_sets!inner("
+                    "owner_user_id,visibility,lifecycle_status)"
+                )
+                .eq(
+                    "review_status",
+                    "APPROVED",
+                )
+                .not_
+                .is_(
+                    "locked_at",
+                    "null",
+                )
+                .eq(
+                    "assessment_exam_setting_sets.lifecycle_status",
+                    "ACTIVE",
+                )
+                .eq(
+                    "subject_code",
+                    normalized_subject,
+                )
+                .eq(
+                    "assessment_type_code",
+                    normalized_assessment_type,
+                )
+                .eq(
+                    "grade_level",
+                    normalized_grade,
+                )
+                .eq(
+                    "academic_year",
+                    normalized_academic_year,
+                )
+                .eq(
+                    "semester_number",
+                    normalized_semester,
+                )
+                .order(
+                    "created_at",
+                    desc=True,
+                )
+                .execute()
             )
-            .select(
-                "setting_version_id,profile_code,"
-                "subject_code,assessment_type_code,grade_level,academic_year,"
-                "semester_number,duration_minutes,"
-                "total_score,review_status,locked_at,"
-                "assessment_exam_setting_sets!inner("
-                "owner_user_id,visibility,lifecycle_status)"
-            )
-            .eq(
-                "review_status",
-                "APPROVED",
-            )
-            .not_
-            .is_(
-                "locked_at",
-                "null",
-            )
-            .eq(
-                "assessment_exam_setting_sets.lifecycle_status",
-                "ACTIVE",
-            )
-            .order(
-                "created_at",
-                desc=True,
-            )
-            .execute()
-        )
+        except Exception as error:
+            raise AssessmentBuilderGovernedDefaultsRuntimeError(
+                "governed assessment settings could not be queried safely "
+                "for the explicit assessment type"
+            ) from error
 
         result: list[
             GovernedAssessmentSettingSnapshot
         ] = []
 
         for row in _rows(response):
+            row_subject = str(
+                row.get("subject_code") or ""
+            ).strip().upper()
+            row_assessment_type = str(
+                row.get("assessment_type_code") or ""
+            ).strip().upper()
+            row_academic_year = str(
+                row.get("academic_year") or ""
+            ).strip()
+
+            try:
+                row_grade = int(row.get("grade_level"))
+                row_semester = int(row.get("semester_number"))
+            except (TypeError, ValueError):
+                continue
+
+            if (
+                row_subject != normalized_subject
+                or row_assessment_type
+                != normalized_assessment_type
+                or row_grade != normalized_grade
+                or row_academic_year
+                != normalized_academic_year
+                or row_semester != normalized_semester
+            ):
+                continue
+
             setting_set = _relation(
                 row.get(
                     "assessment_exam_setting_sets"
