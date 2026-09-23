@@ -52,7 +52,7 @@ def plan_blueprint(
     codes = [str(r['requirement_code']) for r in requirements]
     if len(set(codes)) != len(codes):
         raise AutoBlueprintError("Duplicate YCCĐ")
-    normalized: dict[str, tuple[str, frozenset[tuple[str, str]]]] = {}
+    normalized: dict[str, tuple[str, frozenset[tuple[str, str]], int | None]] = {}
     for requirement in requirements:
         code = str(requirement['requirement_code'])
         topic = str(requirement['topic_code'])
@@ -60,7 +60,10 @@ def plan_blueprint(
         if not code or not topic or not isinstance(eligibility, (list, tuple)) or not eligibility:
             raise AutoBlueprintError(f"Missing curated eligibility for {code}")
         pairs = frozenset((str(p[0]), str(p[1])) for p in eligibility)
-        normalized[code] = (topic, pairs)
+        cap = requirement.get("max_question_count")
+        if cap is not None and int(cap) <= 0:
+            raise AutoBlueprintError(f"Invalid question capacity for {code}")
+        normalized[code] = (topic, pairs, int(cap) if cap is not None else None)
 
     # Represent each question as one indivisible slot. Try valid level and
     # YCCĐ placements via deterministic backtracking; exact totals are required.
@@ -74,7 +77,7 @@ def plan_blueprint(
         for _ in range(count):
             slots.append((str(section['section_code']), str(section['question_type_code']),
                           score / count, responses // count))
-    topics = {topic for topic, _ in normalized.values()}
+    topics = {row[0] for row in normalized.values()}
     if len(slots) < len(topics):
         raise AutoBlueprintError("Profile has fewer questions than selected topics")
     allocations: list[tuple[str, str]] = []
@@ -89,7 +92,8 @@ def plan_blueprint(
         # Prefer uncovered topics, then requirements, then even coverage.
         options = sorted(
             ((level, code) for level in target for code in codes
-             if target[level] >= score and (section, level) in normalized[code][1]),
+             if target[level] >= score and (section, level) in normalized[code][1]
+             and (normalized[code][2] is None or used[code] < normalized[code][2])),
             key=lambda pair: (any(used[c] for c in codes if normalized[c][0] == normalized[pair[1]][0]),
                               used[pair[1]] > 0, used[pair[1]], pair[0], pair[1]),
         )

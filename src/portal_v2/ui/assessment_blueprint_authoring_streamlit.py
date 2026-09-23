@@ -657,6 +657,10 @@ def render_assessment_blueprint_authoring_page(
     user_id: str,
 ) -> None:
     st.title("Ma trận và bản đặc tả")
+    from portal_v2.ui.admin_assessment_blueprint_preview_streamlit import (
+        render_blueprint_documents_preview,
+    )
+    render_blueprint_documents_preview(st, client=client, owner_user_id=user_id)
     st.caption(
         "Chọn chủ đề và yêu cầu cần đạt từ cơ sở dữ liệu giáo dục "
         "chuẩn; không nhập lại nội dung chương trình bằng tay."

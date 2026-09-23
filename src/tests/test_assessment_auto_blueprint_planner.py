@@ -52,3 +52,21 @@ def test_auto_planner_rejects_incompatible_cognitive_targets():
                        requirements=[{'requirement_code': 'R', 'topic_code': 'T',
                                       'eligibility': [('MCQ', 'APPLY')]}],
                        total_score=Decimal('2'))
+
+
+def test_reviewed_capacity_preserves_repeat_allocation_without_overusing_other_yccd():
+    requirements = [
+        {'requirement_code': 'R1', 'topic_code': 'T1',
+         'eligibility': [('MCQ', 'KNOW')], 'max_question_count': 1},
+        {'requirement_code': 'R2', 'topic_code': 'T1',
+         'eligibility': [('MCQ', 'KNOW')], 'max_question_count': 1},
+        {'requirement_code': 'R3', 'topic_code': 'T2',
+         'eligibility': [('ESSAY', 'APPLY')], 'max_question_count': 1},
+    ]
+    cells = plan_blueprint(sections=SECTIONS, cognitive_targets=LEVELS,
+                           requirements=requirements, total_score=Decimal('2'))
+    assert cells[0].requirement_codes == ('R1', 'R2')
+    requirements[0]['max_question_count'] = 0
+    with pytest.raises(AutoBlueprintError, match='Invalid question capacity'):
+        plan_blueprint(sections=SECTIONS, cognitive_targets=LEVELS,
+                       requirements=requirements, total_score=Decimal('2'))

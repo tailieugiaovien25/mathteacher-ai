@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from portal_v2.ui.admin_assessment_blueprint_review_streamlit import (
+    render_admin_assessment_blueprint_review,
+)
 from portal_v2.ui.admin_assessment_blueprint_preview_streamlit import (
     render_blueprint_documents_preview,
 )
@@ -42,6 +45,7 @@ def render_admin_assessment_setting_review(
         return
 
     render_blueprint_documents_preview(st, client=client)
+    render_admin_assessment_blueprint_review(st, client=client, reviewer_user_id=reviewer_user_id)
 
     if not pending:
         st.info("Không có thiết đặt đề kiểm tra nào đang chờ duyệt.")

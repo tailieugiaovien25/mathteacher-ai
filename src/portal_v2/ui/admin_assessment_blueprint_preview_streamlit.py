@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from decimal import Decimal
+from math import gcd
 from typing import Any
 
 from assessment_generation_v2.services.assessment_auto_blueprint_planner import (
@@ -19,19 +21,31 @@ def _data(query: Any) -> list[dict[str, Any]]:
     return [dict(row) for row in (query.execute().data or [])]
 
 
-def render_blueprint_documents_preview(st: Any, *, client: Any) -> None:
+def render_blueprint_documents_preview(
+    st: Any, *, client: Any, owner_user_id: str | None = None
+) -> None:
     st.subheader("Ma trận và bản đặc tả tự sinh từ dữ liệu")
     st.caption("Bản xem trước từ ma trận, YCCĐ và thiết đặt đã lưu. AI chỉ nhận yêu cầu đã phân bổ; câu hỏi sinh ra cần duyệt riêng.")
     try:
-        versions = _data(client.table("assessment_blueprint_versions")
-                         .select("blueprint_version_id,blueprint_name,review_status,setting_version_id,total_score")
-                         .order("created_at", desc=True).limit(30))
+        query = client.table("assessment_blueprint_versions").select(
+            "blueprint_version_id,blueprint_name,review_status,setting_version_id,total_score,"
+            "assessment_blueprints!inner(owner_user_id,lifecycle_status)"
+        )
+        if owner_user_id is not None:
+            query = (query.eq("assessment_blueprints.owner_user_id", owner_user_id)
+                     .eq("assessment_blueprints.lifecycle_status", "ACTIVE")
+                     .eq("review_status", "APPROVED")
+                     .not_.is_("locked_at", "null"))
+        versions = _data(query.order("created_at", desc=True).limit(30))
         if not versions:
-            st.info("Chưa có ma trận đã lưu để xem trước.")
+            st.info("Chưa có ma trận đã duyệt của tài khoản này." if owner_user_id
+                    else "Chưa có ma trận đã lưu để xem trước.")
             return
         labels = {f"{row['blueprint_name']} · {row['review_status']} · {str(row['blueprint_version_id'])[:8]}": row
                   for row in versions}
-        selected = labels[st.selectbox("Chọn ma trận", tuple(labels), key="admin_blueprint_preview_select")]
+        selected = labels[st.selectbox("Chọn ma trận", tuple(labels),
+                                      key="user_blueprint_preview_select" if owner_user_id
+                                      else "admin_blueprint_preview_select")]
         version_id = selected["blueprint_version_id"]
         if not selected.get("setting_version_id"):
             raise BlueprintDocumentError("Ma trận chưa gắn với thiết đặt đề")
@@ -72,7 +86,8 @@ def render_blueprint_documents_preview(st: Any, *, client: Any) -> None:
         st.error(f"Không tải được dữ liệu ma trận: {error}")
         return
 
-    render_auto_blueprint_suggestion(st, client=client, setting=setting[0])
+    if owner_user_id is None:
+        render_auto_blueprint_suggestion(st, client=client, setting=setting[0], saved_cells=cells)
 
     st.info(f"Bản xem trước · {result.total_questions} câu · {result.total_responses} ý · {result.total_score} điểm · {selected['review_status']}")
     st.markdown("**Ma trận theo chủ đề × mức độ**")
@@ -95,7 +110,8 @@ def render_blueprint_documents_preview(st: Any, *, client: Any) -> None:
 
 
 def render_auto_blueprint_suggestion(
-    st: Any, *, client: Any, setting: dict[str, Any]
+    st: Any, *, client: Any, setting: dict[str, Any],
+    saved_cells: list[dict[str, Any]]
 ) -> None:
     """Propose matrix cells using profile and approved question evidence only."""
     st.markdown("**Đề xuất phân bổ ma trận tự động**")
@@ -138,17 +154,23 @@ def render_auto_blueprint_suggestion(
         section_by_type = {str(s["question_type_code"]): str(s["section_code"])
                            for s in sections}
         evidence: dict[str, set[tuple[str, str]]] = {}
+        reviewed_counts: Counter[str] = Counter()
         for link in examples:
             version = version_by_id.get(str(link["question_version_id"]))
             if not version or str(version["question_id"]) not in allowed_questions:
                 continue
             section_code = section_by_type.get(str(version["question_type_code"]))
             if section_code:
+                reviewed_counts[str(link["requirement_code"])] += 1
                 evidence.setdefault(str(link["requirement_code"]), set()).add(
                     (section_code, str(version["cognitive_level_code"])))
+        frequency_unit = 0
+        for observed in reviewed_counts.values():
+            frequency_unit = gcd(frequency_unit, observed)
         missing = sorted(set(codes) - set(evidence))
         eligible = [{"requirement_code": code, "topic_code": by_code[code]["topic_code"],
-                     "eligibility": sorted(pairs)}
+                     "eligibility": sorted(pairs),
+                     "max_question_count": reviewed_counts[code] // frequency_unit}
                     for code, pairs in sorted(evidence.items())
                     if code in by_code and by_code[code].get("status") == "ACTIVE"
                     and by_code[code].get("metadata", {}).get("canonical_status") == "VERIFIED"
@@ -169,6 +191,16 @@ def render_auto_blueprint_suggestion(
     st.caption("Nguồn quy tắc dạng câu/mức độ: câu mẫu ACTIVE đã APPROVED và khóa; đề xuất cần giáo viên rà soát.")
     if missing:
         st.warning(f"{len(missing)} YCCĐ chưa có câu mẫu đã duyệt nên chưa thể suy ra dạng câu/mức độ; cần rà soát bổ sung: {', '.join(missing)}")
+    saved_allocations = sorted((str(row["topic_code"]), str(row["section_code"]),
+                                str(row["cognitive_level_code"]), int(row["question_count"]),
+                                Decimal(str(row["target_score"]))) for row in saved_cells)
+    suggested_allocations = sorted((row.topic_code, row.section_code,
+                                    row.cognitive_level_code, row.question_count,
+                                    row.target_score) for row in proposed)
+    if suggested_allocations != saved_allocations:
+        st.warning("Đề xuất khác ma trận đã lưu; hãy đối chiếu phân bổ trước khi lựa chọn.")
+    else:
+        st.success("Phân bổ đề xuất khớp 11 ô của ma trận dự thảo đã lưu.")
     st.dataframe([{
         "Chủ đề": cell.topic_code, "Dạng": cell.question_type_code,
         "Mức độ": cell.cognitive_level_code, "Số câu": cell.question_count,
