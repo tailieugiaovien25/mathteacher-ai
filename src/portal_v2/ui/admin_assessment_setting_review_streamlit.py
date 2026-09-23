@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from portal_v2.ui.admin_assessment_blueprint_preview_streamlit import (
+    render_blueprint_documents_preview,
+)
 from portal_v2.ui.assessment_exam_settings_streamlit import (
     SupabaseAssessmentExamSettingsCatalog,
 )
@@ -38,6 +41,8 @@ def render_admin_assessment_setting_review(
         st.error(f"Không thể tải hàng đợi duyệt: {error}")
         return
 
+    render_blueprint_documents_preview(st, client=client)
+
     if not pending:
         st.info("Không có thiết đặt đề kiểm tra nào đang chờ duyệt.")
         return
@@ -50,7 +55,8 @@ def render_admin_assessment_setting_review(
         owner = str(setting_set.get("owner_user_id", ""))
         label = (
             f"{setting_set.get('setting_name')} · {row.get('assessment_name')} "
-            f"· Lớp {row.get('grade_level')} · v{row.get('version_number')} "
+            f"· {row.get('assessment_type_code')} · "
+            f"Lớp {row.get('grade_level')} · v{row.get('version_number')} "
             f"· USER {owner[:8]}"
         )
         pending_by_label[label] = (dict(row), dict(setting_set))
@@ -68,6 +74,7 @@ def render_admin_assessment_setting_review(
             "Tên thiết đặt": setting_set.get("setting_name"),
             "Chủ sở hữu": setting_set.get("owner_user_id"),
             "Môn": row.get("subject_code"),
+            "Loại kiểm tra": row.get("assessment_type_code"),
             "Lớp": row.get("grade_level"),
             "Năm học": row.get("academic_year"),
             "Thời lượng": row.get("duration_minutes"),
