@@ -46,7 +46,7 @@ def render_admin_assessment_blueprint_review(
                           .select("owner_user_id,blueprint_code")
                           .eq("blueprint_id", version["blueprint_id"]).execute())
         setting = (_rows(client.table("assessment_exam_setting_versions")
-                         .select("review_status,locked_at")
+                         .select("review_status,locked_at,assessment_exam_setting_sets!inner(owner_user_id)")
                          .eq("setting_version_id", version["setting_version_id"]).execute())
                    if version.get("setting_version_id") else [])
         if len(blueprint) != 1:
@@ -67,6 +67,24 @@ def render_admin_assessment_blueprint_review(
               "Chủ sở hữu": owner, "Tổng điểm": version["total_score"]})
     if action == "SETTING_REQUIRED":
         st.info("Cần duyệt và khóa thiết đặt liên kết trước khi gửi ma trận đi duyệt.")
+        setting_set = setting[0].get("assessment_exam_setting_sets") if setting else None
+        if isinstance(setting_set, list):
+            setting_set = setting_set[0] if len(setting_set) == 1 else None
+        setting_owner = str(setting_set.get("owner_user_id")) if isinstance(setting_set, Mapping) else ""
+        if (setting_status == "DRAFT" and owner == reviewer_user_id
+                and setting_owner == reviewer_user_id):
+            if st.button("Gửi thiết đặt liên kết đi duyệt", key="admin_blueprint_submit_setting"):
+                try:
+                    client.rpc("submit_assessment_exam_setting_for_review", {
+                        "target_setting_version_id": version["setting_version_id"]
+                    }).execute()
+                except Exception as error:
+                    st.error(f"Không thể gửi duyệt thiết đặt: {error}")
+                else:
+                    st.success("Đã gửi thiết đặt cho ADMIN duyệt.")
+                    st.rerun()
+        elif setting_status == "DRAFT":
+            st.caption("Chủ sở hữu thiết đặt cần gửi hồ sơ đi duyệt.")
         return
     if action == "READ_ONLY":
         st.info("Trạng thái hiện tại không cho phép gửi hoặc ghi quyết định duyệt.")
