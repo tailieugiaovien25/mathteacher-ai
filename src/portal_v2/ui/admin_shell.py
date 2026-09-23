@@ -38,6 +38,9 @@ from portal_v2.ui.admin_assessment_template_workflow_streamlit import (
 from portal_v2.ui.admin_assessment_setting_review_streamlit import (
     render_admin_assessment_setting_review,
 )
+from portal_v2.ui.admin_assessment_question_review_streamlit import (
+    render_admin_assessment_question_review,
+)
 
 from portal_v2.ui.admin_lesson_plan_coordination_center_streamlit import (
     render_admin_lesson_plan_coordination_center,
@@ -563,6 +566,11 @@ def render_admin_page(
             client=client,
             reviewer_user_id=authorization.user_id,
         )
+        render_admin_assessment_question_review(
+            st,
+            client=client,
+            reviewer_user_id=authorization.user_id,
+        )
         return
 
     if page.page_id == ADMIN_PAGE_MATH6_ASSESSMENT:
@@ -652,4 +660,3 @@ def render_admin_shell(
 # G1B_P1A_ADMIN_NAVIGATION
 def render_admin_subject_coordination_read_only(*, client):
     return render_admin_subject_coordination_workspace(client=client)
-
