@@ -943,6 +943,13 @@ def main() -> None:
           font-size:18px !important;
           line-height:1.5 !important;
         }
+        [data-testid="stSidebar"] [data-baseweb="select"] > div {
+          background:#123453 !important;
+          border:1px solid #6295bd !important;
+        }
+        [data-testid="stSidebar"] [data-baseweb="select"] svg {
+          fill:#ffffff !important;
+        }
         [data-testid="stSidebarCollapsedControl"] button,
         [data-testid="collapsedControl"] button {
           background:#071a33 !important;
