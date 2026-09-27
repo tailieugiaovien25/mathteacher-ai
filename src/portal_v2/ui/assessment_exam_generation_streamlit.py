@@ -1,8 +1,12 @@
-"""Teacher workspace for governed assessment draft generation."""
+﻿"""Teacher workspace for governed assessment draft generation."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
+
+from assessment_generation_v2.services.assessment_draft_document_export import export_draft_documents
 from typing import Any, Callable, Mapping
 from uuid import UUID
 
@@ -14,6 +18,9 @@ from assessment_generation_v2.services import (
     AssessmentExamGenerationService,
     TeacherValidationConfirmation,
     ValidationStatus,
+)
+from portal_v2.ui.assessment_ai_question_drafts_streamlit import (
+    render_ai_question_drafts,
 )
 
 
@@ -253,9 +260,10 @@ def render_assessment_exam_generation_page(
     )
     st.info(
         "Trang này chỉ tạo, lắp ráp và xác thực bản nháp. "
-        "Hệ thống không tự phê duyệt, xuất bản, sinh mã đề "
-        "hoặc xuất DOCX."
+        "Hệ thống không tự phê duyệt, xuất bản hoặc sinh mã đề. "
+        "Có thể tải bản nháp Word để giáo viên rà soát."
     )
+
 
     try:
         source_catalog = catalog or SupabaseAssessmentGenerationCatalog(
@@ -320,6 +328,14 @@ def render_assessment_exam_generation_page(
             use_container_width=True,
         )
 
+    # RC1-B1.2: optional AI draft UI requires real Supabase client.
+    if callable(getattr(client, "table", None)):
+        render_ai_question_drafts(
+            st=st, client=client, user_id=user_id,
+            blueprint_version_id=selected.blueprint_version_id,
+            grade_level=selected.grade_level,
+        )
+
     if submitted:
         _clear_pending_warning_state(st)
         st.session_state.pop(_RESULT_KEY, None)
@@ -361,6 +377,42 @@ def render_assessment_exam_generation_page(
             False,
         ),
     )
+
+    canonical = result.canonical_validation_result
+    if canonical.status is ValidationStatus.PASS and result.state.value in (
+        "READY_FOR_REVIEW", "PENDING_REVIEW"
+    ):
+        # RC1-B1.2: optional draft-download UI requires real runtime UI/client.
+        if (
+            callable(getattr(client, "table", None))
+            and callable(getattr(st, "subheader", None))
+            and callable(getattr(st, "download_button", None))
+        ):
+            st.subheader("Tải đề, ma trận và bản đặc tả")
+            st.caption("Tệp Word ghi rõ BẢN NHÁP CẦN DUYỆT; tải xuống không phê duyệt đề.")
+            export_key = f"assessment_draft_export_{user_id}_{result.exam_version_id}"
+            if st.button("Chuẩn bị bộ Word bản nháp", key=f"prepare_{export_key}"):
+                try:
+                    files = export_draft_documents(
+                        client=client, user_id=user_id,
+                        exam_version_id=result.exam_version_id,
+                    )
+                    archive = BytesIO()
+                    with ZipFile(archive, "w", compression=ZIP_DEFLATED) as bundle:
+                        for name, data in files.items():
+                            bundle.writestr(name, data)
+                    st.session_state[export_key] = archive.getvalue()
+                except Exception as error:
+                    st.session_state.pop(export_key, None)
+                    st.error(f"Không thể xuất bản nháp: {error}")
+            if export_key in st.session_state:
+                st.download_button(
+                    "Tải bộ đề, ma trận, đặc tả và đáp án (.zip)",
+                    data=st.session_state[export_key],
+                    file_name=f"assessment-draft-{result.exam_version_id}.zip",
+                    mime="application/zip",
+                    key=f"download_{export_key}",
+                )
 
     original_request = st.session_state.get(_PENDING_REQUEST_KEY)
     pending_result = st.session_state.get(_PENDING_RESULT_KEY)

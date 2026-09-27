@@ -1,4 +1,4 @@
-"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
+﻿"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
 
 from __future__ import annotations
 
@@ -42,11 +42,14 @@ PORTAL_PAGES = (
     'Kho t\xe0i li\u1ec7u',
     'Thi\u1ebft \u0111\u1eb7t \u0111\u1ec1 ki\u1ec3m tra',
     'Ma tr\u1eadn & b\u1ea3n \u0111\u1eb7c t\u1ea3',
+    'AI xây dựng ngân hàng câu hỏi',
+    'Lớp học ôn tập',
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra',
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra To\xe1n 6',
     'Xu\u1ea5t \u0111\u1ec1 ki\u1ec3m tra',
     'Thi\u1ebft \u0111\u1eb7t gi\xe1o vi\xean',
     'Tạo đề kiểm tra Toán 6–9',
+    "Xưởng câu hỏi",
 )
 
 # The legacy authoring hub remains wired below for backward-compatible
@@ -2057,9 +2060,45 @@ def main() -> None:
                         render_persisted_ppct_view()
 
     elif selected == "Thiết đặt đề kiểm tra":
+        from educational_planning_v2.adapters.supabase_academic_year_configuration_repository import (
+            SupabaseAcademicYearConfigurationRepository,
+        )
+        from portal_v2.runtime.system_weekly_schedule_runtime import (
+            SystemWeeklyScheduleRuntime,
+        )
+        from portal_v2.runtime.assessment_ppct_session_bridge import (
+            AssessmentPpctRuntimeEvidence,
+            clear_assessment_ppct_rows,
+            inject_assessment_ppct_rows,
+        )
         from portal_v2.ui.assessment_exam_settings_streamlit import (
             render_assessment_exam_settings_page,
         )
+
+        try:
+            current_year = SupabaseAcademicYearConfigurationRepository(
+                client=client,
+            ).get_current()
+            if current_year is None:
+                raise LookupError("ADMIN chưa thiết lập năm học hiện hành.")
+            snapshot = SystemWeeklyScheduleRuntime(
+                client=client,
+                user_id=str(user_id),
+            ).load_active_ppct_snapshot(
+                academic_year=str(current_year.academic_year),
+            )
+            inject_assessment_ppct_rows(
+                session_state=st.session_state,
+                rows=snapshot.rows,
+                evidence=AssessmentPpctRuntimeEvidence(
+                    academic_year=snapshot.academic_year,
+                    source_id=snapshot.source_id,
+                    source_version=snapshot.source_version,
+                ),
+            )
+        except Exception as error:
+            clear_assessment_ppct_rows(session_state=st.session_state)
+            st.warning("Chưa thể nạp PPCT ACTIVE để đề xuất: " + str(error))
 
         render_assessment_exam_settings_page(
             st=st,
@@ -2073,6 +2112,27 @@ def main() -> None:
         )
 
         render_assessment_blueprint_authoring_page(
+            st=st,
+            client=client,
+            user_id=str(user_id),
+        )
+
+    elif selected == "AI xây dựng ngân hàng câu hỏi":
+        from portal_v2.ui.assessment_content_question_streamlit import (
+            render_content_question_authoring,
+        )
+        render_content_question_authoring(st=st, client=client, user_id=str(user_id))
+
+    elif selected == "Lớp học ôn tập":
+        from portal_v2.ui.teacher_classroom_streamlit import render_teacher_classroom
+        render_teacher_classroom(st=st, client=client, user_id=str(user_id))
+
+    elif selected == "Xưởng câu hỏi":
+        from portal_v2.ui.question_studio_streamlit import (
+            render_question_studio,
+        )
+
+        render_question_studio(
             st=st,
             client=client,
             user_id=str(user_id),

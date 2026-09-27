@@ -1,7 +1,8 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 from portal_v2.ui.admin_subject_coordination_workspace_streamlit import render_admin_subject_coordination_workspace
 
 from typing import Any
+from portal_v2.ui.admin_assessment_exam_review_streamlit import render_admin_assessment_exam_review
 
 from portal_v2.authorization import PortalAuthorizationContext
 from portal_v2.ui.admin_user_registration_review_streamlit import render_admin_user_registration_review
@@ -38,8 +39,8 @@ from portal_v2.ui.admin_assessment_template_workflow_streamlit import (
 from portal_v2.ui.admin_assessment_setting_review_streamlit import (
     render_admin_assessment_setting_review,
 )
-from portal_v2.ui.admin_assessment_question_review_streamlit import (
-    render_admin_assessment_question_review,
+from portal_v2.ui.admin_math_question_review_streamlit import (
+    render_admin_math_question_review,
 )
 
 from portal_v2.ui.admin_lesson_plan_coordination_center_streamlit import (
@@ -73,6 +74,8 @@ from portal_v2.ui.admin_navigation import (
 
 
 ADMIN_PORTAL_SESSION_KEY = "admin_portal_page"
+ADMIN_PAGE_MATH_QUESTION_REVIEWS = "math_question_reviews"
+ADMIN_PAGE_MATH_QUESTION_REVIEWS_LABEL = "Duyệt câu hỏi môn Toán"
 
 
 def admin_page_id_from_label(*, label: str) -> str:
@@ -82,6 +85,8 @@ def admin_page_id_from_label(*, label: str) -> str:
     normalized = label.strip()
     if not normalized:
         raise ValueError("label must not be empty")
+    if normalized == ADMIN_PAGE_MATH_QUESTION_REVIEWS_LABEL:
+        return ADMIN_PAGE_MATH_QUESTION_REVIEWS
 
     for page in admin_portal_pages():
         if page.label == normalized:
@@ -91,6 +96,8 @@ def admin_page_id_from_label(*, label: str) -> str:
 
 
 def admin_page_label_from_id(*, page_id: str) -> str:
+    if page_id == ADMIN_PAGE_MATH_QUESTION_REVIEWS:
+        return ADMIN_PAGE_MATH_QUESTION_REVIEWS_LABEL
     return resolve_admin_portal_page(page_id=page_id).label
 
 
@@ -99,6 +106,9 @@ def select_admin_portal_page(
     *,
     page_id: str,
 ) -> None:
+    if page_id == ADMIN_PAGE_MATH_QUESTION_REVIEWS:
+        session_state[ADMIN_PORTAL_SESSION_KEY] = page_id
+        return
     page = resolve_admin_portal_page(page_id=page_id)
     session_state[ADMIN_PORTAL_SESSION_KEY] = page.page_id
 
@@ -443,6 +453,11 @@ def render_admin_page(
     authorization,
     client=None,
 ) -> None:
+    if page_id == ADMIN_PAGE_MATH_QUESTION_REVIEWS:
+        render_admin_math_question_review(
+            st, client=client, reviewer_user_id=authorization.user_id
+        )
+        return
     page = resolve_admin_portal_page(
         page_id=page_id
     )
@@ -566,7 +581,7 @@ def render_admin_page(
             client=client,
             reviewer_user_id=authorization.user_id,
         )
-        render_admin_assessment_question_review(
+        render_admin_assessment_exam_review(
             st,
             client=client,
             reviewer_user_id=authorization.user_id,
@@ -613,9 +628,11 @@ def render_admin_shell(
         None,
     )
     if navigation_target is not None:
-        current_page_id = resolve_admin_portal_page(
-            page_id=navigation_target,
-        ).page_id
+        current_page_id = (
+            ADMIN_PAGE_MATH_QUESTION_REVIEWS
+            if navigation_target == ADMIN_PAGE_MATH_QUESTION_REVIEWS
+            else resolve_admin_portal_page(page_id=navigation_target).page_id
+        )
         st.session_state[ADMIN_PORTAL_SESSION_KEY] = current_page_id
         st.session_state["admin_portal_navigation"] = admin_page_label_from_id(
             page_id=current_page_id,
@@ -631,7 +648,7 @@ def render_admin_shell(
             page_id=current_page_id,
         )
 
-    labels = admin_portal_page_labels()
+    labels = tuple(admin_portal_page_labels()) + (ADMIN_PAGE_MATH_QUESTION_REVIEWS_LABEL,)
 
     selected_label = st.sidebar.radio(
         "Quáº£n trá»‹",

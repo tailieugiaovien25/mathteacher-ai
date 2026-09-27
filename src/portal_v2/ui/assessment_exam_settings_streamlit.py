@@ -7,6 +7,71 @@ from decimal import Decimal
 from typing import Any, Mapping
 from uuid import UUID
 
+from assessment_generation_v2.services.assessment_ppct_scope_suggestion_service import (
+    AssessmentPpctScopeSuggestionService,
+)
+from educational_planning_v2.adapters.ppct_plan_item_adapter import PPCTRow
+from portal_v2.runtime.assessment_ppct_session_bridge import (
+    ASSESSMENT_PPCT_EVIDENCE_SESSION_KEY,
+    ASSESSMENT_PPCT_ROWS_SESSION_KEY,
+    AssessmentPpctRuntimeEvidence,
+)
+from portal_v2.runtime.assessment_builder_requirement_recommendation_runtime import (
+    AssessmentBuilderRequirementRecommendationRuntime,
+)
+
+
+_ASSESSMENT_TYPES = {
+    "MIDTERM": "Giữa học kỳ",
+    "FINAL": "Cuối học kỳ",
+    "REGULAR": "Thường xuyên (chọn phạm vi thủ công)",
+}
+
+
+def _ppct_proposal(
+    *, session_state: Mapping[str, object], client: Any, user_id: str,
+    academic_year: str, grade_level: int, semester_number: int,
+    assessment_type: str,
+) -> tuple[str, tuple[str, ...], tuple[str, ...], str]:
+    """Return evidence-backed suggestions; no write and no selection mutation."""
+    rows = session_state.get(ASSESSMENT_PPCT_ROWS_SESSION_KEY)
+    evidence = session_state.get(ASSESSMENT_PPCT_EVIDENCE_SESSION_KEY)
+    if not isinstance(evidence, AssessmentPpctRuntimeEvidence):
+        raise ValueError("Chưa nạp được phiên bản PPCT ACTIVE.")
+    if evidence.academic_year != academic_year.strip():
+        raise ValueError("Năm học của PPCT ACTIVE không khớp năm học thiết đặt.")
+    if not isinstance(rows, tuple) or not rows or not all(
+        isinstance(row, PPCTRow) for row in rows
+    ):
+        raise ValueError("Chưa có các tiết PPCT hợp lệ.")
+    if assessment_type == "REGULAR":
+        raise ValueError("Kiểm tra thường xuyên cần giáo viên xác nhận khoảng tiết PPCT.")
+    scope = AssessmentPpctScopeSuggestionService().suggest(
+        ppct_rows=rows,
+        grade_level=grade_level,
+        assessment_type=assessment_type,
+        semester=semester_number,
+        subject_name="Toán",
+    )
+    result = AssessmentBuilderRequirementRecommendationRuntime(
+        client=client, user_id=user_id,
+    ).recommend(
+        source_id=evidence.source_id,
+        source_version=evidence.source_version,
+        subject_grade=scope.subject_grade,
+        sub_subject=scope.sub_subject,
+        period_from=scope.period_from,
+        period_to=scope.period_to,
+    )
+    reference = f"{evidence.source_id}@{evidence.source_version}"
+    detail = f"{reference} · tiết {scope.period_from}–{scope.period_to}"
+    return (
+        reference,
+        tuple(str(value) for value in result.textbook_unit_ids),
+        tuple(str(value) for value in result.requirement_codes),
+        detail,
+    )
+
 
 def _data(response: object) -> object:
     if isinstance(response, Mapping):
@@ -281,12 +346,37 @@ def render_assessment_exam_settings_page(
     )
 
     st.subheader("2. SGK, PPCT và tiến độ thực dạy")
+    assessment_type = st.selectbox(
+        "Loại kiểm tra", tuple(_ASSESSMENT_TYPES),
+        format_func=lambda value: _ASSESSMENT_TYPES[value],
+    )
     textbook_by_label = {"Không ràng buộc một SGK": ""}
     for row in textbooks:
         label = f"{row.get('title')} · {row.get('edition_label') or ''}"
         textbook_by_label[label] = str(row.get("textbook_id", ""))
     textbook_label = st.selectbox("Bộ sách/SGK", tuple(textbook_by_label))
     textbook_id = textbook_by_label[textbook_label]
+    teaching_cutoff_date = st.date_input(
+        "Ngày chốt nội dung đã dạy", value=date.today()
+    )
+    class_codes_text = st.text_input(
+        "Lớp áp dụng", placeholder="6A1, 6A2, 6A3"
+    )
+    context = (
+        str(grade_level), academic_year.strip(), str(semester_number),
+        assessment_type, textbook_id, teaching_cutoff_date.isoformat(),
+        class_codes_text.strip(),
+    )
+    if st.session_state.get("assessment_setting_suggestion_context") != context:
+        st.session_state["assessment_setting_suggestion_context"] = context
+        for key in (
+            "assessment_setting_suggestion",
+            "assessment_setting_apply_requirements",
+            "assessment_setting_unit_labels",
+            "assessment_setting_requirement_labels",
+            "assessment_setting_teaching_scope_confirmed",
+        ):
+            st.session_state.pop(key, None)
     try:
         units = catalog.textbook_units(textbook_id)
     except Exception as error:
@@ -298,19 +388,49 @@ def render_assessment_exam_settings_page(
         )
         for row in units
     }
+    if st.button("Đề xuất từ PPCT ACTIVE, SGK và YCCĐ"):
+        try:
+            proposal = _ppct_proposal(
+                session_state=st.session_state, client=client, user_id=user_id,
+                academic_year=academic_year, grade_level=int(grade_level),
+                semester_number=int(semester_number),
+                assessment_type=assessment_type,
+            )
+            if not textbook_id:
+                raise ValueError("Hãy chọn SGK trước khi xem đề xuất bài học.")
+            available_ids = set(unit_by_label.values())
+            if not (set(proposal[1]) & available_ids):
+                raise ValueError("Không có bài SGK khớp bản sách đã chọn và PPCT.")
+        except Exception as error:
+            st.session_state.pop("assessment_setting_suggestion", None)
+            st.warning("Chưa đủ dữ liệu để đề xuất: " + str(error))
+        else:
+            st.session_state["assessment_setting_suggestion"] = proposal
+    suggestion = st.session_state.get("assessment_setting_suggestion")
+    if suggestion:
+        st.info(
+            f"Nguồn: {suggestion[3]}. Đề xuất {len(set(suggestion[1]) & set(unit_by_label.values()))} "
+            f"bài SGK và {len(suggestion[2])} YCCĐ. Giáo viên cần đối chiếu "
+            "ngày chốt với tiến độ thực dạy trước khi áp dụng."
+        )
+        if st.button("Áp dụng đề xuất để chỉnh sửa"):
+            st.session_state["assessment_setting_unit_labels"] = [
+                label for label, unit_id in unit_by_label.items()
+                if unit_id in suggestion[1]
+            ]
+            st.session_state["assessment_setting_apply_requirements"] = True
     selected_unit_labels = st.multiselect(
-        "Bài/chủ đề SGK đã dạy", tuple(unit_by_label)
+        "Bài/chủ đề SGK đã dạy", tuple(unit_by_label),
+        key="assessment_setting_unit_labels",
     )
-    ppct_reference = st.text_input(
-        "Tham chiếu PPCT", placeholder="Mã/phiên bản PPCT đang áp dụng"
-    )
-    teaching_cutoff_date = st.date_input(
-        "Ngày chốt nội dung đã dạy", value=date.today()
-    )
-    class_codes_text = st.text_input(
-        "Lớp áp dụng", placeholder="6A1, 6A2, 6A3"
-    )
+    ppct_reference = suggestion[0] if suggestion else ""
+    st.caption("Tham chiếu PPCT: " + (ppct_reference or "chưa xác định"))
     only_taught = st.checkbox("Chỉ lấy nội dung đã dạy", value=True)
+    teaching_scope_confirmed = st.checkbox(
+        "Tôi đã đối chiếu các bài đã chọn với tiến độ lớp và ngày chốt nội dung",
+        value=False,
+        key="assessment_setting_teaching_scope_confirmed",
+    )
     common_scope = st.selectbox(
         "Phạm vi khi kiểm tra nhiều lớp",
         ("INTERSECTION", "UNION_WITH_ADMIN_EXCEPTION"),
@@ -334,8 +454,14 @@ def render_assessment_exam_settings_page(
         )
         for row in requirements
     }
+    if st.session_state.pop("assessment_setting_apply_requirements", False):
+        st.session_state["assessment_setting_requirement_labels"] = [
+            label for label, code in requirement_by_label.items()
+            if suggestion and code in suggestion[2]
+        ]
     selected_requirement_labels = st.multiselect(
-        "YCCĐ thuộc phạm vi kiểm tra", tuple(requirement_by_label)
+        "YCCĐ thuộc phạm vi kiểm tra", tuple(requirement_by_label),
+        key="assessment_setting_requirement_labels",
     )
 
     st.subheader("4. Phẩm chất và năng lực")
@@ -378,11 +504,21 @@ def render_assessment_exam_settings_page(
     if st.button(
         "Lưu bản nháp thiết đặt", type="primary", use_container_width=True
     ):
+        if not teaching_scope_confirmed:
+            st.error("Hãy xác nhận tiến độ thực dạy trước khi lưu thiết đặt.")
+            return
+        if not suggestion or not ppct_reference:
+            st.error("Chưa xác định PPCT và phạm vi đề xuất; không thể lưu bản nháp.")
+            return
+        if not selected_unit_labels or not selected_requirement_labels:
+            st.error("Cần chọn ít nhất một bài SGK và một YCCĐ trước khi lưu.")
+            return
         payload = {
             "target_setting_code": setting_code,
             "target_setting_name": setting_name,
             "target_visibility": visibility,
             "target_profile_code": str(profile.get("profile_code", "")),
+            "target_assessment_type_code": assessment_type,
             "target_subject_code": str(profile.get("subject_code", "")),
             "target_grade_level": int(grade_level),
             "target_assessment_name": assessment_name,

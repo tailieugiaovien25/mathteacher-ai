@@ -12,6 +12,10 @@ from portal_v2.ui.admin_assessment_blueprint_preview_streamlit import (
 from portal_v2.ui.assessment_exam_settings_streamlit import (
     SupabaseAssessmentExamSettingsCatalog,
 )
+from portal_v2.ui.admin_assessment_review_7_9_streamlit import (
+    render_exam_queue,
+    render_question_queue,
+)
 
 
 def render_admin_assessment_setting_review(
@@ -20,12 +24,8 @@ def render_admin_assessment_setting_review(
     client: Any,
     reviewer_user_id: str,
 ) -> None:
-    st.title("Duyệt đề kiểm tra")
-    st.caption(
-        "Duyệt thiết đặt đề kiểm tra do USER gửi. "
-        "ADMIN được phép duyệt hồ sơ của bất kỳ USER nào, "
-        "kể cả hồ sơ do chính tài khoản ADMIN sở hữu."
-    )
+    st.title("Duyệt hồ sơ kiểm tra")
+    st.caption("Chọn đúng loại hồ sơ: thiết đặt, ma trận, câu hỏi hoặc bản đề đã lắp ráp.")
 
     if client is None:
         st.warning("Chưa có kết nối dữ liệu để tải hàng đợi duyệt.")
@@ -44,8 +44,24 @@ def render_admin_assessment_setting_review(
         st.error(f"Không thể tải hàng đợi duyệt: {error}")
         return
 
-    render_blueprint_documents_preview(st, client=client)
-    render_admin_assessment_blueprint_review(st, client=client, reviewer_user_id=reviewer_user_id)
+    setting_tab, blueprint_tab, question_tab, exam_tab = st.tabs((
+        "01 · Thiết đặt", "02 · Ma trận và đặc tả",
+        "03 · Câu hỏi lớp 7–9", "04 · Duyệt đề lớp 7–9",
+    ))
+    with blueprint_tab:
+        render_blueprint_documents_preview(st, client=client)
+        render_admin_assessment_blueprint_review(st, client=client,
+                                                 reviewer_user_id=reviewer_user_id)
+    with question_tab:
+        render_question_queue(st, client=client, reviewer_user_id=reviewer_user_id)
+    with exam_tab:
+        render_exam_queue(st, client=client, reviewer_user_id=reviewer_user_id)
+    with setting_tab:
+        _render_setting_queue(st, pending=pending, catalog=catalog)
+
+
+def _render_setting_queue(st: Any, *, pending: list[dict[str, Any]], catalog: Any) -> None:
+    st.markdown("### Thiết đặt đề kiểm tra đang chờ duyệt")
 
     if not pending:
         st.info("Không có thiết đặt đề kiểm tra nào đang chờ duyệt.")

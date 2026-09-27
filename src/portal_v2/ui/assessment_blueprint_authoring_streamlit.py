@@ -23,11 +23,16 @@ from assessment_generation_v2.services.canonical_assessment_selection_service im
 )
 from assessment_generation_v2.services.assessment_matrix_cell_authoring import (
     AssessmentMatrixAuthoringError,
+    AssessmentMatrixCell,
     AssessmentProfileSectionOption,
     CognitiveLevelOption,
     ProfileLevelAllocation,
     build_default_matrix_cell_rows,
     matrix_cell_rows_payload,
+)
+from assessment_generation_v2.services.assessment_blueprint_auto_specification import (
+    AutoSpecificationError,
+    propose_specification,
 )
 
 
@@ -398,6 +403,28 @@ class SupabaseAssessmentBlueprintAuthoringCatalog:
         )
         return tuple(_rows(response))
 
+    def approved_setting_requirement_codes(
+        self, *, setting_version_id: str
+    ) -> tuple[str, ...]:
+        response = (
+            self._client.table("assessment_exam_setting_versions")
+            .select("requirement_codes,review_status,locked_at")
+            .eq("setting_version_id", setting_version_id)
+            .limit(1)
+            .execute()
+        )
+        rows = _rows(response)
+        if len(rows) != 1 or rows[0].get("review_status") != "APPROVED" or not rows[0].get("locked_at"):
+            raise AssessmentBlueprintAuthoringError(
+                "Không tìm thấy phiên bản thiết đặt đã duyệt và khóa."
+            )
+        codes = rows[0].get("requirement_codes")
+        if not isinstance(codes, list) or not codes or any(not isinstance(code, str) for code in codes):
+            raise AssessmentBlueprintAuthoringError(
+                "Thiết đặt đã duyệt không có danh sách YCCĐ hợp lệ."
+            )
+        return tuple(dict.fromkeys(codes))
+
     def list_profile_sections(
         self,
         *,
@@ -587,6 +614,39 @@ def _assignment_rows(
             }
         )
     return result
+
+
+def _fit_requirements_to_cells(
+    *,
+    codes: Sequence[str],
+    requirement_topics: Mapping[str, str],
+    cells: Sequence[object],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Offer at most one primary requirement per question, by approved order."""
+    capacity: dict[str, int] = {}
+    score_types: dict[str, set[Decimal]] = {}
+    for cell in cells:
+        topic = str(cell.topic_code)
+        capacity[topic] = capacity.get(topic, 0) + int(cell.question_count)
+        score_types.setdefault(topic, set()).add(
+            cell.target_score / cell.question_count
+        )
+    chosen: list[str] = []
+    omitted: list[str] = []
+    counts: dict[str, int] = {}
+    for code in codes:
+        topic = requirement_topics[code]
+        if counts.get(topic, 0) < capacity.get(topic, 0):
+            chosen.append(code)
+            counts[topic] = counts.get(topic, 0) + 1
+        else:
+            omitted.append(code)
+    for topic, slots in capacity.items():
+        if slots and counts.get(topic, 0) < len(score_types[topic]):
+            raise AutoSpecificationError(
+                f"Chủ đề {topic} thiếu YCCĐ để phân bổ các mức điểm/câu."
+            )
+    return tuple(chosen), tuple(omitted)
 
 
 def _build_assignments(
@@ -879,6 +939,132 @@ def render_assessment_blueprint_authoring_page(
         if requirement.requirement_code in existing_requirement_codes
     }
 
+    if not existing_links and draft.setting_version_id == selected_setting.setting_version_id:
+        if st.button(
+            "Lấy YCCĐ từ thiết đặt đã duyệt",
+            use_container_width=True,
+            key="assessment_blueprint_restore_setting_scope_" + draft.blueprint_version_id,
+        ):
+            try:
+                setting_codes = catalog.approved_setting_requirement_codes(
+                    setting_version_id=draft.setting_version_id
+                )
+                curriculum_by_code = {
+                    requirement.requirement_code: requirement
+                    for requirement in curriculum.requirements
+                }
+                missing = sorted(set(setting_codes) - set(curriculum_by_code))
+                if missing:
+                    raise AssessmentBlueprintAuthoringError(
+                        "YCCĐ của thiết đặt chưa có trong chương trình lớp này: "
+                        + ", ".join(missing)
+                    )
+                selected_codes = set(setting_codes)
+                selected_topics = {
+                    curriculum_by_code[code].topic_code for code in setting_codes
+                }
+                st.session_state["assessment_blueprint_topics"] = [
+                    f"{topic.topic_name} [{topic.topic_code}]"
+                    for topic in curriculum.topics
+                    if topic.topic_code in selected_topics
+                ]
+                st.session_state["assessment_blueprint_requirements"] = [
+                    f"{requirement.requirement_text} [{requirement.requirement_code}]"
+                    for requirement in curriculum.requirements
+                    if requirement.requirement_code in selected_codes
+                ]
+                st.session_state["assessment_blueprint_scope_restored"] = draft.blueprint_version_id
+            except Exception as error:
+                st.error(f"Không thể lấy phạm vi YCCĐ: {error}")
+            else:
+                st.rerun()
+
+        if st.button(
+            "Đề xuất YCCĐ vừa cấu trúc đề",
+            use_container_width=True,
+            key="assessment_blueprint_fit_setting_scope_" + draft.blueprint_version_id,
+        ):
+            try:
+                if catalog.list_cells(blueprint_version_id=draft.blueprint_version_id):
+                    raise AutoSpecificationError(
+                        "Bản nháp đã có ô ma trận; cần giữ phân bổ hiện tại."
+                    )
+                setting_codes = catalog.approved_setting_requirement_codes(
+                    setting_version_id=draft.setting_version_id
+                )
+                curriculum_by_code = {
+                    requirement.requirement_code: requirement
+                    for requirement in curriculum.requirements
+                }
+                missing = sorted(set(setting_codes) - set(curriculum_by_code))
+                if missing:
+                    raise AutoSpecificationError(
+                        "YCCĐ chưa có trong chương trình: " + ", ".join(missing)
+                    )
+                topic_codes = tuple(dict.fromkeys(
+                    curriculum_by_code[code].topic_code for code in setting_codes
+                ))
+                sections_for_fit = catalog.list_profile_sections(
+                    profile_code=draft.profile_code
+                )
+                levels_for_fit = catalog.list_cognitive_levels()
+                allocations_for_fit = catalog.list_profile_level_allocations(
+                    profile_code=draft.profile_code
+                )
+                from assessment_generation_v2.services.assessment_matrix_cell_authoring import (
+                    build_default_matrix_cells,
+                )
+                cells_for_fit = build_default_matrix_cells(
+                    sections=sections_for_fit,
+                    topic_codes=topic_codes,
+                    cognitive_levels=levels_for_fit,
+                    level_allocations=allocations_for_fit,
+                )
+                topics_by_code = {
+                    code: curriculum_by_code[code].topic_code
+                    for code in setting_codes
+                }
+                chosen, omitted = _fit_requirements_to_cells(
+                    codes=setting_codes,
+                    requirement_topics=topics_by_code,
+                    cells=cells_for_fit,
+                )
+                suggested = propose_specification(
+                    sections=sections_for_fit,
+                    cognitive_levels=levels_for_fit,
+                    level_allocations=allocations_for_fit,
+                    topic_codes=topic_codes,
+                    requirement_topics={code: topics_by_code[code] for code in chosen},
+                    existing_cells=cells_for_fit,
+                )
+                st.session_state["assessment_blueprint_topics"] = [
+                    f"{topic.topic_name} [{topic.topic_code}]"
+                    for topic in curriculum.topics if topic.topic_code in topic_codes
+                ]
+                st.session_state["assessment_blueprint_requirements"] = [
+                    f"{requirement.requirement_text} [{requirement.requirement_code}]"
+                    for requirement in curriculum.requirements
+                    if requirement.requirement_code in chosen
+                ]
+                st.session_state["assessment_blueprint_scope_restored"] = draft.blueprint_version_id
+                st.session_state["assessment_auto_specification_" + draft.blueprint_version_id] = {
+                    "requirements": tuple(
+                        requirement.requirement_code
+                        for requirement in curriculum.requirements
+                        if requirement.requirement_code in chosen
+                    ),
+                    "assignments": [row.as_rpc_record() for row in suggested.assignments],
+                    "cells": [row.as_payload_record() for row in suggested.cells],
+                    "omitted": omitted,
+                }
+            except Exception as error:
+                st.error(f"Không thể đề xuất YCCĐ vừa cấu trúc đề: {error}")
+            else:
+                st.rerun()
+
+    if st.session_state.get("assessment_blueprint_scope_restored") == draft.blueprint_version_id:
+        st.info("Đã điền YCCĐ từ thiết đặt đã duyệt. Kiểm tra phạm vi và bấm 'Lưu YCCĐ vào ma trận'.")
+
     st.subheader("3. Chọn chủ đề và yêu cầu cần đạt")
     topic_by_label = {
         f"{topic.topic_name} [{topic.topic_code}]": topic
@@ -951,6 +1137,16 @@ def render_assessment_blueprint_authoring_page(
         requirement_codes=selected_requirement_codes,
         existing_links=existing_links,
     )
+    proposal_key = "assessment_auto_specification_" + draft.blueprint_version_id
+    proposal = st.session_state.get(proposal_key)
+    if proposal and proposal["requirements"] == selected_requirement_codes:
+        editor_rows = proposal["assignments"]
+        if proposal.get("omitted"):
+            st.info(
+                "Đề xuất theo thứ tự YCCĐ trong thiết đặt và sức chứa từng chủ đề; "
+                "chưa đưa vào ma trận: " + ", ".join(proposal["omitted"])
+                + ". Giáo viên cần kiểm tra mức độ ưu tiên trước khi lưu."
+            )
     edited_rows = st.data_editor(
         editor_rows,
         use_container_width=True,
@@ -959,6 +1155,8 @@ def render_assessment_blueprint_authoring_page(
         key=(
             "assessment_blueprint_assignment_editor_"
             + draft.blueprint_version_id
+            + ("_setting_scope" if st.session_state.get("assessment_blueprint_scope_restored") == draft.blueprint_version_id else "")
+            + ("_proposed" if proposal and proposal["requirements"] == selected_requirement_codes else "")
         ),
     )
 
@@ -977,6 +1175,16 @@ def render_assessment_blueprint_authoring_page(
         disabled=not selected_requirement_codes,
     ):
         try:
+            section_capacity = sum(
+                section.question_count
+                for section in catalog.list_profile_sections(profile_code=draft.profile_code)
+            )
+            if len(selected_requirement_codes) > section_capacity:
+                raise AssessmentBlueprintAuthoringError(
+                    f"Đang chọn {len(selected_requirement_codes)} YCCĐ PRIMARY "
+                    f"cho {section_capacity} câu. Hãy dùng 'Đề xuất YCCĐ vừa cấu trúc đề' "
+                    "và xem lại các YCCĐ được chọn."
+                )
             editing_selection = selection_service.build_editing_selection(
                 subject_code=draft.subject_code,
                 grade_level=draft.grade_level,
@@ -1075,6 +1283,35 @@ def render_assessment_blueprint_authoring_page(
         level_allocations=level_allocations,
         existing_cells=existing_cells,
     )
+    if st.button(
+        "Tự đề xuất bản đặc tả từ YCCĐ và hồ sơ",
+        disabled=not selected_requirement_codes or bool(existing_links or existing_cells),
+        use_container_width=True,
+    ):
+        try:
+            suggested = propose_specification(
+                sections=sections,
+                cognitive_levels=cognitive_levels,
+                level_allocations=level_allocations,
+                topic_codes=selected_topic_codes,
+                requirement_topics={
+                    requirement.requirement_code: requirement.topic_code
+                    for requirement in available_requirements
+                    if requirement.requirement_code in selected_requirement_codes
+                },
+            )
+        except (AutoSpecificationError, AssessmentMatrixAuthoringError) as error:
+            st.error(f"Không thể đề xuất bản đặc tả: {error}")
+        else:
+            st.session_state[proposal_key] = {
+                "requirements": selected_requirement_codes,
+                "assignments": [row.as_rpc_record() for row in suggested.assignments],
+                "cells": [row.as_payload_record() for row in suggested.cells],
+            }
+            st.rerun()
+    if proposal and proposal["requirements"] == selected_requirement_codes and not existing_cells:
+        cell_rows = proposal["cells"]
+        st.info("Đã tạo gợi ý. Kiểm tra rồi bấm từng nút Lưu YCCĐ và Lưu các ô ma trận.")
     edited_cells = st.data_editor(
         cell_rows,
         use_container_width=True,
@@ -1083,6 +1320,7 @@ def render_assessment_blueprint_authoring_page(
         key=(
             "assessment_blueprint_cell_editor_"
             + draft.blueprint_version_id
+            + ("_proposed" if proposal and proposal["requirements"] == selected_requirement_codes else "")
         ),
     )
     if st.button(
