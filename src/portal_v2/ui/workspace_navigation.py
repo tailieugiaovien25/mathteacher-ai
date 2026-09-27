@@ -67,6 +67,14 @@ def visible_teacher_labels() -> tuple[str, ...]:
     return tuple(route.label for route in TEACHER_ROUTES if route.visible)
 
 
+def navigation_groups(routes: tuple[WorkspaceRoute, ...]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(route.group for route in routes if route.visible))
+
+
+def labels_for_group(routes: tuple[WorkspaceRoute, ...], group: str) -> tuple[str, ...]:
+    return tuple(route.label for route in routes if route.visible and route.group == group)
+
+
 _ADMIN_GROUPS = {
     "dashboard": "Tổng quan",
     "trusted_data": "Chương trình & dữ liệu",

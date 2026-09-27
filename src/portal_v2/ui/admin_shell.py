@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from portal_v2.ui.admin_subject_coordination_workspace_streamlit import render_admin_subject_coordination_workspace
 
 from typing import Any
@@ -71,7 +72,7 @@ from portal_v2.ui.admin_navigation import (
     admin_portal_pages,
     resolve_admin_portal_page,
 )
-from portal_v2.ui.workspace_navigation import admin_routes
+from portal_v2.ui.workspace_navigation import admin_routes, labels_for_group, navigation_groups
 
 
 ADMIN_PORTAL_SESSION_KEY = "admin_portal_page"
@@ -649,7 +650,24 @@ def render_admin_shell(
             page_id=current_page_id,
         )
 
-    labels = tuple(route.label for route in admin_routes())
+    routes = admin_routes()
+    labels = tuple(route.label for route in routes)
+    if os.environ.get("MATHTEACHER_GROUPED_NAVIGATION") == "1":
+        current_group = next(route.group for route in routes if route.route_id == current_page_id)
+        if st.session_state.get("admin_portal_navigation_group") != current_group:
+            st.session_state["admin_portal_navigation_group"] = current_group
+
+        def change_admin_group() -> None:
+            group = st.session_state["admin_portal_navigation_group"]
+            first_label = labels_for_group(routes, group)[0]
+            st.session_state["admin_portal_navigation"] = first_label
+            st.session_state[ADMIN_PORTAL_SESSION_KEY] = admin_page_id_from_label(label=first_label)
+
+        st.sidebar.selectbox(
+            "Nhóm quản trị", navigation_groups(routes),
+            key="admin_portal_navigation_group", on_change=change_admin_group,
+        )
+        labels = labels_for_group(routes, st.session_state["admin_portal_navigation_group"])
 
     selected_label = st.sidebar.radio(
         "Quáº£n trá»‹",
