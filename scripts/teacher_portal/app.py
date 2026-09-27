@@ -21,7 +21,13 @@ from portal_v2.authorization.supabase_session_guard import (
     validate_supabase_portal_session,
 )
 from portal_v2.ui import render_admin_shell
-from portal_v2.ui.workspace_navigation import route_from_label, visible_teacher_labels
+from portal_v2.ui.workspace_navigation import (
+    TEACHER_ROUTES,
+    labels_for_group,
+    navigation_groups,
+    route_from_label,
+    visible_teacher_labels,
+)
 from portal_v2.ui.user_registration_streamlit import render_user_registration
 from portal_v2.ui.teacher_workspace_styles import apply_teacher_workspace_styles
 from portal_v2.ui.modern_3d_design_system import (
@@ -335,6 +341,12 @@ def _autosave_before_portal_navigation(session_state: Any) -> None:
     session_state["portal_navigation_notice"] = (
         f"Đã tự lưu dữ liệu trên trang {previous_page} trước khi chuyển trang."
     )
+
+
+def _select_teacher_navigation_group(session_state: Any) -> None:
+    group = session_state["portal_navigation_group"]
+    session_state["portal_navigation"] = labels_for_group(TEACHER_ROUTES, group)[0]
+    _autosave_before_portal_navigation(session_state)
 
 
 def resolve_authenticated_portal_role(
@@ -1128,8 +1140,22 @@ def main() -> None:
     else:
         if st.session_state.get("portal_navigation") != current_page:
             st.session_state["portal_navigation"] = current_page
+        menu_pages = PORTAL_PAGES
+        if os.environ.get("MATHTEACHER_GROUPED_NAVIGATION") == "1":
+            group = route_from_label(current_page).group
+            if st.session_state.get("portal_navigation_group") != group:
+                st.session_state["portal_navigation_group"] = group
+            st.sidebar.selectbox(
+                "Nhóm công cụ", navigation_groups(TEACHER_ROUTES),
+                key="portal_navigation_group",
+                on_change=_select_teacher_navigation_group,
+                args=(st.session_state,),
+            )
+            menu_pages = labels_for_group(
+                TEACHER_ROUTES, st.session_state["portal_navigation_group"]
+            )
         selected = st.sidebar.radio(
-            "Công cụ", PORTAL_PAGES,
+            "Công cụ", menu_pages,
             key="portal_navigation",
             label_visibility="collapsed",
             on_change=_autosave_before_portal_navigation,
