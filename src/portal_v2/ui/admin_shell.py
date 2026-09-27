@@ -71,6 +71,7 @@ from portal_v2.ui.admin_navigation import (
     admin_portal_pages,
     resolve_admin_portal_page,
 )
+from portal_v2.ui.workspace_navigation import admin_routes
 
 
 ADMIN_PORTAL_SESSION_KEY = "admin_portal_page"
@@ -648,7 +649,7 @@ def render_admin_shell(
             page_id=current_page_id,
         )
 
-    labels = tuple(admin_portal_page_labels()) + (ADMIN_PAGE_MATH_QUESTION_REVIEWS_LABEL,)
+    labels = tuple(route.label for route in admin_routes())
 
     selected_label = st.sidebar.radio(
         "Quáº£n trá»‹",
