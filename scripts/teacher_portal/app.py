@@ -21,6 +21,7 @@ from portal_v2.authorization.supabase_session_guard import (
     validate_supabase_portal_session,
 )
 from portal_v2.ui import render_admin_shell
+from portal_v2.ui.workspace_navigation import route_from_label, visible_teacher_labels
 from portal_v2.ui.user_registration_streamlit import render_user_registration
 from portal_v2.ui.teacher_workspace_styles import apply_teacher_workspace_styles
 from portal_v2.ui.modern_3d_design_system import (
@@ -51,6 +52,8 @@ PORTAL_PAGES = (
     'Tạo đề kiểm tra Toán 6–9',
     "Xưởng câu hỏi",
 )
+if PORTAL_PAGES != visible_teacher_labels():
+    raise RuntimeError("teacher navigation metadata does not match the legacy menu")
 
 # The legacy authoring hub remains wired below for backward-compatible
 # session/deep-link handling, but it is intentionally absent from the visible
@@ -282,6 +285,7 @@ def select_portal_page(session_state: Any, page: str) -> None:
     )
     if page not in valid_pages:
         raise ValueError("Trang cổng giáo viên không hợp lệ.")
+    route_from_label(page)
     session_state["portal_navigation_request"] = page
 
 
@@ -300,6 +304,7 @@ def _resolve_portal_navigation_request(session_state: Any) -> str:
     )
     if requested not in valid_pages:
         raise ValueError("Trang cổng giáo viên không hợp lệ.")
+    route_from_label(requested)
 
     session_state["portal_page"] = requested
     return str(requested)
