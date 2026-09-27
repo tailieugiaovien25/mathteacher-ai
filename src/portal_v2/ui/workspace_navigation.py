@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from portal_v2.ui.admin_navigation import admin_portal_pages
+
 
 @dataclass(frozen=True)
 class WorkspaceRoute:
@@ -63,3 +65,45 @@ def route_from_label(label: str, *, space: str = "teacher") -> WorkspaceRoute:
 
 def visible_teacher_labels() -> tuple[str, ...]:
     return tuple(route.label for route in TEACHER_ROUTES if route.visible)
+
+
+_ADMIN_GROUPS = {
+    "dashboard": "Tổng quan",
+    "trusted_data": "Chương trình & dữ liệu",
+    "time_allocation": "Chương trình & dữ liệu",
+    "sources_provenance": "Chương trình & dữ liệu",
+    "users_permissions": "Người dùng & lớp",
+    "system_health": "Vận hành",
+    "assessment_templates": "Nội dung & duyệt",
+    "assessment_reviews": "Nội dung & duyệt",
+    "math6_assessment": "Nội dung & duyệt",
+    "user_registrations": "Người dùng & lớp",
+    "subject_catalog": "Chương trình & dữ liệu",
+    "competency_catalog": "Chương trình & dữ liệu",
+    "learning_content_catalog": "Chương trình & dữ liệu",
+    "class_catalog": "Người dùng & lớp",
+    "assignments": "Người dùng & lớp",
+    "academic_year_configuration": "Vận hành",
+    "canonical_code_catalog": "Chương trình & dữ liệu",
+    "context_control_center": "Vận hành",
+    "lesson_plan_coordination_center": "Nội dung & duyệt",
+    "math_question_reviews": "Nội dung & duyệt",
+}
+
+
+def admin_routes() -> tuple[WorkspaceRoute, ...]:
+    """Adapt the canonical admin IDs plus the legacy question review page."""
+    pages = admin_portal_pages()
+    routes = tuple(
+        WorkspaceRoute(page.page_id, page.label, "admin", _ADMIN_GROUPS[page.page_id])
+        for page in pages
+    )
+    routes += (
+        WorkspaceRoute(
+            "math_question_reviews", "Duyệt câu hỏi môn Toán", "admin",
+            _ADMIN_GROUPS["math_question_reviews"],
+        ),
+    )
+    if {route.route_id for route in routes} != set(_ADMIN_GROUPS):
+        raise RuntimeError("admin route groups do not match the canonical pages")
+    return routes
