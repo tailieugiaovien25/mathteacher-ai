@@ -35,8 +35,10 @@ def build_ai_cards(payload: object, *, lesson_id: str, excerpt_ref: str,
         else:
             instruction = str(raw.get("instruction", ""))
         refs = raw.get("source_refs", [])
+        # Model formatting is untrusted. Authoritative references are attached below.
+        # Discard malformed values rather than blocking an otherwise useful proposal.
         if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
-            raise ValueError("AI trả về danh sách nguồn không hợp lệ.")
+            refs = []
         if any(ref not in allowed_sources for ref in refs):
             raise ValueError("Thẻ tham chiếu nguồn không có trong dữ liệu đã kiểm tra.")
         # These IDs come from the server-side selection, not from the model.

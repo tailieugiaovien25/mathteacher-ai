@@ -63,6 +63,16 @@ def test_verified_sources_are_attached_when_ai_omits_citations():
                                        "question:" + QUESTION_ID]
 
 
+def test_malformed_model_citations_fall_back_to_verified_sources():
+    data = payload()
+    data["cards"][0]["source_refs"] = "nguồn bài học"
+    data["cards"][1]["source_refs"] = [None]
+    task, question = propose(data)
+    assert task["source_refs"] == ["lesson:" + LESSON_ID, EXCERPT_REF]
+    assert question["source_refs"] == ["lesson:" + LESSON_ID, EXCERPT_REF,
+                                       "question:" + QUESTION_ID]
+
+
 def test_teacher_edits_stay_in_draft_when_new_ai_proposal_arrives():
     draft = new_draft()
     card = dict(propose()[0], review_status="TEACHER_APPROVED")
