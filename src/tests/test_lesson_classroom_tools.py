@@ -15,6 +15,18 @@ def test_classroom_stage_cards_are_portable_and_import_checked():
         validate_draft(draft)
 
 
+def test_prepared_stage_is_embedded_in_activity_slide():
+    draft = new_draft()
+    tool = add_tool(draft, activity="LUYEN_TAP", kind="QUESTION_STAGE",
+                    session_id="owned-session", title="Bộ câu luyện tập")
+    stage = b'<!doctype html><html><body><button>Next &amp; check</button></body></html>'
+    html = build_presentation_html(draft, classroom_stages={tool["id"]: stage})
+    assert 'srcdoc="&lt;!doctype html&gt;' in html
+    assert 'Next &amp;amp; check' in html
+    assert 'Chuẩn bị sân khấu tích hợp để trình chiếu' not in html
+    assert html.index('3 · Luyện tập') < html.index('srcdoc=')
+
+
 def test_imported_session_cannot_be_launched_without_ownership():
     class Query:
         def select(self, *_): return self

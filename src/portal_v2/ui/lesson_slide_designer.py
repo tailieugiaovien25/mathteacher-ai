@@ -124,9 +124,10 @@ def validate_draft(draft: object) -> dict:
     return draft
 
 
-def build_presentation_html(draft: dict) -> str:
+def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] | None = None) -> str:
     """Escape all teacher text; presentation uses pinned reveal.js assets."""
     validate_draft(draft)
+    classroom_stages = classroom_stages or {}
     sections = []
     for activity, label in ACTIVITIES:
         activity_slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
@@ -150,9 +151,18 @@ def build_presentation_html(draft: dict) -> str:
                                 + '</section>')
         for tool in draft.get("classroom_tools", []):
             if tool["activity"] == activity:
+                stage = classroom_stages.get(tool["id"])
+                if stage is not None:
+                    # Stage builders escape question content. srcdoc keeps the
+                    # existing interactive stage inside this presentation slide.
+                    frame = ('<iframe title="' + escape(TOOL_LABELS[tool["kind"]], quote=True)
+                             + '" sandbox="allow-scripts allow-same-origin" '
+                             + 'style="width:100%;height:68vh;border:0;border-radius:12px" srcdoc="'
+                             + escape(stage.decode("utf-8"), quote=True) + '"></iframe>')
+                else:
+                    frame = '<p>Chuẩn bị sân khấu tích hợp để trình chiếu tại slide này.</p>'
                 sections.append('<section><small>' + escape(label) + '</small><h2>'
-                                + escape(TOOL_LABELS[tool["kind"]]) + '</h2><p>'
-                                + escape(tool["title"]) + '</p><p>Mở sân khấu từ thẻ công cụ trong trình soạn bài.</p></section>')
+                                + escape(TOOL_LABELS[tool["kind"]]) + '</h2>' + frame + '</section>')
     if not sections:
         sections.append('<section><h2>Chưa có slide</h2><p>Thêm nội dung để xem trước.</p></section>')
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8">'
@@ -213,6 +223,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.session_state["lesson_slide_revision"] = str(uuid4())
                 for key in ("lesson_slide_saved_id", "lesson_slide_saved_digest", "lesson_slide_selected"):
                     st.session_state.pop(key, None)
+                st.session_state.pop("lesson_integrated_stages", None)
                 st.rerun()
     st.caption("Nếu bắt đầu bài mới, chọn môn và lớp rồi mở Xưởng thẻ để lấy bài SGK. Chỉ dùng Tải JSON khi đã có bản nháp trước đó.")
     uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
@@ -227,6 +238,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
             st.session_state.pop("lesson_slide_saved_id", None)
             st.session_state.pop("lesson_slide_saved_digest", None)
             st.session_state.pop("lesson_slide_selected", None)
+            st.session_state.pop("lesson_integrated_stages", None)
             st.rerun()
         except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
             st.error(f"Không mở được bài giảng: {exc}")
@@ -296,5 +308,24 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
                        file_name="bai_giang_nhap.json", mime="application/json")
     with st.expander("Xem trước và trình chiếu", expanded=False):
-        st.caption("Bản xem trước dùng reveal.js qua mạng; các khối đánh dấu sẽ hiện khi chuyển bước.")
-        st.components.v1.html(build_presentation_html(draft), height=620, scrolling=False)
+        st.caption("Sân khấu tích hợp hiện ngay trong slide hoạt động. Chuẩn bị lại nếu bộ câu hỏi của buổi học thay đổi.")
+        if client is not None and user_id and draft.get("classroom_tools"):
+            if st.button("Chuẩn bị sân khấu tích hợp", key="lesson_integrated_prepare"):
+                from portal_v2.ui.lesson_classroom_tools import build_owned_stage
+                prepared = {}
+                failures = []
+                for tool in draft["classroom_tools"]:
+                    try:
+                        prepared[tool["id"]] = build_owned_stage(client, user_id, tool)
+                    except Exception as exc:
+                        failures.append(f"{tool['title']} ({TOOL_LABELS[tool['kind']]}): {exc}")
+                st.session_state["lesson_integrated_stages"] = prepared
+                for failure in failures:
+                    st.warning(failure)
+                if prepared:
+                    st.success(f"Đã đưa {len(prepared)} sân khấu vào các slide hoạt động.")
+        known_ids = {tool["id"] for tool in draft.get("classroom_tools", [])}
+        staged = {key: value for key, value in st.session_state.get("lesson_integrated_stages", {}).items()
+                  if key in known_ids}
+        st.components.v1.html(build_presentation_html(draft, classroom_stages=staged),
+                              height=780, scrolling=False)
