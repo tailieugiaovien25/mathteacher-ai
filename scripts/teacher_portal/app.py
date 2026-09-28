@@ -21,6 +21,7 @@ from portal_v2.authorization.supabase_session_guard import (
     validate_supabase_portal_session,
 )
 from portal_v2.ui import render_admin_shell
+from portal_v2.ui.assessment_workspace_hub import ASSESSMENT_LEGACY_DESTINATIONS
 from portal_v2.ui.workspace_navigation import route_from_label, visible_teacher_labels
 from portal_v2.ui.user_registration_streamlit import render_user_registration
 from portal_v2.ui.teacher_workspace_styles import apply_teacher_workspace_styles
@@ -42,6 +43,7 @@ PORTAL_PAGES = (
     'Th\u1eddi kh\xf3a bi\u1ec3u',
     'D\u1eef li\u1ec7u c\u1ee7a t\xf4i',
     'Kho t\xe0i li\u1ec7u',
+    'Đề kiểm tra',
     'Thi\u1ebft \u0111\u1eb7t \u0111\u1ec1 ki\u1ec3m tra',
     'Ma tr\u1eadn & b\u1ea3n \u0111\u1eb7c t\u1ea3',
     'AI xây dựng ngân hàng câu hỏi',
@@ -1131,14 +1133,31 @@ def main() -> None:
     slide_designer_enabled = os.environ.get("MATHTEACHER_SLIDE_DESIGNER") == "1"
     if not slide_designer_enabled and current_page == "Thiết kế bài giảng":
         current_page = "Tổng quan"
+    assessment_hub_enabled = os.environ.get("MATHTEACHER_ASSESSMENT_HUB") == "1"
+    if not assessment_hub_enabled and current_page == "Đề kiểm tra":
+        current_page = "Tổng quan"
+    menu_pages = tuple(
+        page for page in PORTAL_PAGES
+        if (slide_designer_enabled or page != "Thiết kế bài giảng")
+        and (
+            page not in ASSESSMENT_LEGACY_DESTINATIONS
+            if assessment_hub_enabled else page != "Đề kiểm tra"
+        )
+    )
+    if assessment_hub_enabled and current_page in ASSESSMENT_LEGACY_DESTINATIONS:
+        hidden_route = True
     if hidden_route:
         selected = current_page
+        if current_page in ASSESSMENT_LEGACY_DESTINATIONS and assessment_hub_enabled:
+            if st.sidebar.button("← Đề kiểm tra", key="assessment_hub_back"):
+                select_portal_page(st.session_state, "Đề kiểm tra")
+                st.rerun()
     else:
         if st.session_state.get("portal_navigation") != current_page:
             st.session_state["portal_navigation"] = current_page
         selected = st.sidebar.radio(
-            "Công cụ", (PORTAL_PAGES if slide_designer_enabled else
-                        tuple(page for page in PORTAL_PAGES if page != "Thiết kế bài giảng")),
+<<<<<<< HEAD
+            "Công cụ", menu_pages,
             key="portal_navigation",
             label_visibility="collapsed",
             on_change=_autosave_before_portal_navigation,
@@ -1155,7 +1174,13 @@ def main() -> None:
             clear_portal_session(st.session_state)
         st.rerun()
 
-    if selected == "Tổng quan":
+    if selected == "Đề kiểm tra":
+        from portal_v2.ui.assessment_workspace_hub import render_assessment_workspace_hub
+        render_assessment_workspace_hub(
+            st, navigate=lambda page: select_portal_page(st.session_state, page),
+        )
+
+    elif selected == "Tổng quan":
         render_dashboard(st)
 
     elif selected == "Thiết kế bài giảng":

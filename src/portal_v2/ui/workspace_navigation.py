@@ -33,6 +33,7 @@ _TEACHER_ROUTES = (
     ("timetable", "Thời khóa biểu", "Kế hoạch dạy"),
     ("my_data", "Dữ liệu của tôi", "Hồ sơ & dữ liệu"),
     ("document_library", "Kho tài liệu", "Học liệu"),
+    ("assessment_home", "Đề kiểm tra", "Đề kiểm tra"),
     ("assessment_settings", "Thiết đặt đề kiểm tra", "Đề kiểm tra"),
     ("assessment_blueprint", "Ma trận & bản đặc tả", "Đề kiểm tra"),
     ("question_bank_ai", "AI xây dựng ngân hàng câu hỏi", "Đề kiểm tra"),
