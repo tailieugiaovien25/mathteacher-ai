@@ -13,7 +13,9 @@ from portal_v2.ui.lesson_classroom_tools import validate_tool, render_classroom_
 from portal_v2.ui.lesson_ai_presenter import (
     validate_presenter, render_presenter_authoring, avatar_data_uri, presenter_speech_script, ROLES,
 )
-from portal_v2.ui.lesson_evidence_card import validate_evidence_card, render_evidence_authoring
+from portal_v2.ui.lesson_evidence_card import (
+    validate_evidence_card, render_evidence_authoring, MAX_DRAFT_PHOTO_BASE64,
+)
 
 
 ACTIVITIES = (
@@ -124,6 +126,9 @@ def validate_draft(draft: object) -> dict:
         if evidence["id"] in ids:
             raise ValueError("Mã thẻ ghi nhận đã được sử dụng.")
         ids.add(evidence["id"])
+    if sum(len(photo["data_b64"]) for evidence in evidence_cards
+           for photo in evidence.get("media", [])) > MAX_DRAFT_PHOTO_BASE64:
+        raise ValueError("Tổng dung lượng ảnh minh chứng vượt giới hạn bản nháp.")
     evidence = draft.get("source_evidence", {})
     if not isinstance(evidence, dict) or len(evidence) > 80 or any(
         not isinstance(key, str) or not key.startswith("teacher_excerpt:") or
@@ -176,11 +181,17 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
                 summary = (f"Lần ghi gần nhất: {recent['participated']} tham gia, "
                            f"{recent['completed']} hoàn thành, {recent['needs_help']} cần hỗ trợ."
                            if recent else "Chưa có số liệu học sinh. Giáo viên ghi nhận trong trình soạn bài.")
+                photos = ''.join(
+                    '<figure><img alt="Ảnh hoạt động học sinh từ ' + escape(photo["device"], quote=True)
+                    + '" src="data:' + photo["mime"] + ';base64,' + photo["data_b64"]
+                    + '"><figcaption>' + escape(photo["device"]) + '</figcaption></figure>'
+                    for photo in evidence.get("media", []))
                 sections.append('<section class="lesson-evidence-slide"><small>' + escape(label)
                                 + '</small><h2>' + escape(evidence["title"]) + '</h2><p>'
                                 + escape(summary) + '</p><p>'
                                 + f"Đã ghi {len(evidence['entries'])} lần từ {len(evidence['source_ids'])} nguồn kết nối."
-                                + '</p></section>')
+                                + '</p><div class="lesson-evidence-media">' + photos + '</div>'
+                                + '</section>')
         for presenter in draft.get("ai_presenters", []):
             if presenter["activity"] == activity:
                 script_lines = ''.join(
@@ -228,6 +239,9 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
             '<style>.reveal .slides{text-align:left}.reveal small{color:#2563a6}'
             '.reveal .content{padding:.4em .7em;margin:.5em 0;background:#eef4fc;border-radius:.35em}'
             '.reveal .question-choices{font-size:.68em;line-height:1.5;list-style:none;padding-left:0}'
+            '.reveal .lesson-evidence-media{display:flex;gap:12px;align-items:start;max-height:42vh}'
+            '.reveal .lesson-evidence-media figure{max-width:30%;margin:0;font-size:.45em}'
+            '.reveal .lesson-evidence-media img{display:block;max-width:100%;max-height:36vh;object-fit:contain}'
             '.reveal .content p{margin:.2em 0;font-size:.65em}'
             '.reveal .classroom-tool-slide h2{font-size:.9em;margin:.08em 0 .2em}'
             '.reveal .classroom-stage-shell{position:relative;width:100%;height:76vh;'

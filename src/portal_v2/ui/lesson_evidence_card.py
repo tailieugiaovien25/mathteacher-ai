@@ -2,11 +2,27 @@
 
 from datetime import datetime, timezone
 from uuid import uuid4
+from base64 import b64decode, b64encode
+from binascii import Error as Base64Error
 
 from portal_v2.ui.lesson_classroom_tools import TOOL_LABELS
 
 ACTIVITIES = {"MO_DAU", "HINH_THANH_KIEN_THUC", "LUYEN_TAP", "VAN_DUNG"}
 MANUAL = "TEACHER_OBSERVATION"
+DEVICE_TYPES = ("Máy tính", "Điện thoại", "iPad", "Máy ảnh", "Máy quay")
+PHOTO_MIMES = {"image/jpeg", "image/png", "image/webp"}
+MAX_PHOTO_BYTES = 450_000
+MAX_DRAFT_PHOTO_BASE64 = 1_400_000
+
+
+def image_mime(data: bytes) -> str:
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image/webp"
+    raise ValueError("Ảnh phải là JPEG, PNG hoặc WebP hợp lệ.")
 
 
 def available_sources(draft, activity):
@@ -21,7 +37,8 @@ def available_sources(draft, activity):
 
 
 def validate_evidence_card(card, draft=None):
-    if not isinstance(card, dict) or set(card) != {"id", "activity", "title", "source_ids", "entries"}:
+    required = {"id", "activity", "title", "source_ids", "entries"}
+    if not isinstance(card, dict) or not required <= set(card) or set(card) - required - {"media"}:
         raise ValueError("Thẻ ghi nhận hoạt động không hợp lệ.")
     if card["activity"] not in ACTIVITIES or not isinstance(card["id"], str) or not 0 < len(card["id"]) <= 80:
         raise ValueError("Mã hoặc hoạt động của thẻ ghi nhận không hợp lệ.")
@@ -56,6 +73,29 @@ def validate_evidence_card(card, draft=None):
             raise ValueError("Số học sinh hoàn thành/cần hỗ trợ vượt số tham gia.")
         if not isinstance(entry["note"], str) or len(entry["note"]) > 1000:
             raise ValueError("Ghi chú minh chứng không hợp lệ.")
+    media = card.get("media", [])
+    if not isinstance(media, list) or len(media) > 3:
+        raise ValueError("Một thẻ chỉ lưu tối đa 3 ảnh minh chứng.")
+    for photo in media:
+        if not isinstance(photo, dict) or set(photo) != {"id", "source_id", "device", "captured_at", "mime", "data_b64"}:
+            raise ValueError("Ảnh minh chứng không hợp lệ.")
+        if not isinstance(photo["id"], str) or not 0 < len(photo["id"]) <= 80 or photo["source_id"] not in sources or photo["device"] not in DEVICE_TYPES:
+            raise ValueError("Nguồn ảnh minh chứng không hợp lệ.")
+        if not isinstance(photo["captured_at"], str) or len(photo["captured_at"]) > 40:
+            raise ValueError("Ngày chụp ảnh không hợp lệ.")
+        try:
+            if datetime.fromisoformat(photo["captured_at"]).tzinfo is None:
+                raise ValueError("Thiếu múi giờ.")
+        except ValueError as exc:
+            raise ValueError("Ngày chụp ảnh không hợp lệ.") from exc
+        if not isinstance(photo["mime"], str) or photo["mime"] not in PHOTO_MIMES or not isinstance(photo["data_b64"], str) or len(photo["data_b64"]) > 600_000:
+            raise ValueError("Định dạng hoặc kích thước ảnh không hợp lệ.")
+        try:
+            raw = b64decode(photo["data_b64"], validate=True)
+            if len(raw) > MAX_PHOTO_BYTES or image_mime(raw) != photo["mime"]:
+                raise ValueError("Nội dung ảnh không khớp định dạng.")
+        except (ValueError, Base64Error) as exc:
+            raise ValueError("Ảnh minh chứng không hợp lệ.") from exc
     return card
 
 
@@ -79,6 +119,27 @@ def record_evidence(card, *, source_id, participated, completed, needs_help, not
     validate_evidence_card(candidate)
     card["entries"].append(entry)
     return entry
+
+
+def attach_photo(draft, card, *, source_id, device, data):
+    if source_id not in card["source_ids"] or device not in DEVICE_TYPES or not isinstance(data, bytes):
+        raise ValueError("Nguồn thiết bị không hợp lệ.")
+    if not data or len(data) > MAX_PHOTO_BYTES:
+        raise ValueError("Ảnh minh chứng phải nhỏ hơn 450 KB. Hãy chọn ảnh dung lượng thấp hơn.")
+    mime = image_mime(data)
+    encoded = b64encode(data).decode("ascii")
+    if any(p["data_b64"] == encoded for c in draft.get("evidence_cards", [])
+           for p in c.get("media", [])):
+        raise ValueError("Ảnh này đã được lưu trong bài giảng.")
+    used = sum(len(p["data_b64"]) for c in draft.get("evidence_cards", []) for p in c.get("media", []))
+    if used + len(encoded) > MAX_DRAFT_PHOTO_BASE64:
+        raise ValueError("Bài giảng đã đạt giới hạn ảnh. Hãy dùng ảnh dung lượng thấp hơn hoặc bỏ ảnh cũ.")
+    photo = {"id": str(uuid4()), "source_id": source_id, "device": device,
+             "captured_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+             "mime": mime, "data_b64": encoded}
+    validate_evidence_card(dict(card, media=[*card.get("media", []), photo]))
+    card.setdefault("media", []).append(photo)
+    return photo
 
 
 def render_evidence_authoring(st, draft, activity):
@@ -128,6 +189,43 @@ def render_evidence_authoring(st, draft, activity):
                            f"cần hỗ trợ {entry['needs_help']}")
                 if entry["note"]:
                     st.write(entry["note"])
+            with st.expander("Thiết bị · ảnh và video hoạt động học sinh", expanded=False):
+                device = st.selectbox("Thiết bị tạo nội dung", DEVICE_TYPES,
+                                      key="lesson_evidence_device_" + card["id"])
+                st.caption("Máy tính, điện thoại và iPad có thể chụp ảnh hoặc chọn tệp; máy ảnh, máy quay dùng tệp đã chép sang thiết bị đang mở ứng dụng.")
+                captured = st.camera_input("Chụp ảnh hoạt động", key="lesson_evidence_camera_" + card["id"])
+                image_file = st.file_uploader("Chọn ảnh từ thiết bị", type=["jpg", "jpeg", "png", "webp"],
+                                              key="lesson_evidence_image_" + card["id"])
+                chosen_photo = captured or image_file
+                if chosen_photo is not None:
+                    photo_bytes = chosen_photo.getvalue()
+                    already_saved = any(p["data_b64"] == b64encode(photo_bytes).decode("ascii")
+                                        for c in draft.get("evidence_cards", []) for p in c.get("media", []))
+                    st.image(chosen_photo, caption="Ảnh đã lưu" if already_saved else "Ảnh vừa chọn · chưa lưu vào bản nháp")
+                    if st.button("Lưu ảnh vào thẻ", disabled=not active_sources or already_saved,
+                                 key="lesson_evidence_save_photo_" + card["id"]):
+                        try:
+                            attach_photo(draft, card, source_id=source_id, device=device,
+                                         data=photo_bytes)
+                            st.rerun()
+                        except ValueError as exc:
+                            st.warning(str(exc))
+                for photo in reversed(card.get("media", [])):
+                    st.image(b64decode(photo["data_b64"]),
+                             caption=f"{photo['device']} · {photo['captured_at']} · ảnh đã lưu")
+                    if st.button("Bỏ ảnh này", key="lesson_evidence_remove_photo_" + photo["id"]):
+                        card["media"].remove(photo)
+                        st.rerun()
+                video = st.file_uploader("Chọn video từ điện thoại, iPad hoặc máy quay (MP4/WebM)",
+                                         type=["mp4", "webm"],
+                                         key="lesson_evidence_video_" + card["id"])
+                if video is not None:
+                    if video.size > 25_000_000:
+                        st.warning("Video vượt 25 MB; hãy chọn đoạn ngắn hơn.")
+                    else:
+                        st.video(video)
+                        st.caption(f"{device} · {video.name} · {video.size / 1_000_000:.1f} MB. "
+                                   "Video chỉ xem trước trong phiên này, chưa lưu hoặc chuyển tới thiết bị khác.")
             if st.button("Bỏ thẻ ghi nhận", key="lesson_evidence_remove_" + card["id"]):
                 draft["evidence_cards"].remove(card)
                 st.rerun()

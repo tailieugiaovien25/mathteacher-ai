@@ -2,7 +2,9 @@ import pytest
 
 from portal_v2.ui.lesson_activity_cards import make_card
 from portal_v2.ui.lesson_classroom_tools import add_tool
-from portal_v2.ui.lesson_evidence_card import add_evidence_card, record_evidence, validate_evidence_card
+from portal_v2.ui.lesson_evidence_card import (
+    add_evidence_card, record_evidence, validate_evidence_card, attach_photo, DEVICE_TYPES,
+)
 from portal_v2.ui.lesson_slide_designer import build_presentation_html, new_draft, validate_draft
 
 
@@ -38,3 +40,20 @@ def test_card_rejects_wrong_activity_and_bad_counts():
     card["entries"][0]["completed"] = True
     with pytest.raises(ValueError, match="Số lượng"):
         validate_evidence_card(card)
+
+
+def test_ipad_photo_is_saved_in_draft_and_visible_on_slide():
+    draft = new_draft()
+    card = add_evidence_card(draft, activity="VAN_DUNG", title="Sản phẩm học sinh",
+                             source_ids=["TEACHER_OBSERVATION"])
+    assert "iPad" in DEVICE_TYPES
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    attach_photo(draft, card, source_id="TEACHER_OBSERVATION", device="iPad", data=png)
+    assert validate_draft(draft) is draft
+    html = build_presentation_html(draft)
+    assert 'alt="Ảnh hoạt động học sinh từ iPad"' in html
+    assert "data:image/png;base64," in html
+    with pytest.raises(ValueError, match="JPEG, PNG hoặc WebP"):
+        attach_photo(draft, card, source_id="TEACHER_OBSERVATION", device="iPad", data=b"not an image")
+    with pytest.raises(ValueError, match="nhỏ hơn 450 KB"):
+        attach_photo(draft, card, source_id="TEACHER_OBSERVATION", device="iPad", data=png + b"x" * 450_000)
