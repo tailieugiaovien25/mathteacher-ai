@@ -13,6 +13,7 @@ from portal_v2.ui.lesson_classroom_tools import validate_tool, render_classroom_
 from portal_v2.ui.lesson_ai_presenter import (
     validate_presenter, render_presenter_authoring, avatar_data_uri, presenter_speech_script, ROLES,
 )
+from portal_v2.ui.lesson_evidence_card import validate_evidence_card, render_evidence_authoring
 
 
 ACTIVITIES = (
@@ -27,7 +28,8 @@ BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt")
 def new_draft() -> dict:
     return {"schema_version": 1, "subject": "Toán", "grade": 6,
             "lesson_title": "", "source_lesson_id": "", "slides": [],
-            "activity_cards": [], "classroom_tools": [], "ai_presenters": []}
+            "activity_cards": [], "classroom_tools": [], "ai_presenters": [],
+            "evidence_cards": []}
 
 
 def save_teacher_draft(client, user_id: str, draft_id: str, draft: dict) -> None:
@@ -114,6 +116,14 @@ def validate_draft(draft: object) -> dict:
         if presenter["id"] in ids:
             raise ValueError("Mã thẻ nhân vật AI đã được sử dụng.")
         ids.add(presenter["id"])
+    evidence_cards = draft.get("evidence_cards", [])
+    if not isinstance(evidence_cards, list) or len(evidence_cards) > 40:
+        raise ValueError("Bài giảng vượt quá 40 thẻ ghi nhận.")
+    for evidence in evidence_cards:
+        validate_evidence_card(evidence)
+        if evidence["id"] in ids:
+            raise ValueError("Mã thẻ ghi nhận đã được sử dụng.")
+        ids.add(evidence["id"])
     evidence = draft.get("source_evidence", {})
     if not isinstance(evidence, dict) or len(evidence) > 80 or any(
         not isinstance(key, str) or not key.startswith("teacher_excerpt:") or
@@ -160,6 +170,17 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
                                 f'<p>{escape(card["instruction"]).replace(chr(10), "<br>")}</p>'
                                 + ('<ol class="question-choices">' + choices + '</ol>' if choices else '')
                                 + '</section>')
+        for evidence in draft.get("evidence_cards", []):
+            if evidence["activity"] == activity:
+                recent = evidence["entries"][-1] if evidence["entries"] else None
+                summary = (f"Lần ghi gần nhất: {recent['participated']} tham gia, "
+                           f"{recent['completed']} hoàn thành, {recent['needs_help']} cần hỗ trợ."
+                           if recent else "Chưa có số liệu học sinh. Giáo viên ghi nhận trong trình soạn bài.")
+                sections.append('<section class="lesson-evidence-slide"><small>' + escape(label)
+                                + '</small><h2>' + escape(evidence["title"]) + '</h2><p>'
+                                + escape(summary) + '</p><p>'
+                                + f"Đã ghi {len(evidence['entries'])} lần từ {len(evidence['source_ids'])} nguồn kết nối."
+                                + '</p></section>')
         for presenter in draft.get("ai_presenters", []):
             if presenter["activity"] == activity:
                 script_lines = ''.join(
@@ -340,6 +361,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
                             format_func=dict(ACTIVITIES).get)
     render_presenter_authoring(st, draft, activity)
+    render_evidence_authoring(st, draft, activity)
     if client is not None and user_id and draft["subject"] == "Toán":
         render_classroom_tools(st, draft, client, user_id, activity)
     slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
