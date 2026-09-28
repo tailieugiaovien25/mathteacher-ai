@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from html import escape
+from hashlib import sha256
+from datetime import datetime, timezone
 import json
 from uuid import uuid4
 
@@ -22,6 +24,38 @@ def new_draft() -> dict:
     return {"schema_version": 1, "subject": "Toán", "grade": 6,
             "lesson_title": "", "source_lesson_id": "", "slides": [],
             "activity_cards": []}
+
+
+def save_teacher_draft(client, user_id: str, draft_id: str, draft: dict) -> None:
+    """Save a validated draft with the signed-in user's RLS-scoped client."""
+    validate_draft(draft)
+    if len(json.dumps(draft, ensure_ascii=False).encode("utf-8")) > 2_000_000:
+        raise ValueError("Bản nháp vượt quá 2 MB.")
+    client.table("teacher_lesson_drafts").upsert({
+        "draft_id": draft_id, "owner_user_id": user_id,
+        "title": draft["lesson_title"], "draft_json": draft,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }, on_conflict="draft_id").execute()
+
+
+def list_teacher_drafts(client, user_id: str) -> list[dict]:
+    rows = (client.table("teacher_lesson_drafts")
+            .select("draft_id,title,updated_at").eq("owner_user_id", user_id)
+            .order("updated_at", desc=True).limit(50).execute().data)
+    return rows or []
+
+
+def open_teacher_draft(client, user_id: str, draft_id: str) -> dict:
+    rows = (client.table("teacher_lesson_drafts")
+            .select("draft_json").eq("owner_user_id", user_id)
+            .eq("draft_id", draft_id).limit(1).execute().data)
+    if not rows:
+        raise ValueError("Không tìm thấy bản nháp của tài khoản này.")
+    return validate_draft(rows[0]["draft_json"])
+
+
+def _draft_digest(draft: dict) -> str:
+    return sha256(json.dumps(draft, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def validate_draft(draft: object) -> dict:
@@ -131,6 +165,41 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     if "lesson_slide_revision" not in st.session_state:
         st.session_state["lesson_slide_revision"] = str(uuid4())
     draft = st.session_state["lesson_slide_draft"]
+    if client is not None and user_id:
+        with st.expander("Bản nháp đã lưu của tôi", expanded=True):
+            try:
+                saved = list_teacher_drafts(client, user_id)
+                if saved:
+                    selected = st.selectbox("Chọn bản nháp", saved,
+                        format_func=lambda row: (row["title"] or "Bài chưa đặt tên") + " · " + str(row["updated_at"]),
+                        key="slide_saved_draft_selection")
+                    if st.button("Mở bản nháp đã chọn", key="slide_open_saved"):
+                        loaded = open_teacher_draft(client, user_id, selected["draft_id"])
+                        st.session_state["lesson_slide_draft"] = loaded
+                        st.session_state["lesson_slide_saved_id"] = selected["draft_id"]
+                        st.session_state["lesson_slide_saved_digest"] = _draft_digest(loaded)
+                        st.session_state["lesson_slide_revision"] = str(uuid4())
+                        st.session_state.pop("lesson_slide_selected", None)
+                        st.rerun()
+                else:
+                    st.caption("Chưa có bản nháp đã lưu trên tài khoản này.")
+            except Exception as exc:
+                st.warning(f"Chưa đọc được bản nháp đã lưu: {exc}")
+            if st.button("Lưu bản nháp lên tài khoản", key="slide_save_cloud"):
+                try:
+                    draft_id = st.session_state.get("lesson_slide_saved_id") or str(uuid4())
+                    save_teacher_draft(client, user_id, draft_id, draft)
+                    st.session_state["lesson_slide_saved_id"] = draft_id
+                    st.session_state["lesson_slide_saved_digest"] = _draft_digest(draft)
+                    st.success("Đã lưu bản nháp. Các chỉnh sửa tiếp theo sẽ được tự lưu.")
+                except Exception as exc:
+                    st.error(f"Chưa lưu được bản nháp: {exc}")
+            if st.button("Tạo bài giảng mới", key="slide_new_cloud"):
+                st.session_state["lesson_slide_draft"] = new_draft()
+                st.session_state["lesson_slide_revision"] = str(uuid4())
+                for key in ("lesson_slide_saved_id", "lesson_slide_saved_digest", "lesson_slide_selected"):
+                    st.session_state.pop(key, None)
+                st.rerun()
     st.caption("Nếu bắt đầu bài mới, chọn môn và lớp rồi mở Xưởng thẻ để lấy bài SGK. Chỉ dùng Tải JSON khi đã có bản nháp trước đó.")
     uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
     st.caption("File JSON tải lên giới hạn 2 MB; giới hạn 200 MB ở khung tải lên là mặc định của Streamlit.")
@@ -141,6 +210,8 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
             imported = validate_draft(json.load(uploaded))
             st.session_state["lesson_slide_draft"] = imported
             st.session_state["lesson_slide_revision"] = str(uuid4())
+            st.session_state.pop("lesson_slide_saved_id", None)
+            st.session_state.pop("lesson_slide_saved_digest", None)
             st.session_state.pop("lesson_slide_selected", None)
             st.rerun()
         except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
@@ -197,6 +268,15 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
             st.session_state.pop("lesson_slide_selected", None)
             st.rerun()
     validate_draft(draft)
+    if client is not None and user_id and st.session_state.get("lesson_slide_saved_id"):
+        current_digest = _draft_digest(draft)
+        if current_digest != st.session_state.get("lesson_slide_saved_digest"):
+            try:
+                save_teacher_draft(client, user_id, st.session_state["lesson_slide_saved_id"], draft)
+                st.session_state["lesson_slide_saved_digest"] = current_digest
+                st.caption("Đã tự lưu thay đổi vào tài khoản.")
+            except Exception as exc:
+                st.error(f"Chưa tự lưu được thay đổi: {exc}. Hãy tải bản nháp JSON để giữ nội dung.")
     st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
                        file_name="bai_giang_nhap.json", mime="application/json")
     with st.expander("Xem trước và trình chiếu", expanded=False):

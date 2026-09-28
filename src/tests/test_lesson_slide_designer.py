@@ -2,6 +2,7 @@ import pytest
 
 from portal_v2.ui.lesson_slide_designer import (
     ACTIVITIES, build_presentation_html, new_draft, validate_draft,
+    save_teacher_draft, list_teacher_drafts, open_teacher_draft,
 )
 from portal_v2.ui.workspace_navigation import route_from_label
 from scripts.teacher_portal.app import PORTAL_PAGES
@@ -37,3 +38,36 @@ def test_import_rejects_unknown_activity_and_duplicate_slide_ids():
     draft["slides"] = [dict(slide, activity="UNKNOWN")]
     with pytest.raises(ValueError, match="hoạt động"):
         validate_draft(draft)
+
+
+def test_owned_draft_roundtrip_uses_scoped_queries():
+    class Query:
+        def __init__(self, rows): self.rows = rows; self.filters = {}
+        def upsert(self, record, *, on_conflict):
+            assert on_conflict == "draft_id"
+            self.rows[record["draft_id"]] = record
+            return self
+        def select(self, *_): return self
+        def eq(self, field, value): self.filters[field] = value; return self
+        def order(self, *_args, **_kwargs): return self
+        def limit(self, *_): return self
+        def execute(self):
+            class Result: pass
+            result = Result()
+            result.data = [row for row in self.rows.values() if all(
+                row.get(field) == value for field, value in self.filters.items())]
+            return result
+    class Client:
+        def __init__(self): self.rows = {}
+        def table(self, name):
+            assert name == "teacher_lesson_drafts"
+            return Query(self.rows)
+    client = Client()
+    draft = new_draft()
+    draft["lesson_title"] = "Bài 1. Tập hợp"
+    save_teacher_draft(client, "teacher-A", "draft-A", draft)
+    assert len(list_teacher_drafts(client, "teacher-A")) == 1
+    assert list_teacher_drafts(client, "teacher-B") == []
+    assert open_teacher_draft(client, "teacher-A", "draft-A") == draft
+    with pytest.raises(ValueError, match="Không tìm thấy"):
+        open_teacher_draft(client, "teacher-B", "draft-A")
