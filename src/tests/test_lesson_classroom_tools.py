@@ -23,6 +23,10 @@ def test_prepared_stage_is_embedded_in_activity_slide():
     html = build_presentation_html(draft, classroom_stages={tool["id"]: stage})
     assert 'srcdoc="&lt;!doctype html&gt;' in html
     assert 'Next &amp;amp; check' in html
+    assert 'class="classroom-stage-shell"' in html
+    assert '⛶ Toàn màn hình' in html
+    assert 'shell.requestFullscreen()' in html
+    assert '.classroom-stage-shell:fullscreen{width:100vw;height:100vh' in html
     assert 'Chuẩn bị sân khấu tích hợp để trình chiếu' not in html
     assert html.index('3 · Luyện tập') < html.index('srcdoc=')
 

@@ -155,14 +155,17 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
                 if stage is not None:
                     # Stage builders escape question content. srcdoc keeps the
                     # existing interactive stage inside this presentation slide.
-                    frame = ('<iframe title="' + escape(TOOL_LABELS[tool["kind"]], quote=True)
-                             + '" sandbox="allow-scripts allow-same-origin" '
-                             + 'style="width:100%;height:68vh;border:0;border-radius:12px" srcdoc="'
-                             + escape(stage.decode("utf-8"), quote=True) + '"></iframe>')
+                    frame = ('<div class="classroom-stage-shell">'
+                             '<iframe title="' + escape(TOOL_LABELS[tool["kind"]], quote=True)
+                             + '" sandbox="allow-scripts allow-same-origin" allow="fullscreen" allowfullscreen '
+                             + 'srcdoc="' + escape(stage.decode("utf-8"), quote=True) + '"></iframe>'
+                             '<button class="classroom-fullscreen" type="button" '
+                             'aria-label="Toàn màn hình sân khấu">⛶ Toàn màn hình</button></div>')
                 else:
                     frame = '<p>Chuẩn bị sân khấu tích hợp để trình chiếu tại slide này.</p>'
-                sections.append('<section><small>' + escape(label) + '</small><h2>'
-                                + escape(TOOL_LABELS[tool["kind"]]) + '</h2>' + frame + '</section>')
+                sections.append('<section class="classroom-tool-slide"><small>' + escape(label)
+                                + '</small><h2>' + escape(TOOL_LABELS[tool["kind"]])
+                                + '</h2>' + frame + '</section>')
     if not sections:
         sections.append('<section><h2>Chưa có slide</h2><p>Thêm nội dung để xem trước.</p></section>')
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8">'
@@ -174,10 +177,32 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
             '<style>.reveal .slides{text-align:left}.reveal small{color:#2563a6}'
             '.reveal .content{padding:.4em .7em;margin:.5em 0;background:#eef4fc;border-radius:.35em}'
             '.reveal .question-choices{font-size:.68em;line-height:1.5;list-style:none;padding-left:0}'
-            '.reveal .content p{margin:.2em 0;font-size:.65em}</style></head><body>'
+            '.reveal .content p{margin:.2em 0;font-size:.65em}'
+            '.reveal .classroom-tool-slide h2{font-size:.9em;margin:.08em 0 .2em}'
+            '.reveal .classroom-stage-shell{position:relative;width:100%;height:76vh;'
+            'background:#061427;overflow:hidden;border-radius:12px}'
+            '.classroom-stage-shell iframe{display:block;width:100%;height:100%;border:0}'
+            '.classroom-stage-shell:fullscreen{width:100vw;height:100vh;border-radius:0}'
+            '.classroom-fullscreen{position:absolute;right:12px;bottom:12px;z-index:5;'
+            'padding:9px 13px;border:1px solid #a9daf9;border-radius:10px;'
+            'background:#0b3550;color:#fff;font:700 16px Segoe UI,Arial,sans-serif;cursor:pointer;'
+            'box-shadow:0 4px 14px #071b34aa}'
+            '.classroom-fullscreen:focus-visible{outline:3px solid #ffc857}'
+            '</style></head><body>'
             '<div class="reveal"><div class="slides">' + "".join(sections) + '</div></div>'
             '<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.js"></script>'
-            '<script>if(window.Reveal){Reveal.initialize({hash:false,controls:true,progress:true,center:true});}</script>'
+            '<script>if(window.Reveal){Reveal.initialize({hash:false,controls:true,progress:true,center:true});}'
+            'document.addEventListener("click",function(event){'
+            'const button=event.target.closest(".classroom-fullscreen");if(!button)return;'
+            'event.preventDefault();event.stopPropagation();'
+            'const shell=button.closest(".classroom-stage-shell");'
+            'if(document.fullscreenElement===shell){document.exitFullscreen();return;}'
+            'if(!shell.requestFullscreen){button.textContent="Trình duyệt không hỗ trợ";return;}'
+            'shell.requestFullscreen().catch(function(){button.textContent="Không mở được toàn màn hình";});'
+            '});document.addEventListener("fullscreenchange",function(){'
+            'document.querySelectorAll(".classroom-fullscreen").forEach(function(button){'
+            'button.textContent=document.fullscreenElement===button.parentElement'
+            '?"⤢ Thoát toàn màn hình":"⛶ Toàn màn hình";});});</script>'
             '</body></html>')
 
 
