@@ -9,6 +9,7 @@ import json
 from uuid import uuid4
 
 from portal_v2.ui.lesson_activity_cards import validate_card
+from portal_v2.ui.lesson_classroom_tools import validate_tool, render_classroom_tools, TOOL_LABELS
 
 
 ACTIVITIES = (
@@ -23,7 +24,7 @@ BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt")
 def new_draft() -> dict:
     return {"schema_version": 1, "subject": "Toán", "grade": 6,
             "lesson_title": "", "source_lesson_id": "", "slides": [],
-            "activity_cards": []}
+            "activity_cards": [], "classroom_tools": []}
 
 
 def save_teacher_draft(client, user_id: str, draft_id: str, draft: dict) -> None:
@@ -94,6 +95,14 @@ def validate_draft(draft: object) -> dict:
         if card["review_status"] != "TEACHER_APPROVED" or card["id"] in ids:
             raise ValueError("Chỉ lưu thẻ giáo viên đã duyệt và có mã riêng.")
         ids.add(card["id"])
+    classroom_tools = draft.get("classroom_tools", [])
+    if not isinstance(classroom_tools, list) or len(classroom_tools) > 40:
+        raise ValueError("Bài giảng vượt quá 40 thẻ công cụ.")
+    for tool in classroom_tools:
+        validate_tool(tool)
+        if tool["id"] in ids:
+            raise ValueError("Mã thẻ công cụ đã được sử dụng.")
+        ids.add(tool["id"])
     evidence = draft.get("source_evidence", {})
     if not isinstance(evidence, dict) or len(evidence) > 80 or any(
         not isinstance(key, str) or not key.startswith("teacher_excerpt:") or
@@ -139,6 +148,11 @@ def build_presentation_html(draft: dict) -> str:
                                 f'<p>{escape(card["instruction"]).replace(chr(10), "<br>")}</p>'
                                 + ('<ol class="question-choices">' + choices + '</ol>' if choices else '')
                                 + '</section>')
+        for tool in draft.get("classroom_tools", []):
+            if tool["activity"] == activity:
+                sections.append('<section><small>' + escape(label) + '</small><h2>'
+                                + escape(TOOL_LABELS[tool["kind"]]) + '</h2><p>'
+                                + escape(tool["title"]) + '</p><p>Mở sân khấu từ thẻ công cụ trong trình soạn bài.</p></section>')
     if not sections:
         sections.append('<section><h2>Chưa có slide</h2><p>Thêm nội dung để xem trước.</p></section>')
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8">'
@@ -234,6 +248,8 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                                                key="slide_source_lesson_" + revision)
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
                             format_func=dict(ACTIVITIES).get)
+    if client is not None and user_id and draft["subject"] == "Toán":
+        render_classroom_tools(st, draft, client, user_id, activity)
     slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
     if st.button("Thêm slide vào hoạt động này"):
         slide = {"id": str(uuid4()), "activity": activity, "title": "Slide mới", "blocks": []}
