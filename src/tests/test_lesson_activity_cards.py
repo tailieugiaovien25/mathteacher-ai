@@ -53,6 +53,16 @@ def test_ai_cannot_use_invented_question_or_requirement():
         propose(data)
 
 
+def test_verified_sources_are_attached_when_ai_omits_citations():
+    data = payload()
+    data["cards"][0].pop("source_refs")
+    data["cards"][1]["source_refs"] = []
+    task, question = propose(data)
+    assert task["source_refs"][:2] == ["lesson:" + LESSON_ID, EXCERPT_REF]
+    assert question["source_refs"] == ["lesson:" + LESSON_ID, EXCERPT_REF,
+                                       "question:" + QUESTION_ID]
+
+
 def test_teacher_edits_stay_in_draft_when_new_ai_proposal_arrives():
     draft = new_draft()
     card = dict(propose()[0], review_status="TEACHER_APPROVED")

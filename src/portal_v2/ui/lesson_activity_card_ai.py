@@ -34,11 +34,16 @@ def build_ai_cards(payload: object, *, lesson_id: str, excerpt_ref: str,
             instruction = approved_questions[question_id]
         else:
             instruction = str(raw.get("instruction", ""))
-        refs = raw.get("source_refs")
-        if not isinstance(refs, list) or excerpt_ref not in refs or "lesson:" + lesson_id not in refs:
-            raise ValueError("AI chưa trích dẫn bài học và nội dung giáo viên kiểm tra.")
-        if kind == "QUICK_CHECK" and "question:" + question_id not in refs:
-            raise ValueError("AI chưa truy vết câu hỏi đã duyệt.")
+        refs = raw.get("source_refs", [])
+        if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
+            raise ValueError("AI trả về danh sách nguồn không hợp lệ.")
+        if any(ref not in allowed_sources for ref in refs):
+            raise ValueError("Thẻ tham chiếu nguồn không có trong dữ liệu đã kiểm tra.")
+        # These IDs come from the server-side selection, not from the model.
+        required_refs = ["lesson:" + lesson_id, excerpt_ref]
+        if kind == "QUICK_CHECK":
+            required_refs.append("question:" + question_id)
+        refs = list(dict.fromkeys([*required_refs, *refs]))
         card = make_card(
             kind=kind, activity=raw.get("activity"), title=str(raw.get("title", "")),
             instruction=instruction, expected_product=str(raw.get("expected_product", "")),
