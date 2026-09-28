@@ -11,7 +11,7 @@ from uuid import uuid4
 from portal_v2.ui.lesson_activity_cards import validate_card
 from portal_v2.ui.lesson_classroom_tools import validate_tool, render_classroom_tools, TOOL_LABELS
 from portal_v2.ui.lesson_ai_presenter import (
-    validate_presenter, render_presenter_authoring, avatar_data_uri, ROLES,
+    validate_presenter, render_presenter_authoring, avatar_data_uri, presenter_speech_script, ROLES,
 )
 
 
@@ -162,13 +162,21 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
                                 + '</section>')
         for presenter in draft.get("ai_presenters", []):
             if presenter["activity"] == activity:
+                script_lines = ''.join(
+                    '<span class="ai-script-line">' + escape(line) + '</span>'
+                    for line in presenter["message"].splitlines() if line.strip()
+                )
                 sections.append('<section class="ai-presenter-slide"><small>' + escape(label)
                                 + '</small><div class="ai-presenter-layout">'
                                 '<div class="ai-presenter-avatar" role="img" aria-label="Nhân vật AI"></div>'
                                 '<div class="ai-presenter-dialog"><h2>'
-                                + escape(ROLES[presenter["role"]]) + '</h2><p>'
-                                + escape(presenter["message"]).replace(chr(10), '<br>')
-                                + '</p></div></div></section>')
+                                + escape(ROLES[presenter["role"]]) + '</h2><div class="ai-script">'
+                                + script_lines + '</div><div class="ai-voice-controls">'
+                                '<select class="ai-voice-select" aria-label="Chọn giọng tiếng Việt"></select>'
+                                '<button type="button" class="ai-voice-play">▶ Phát lời dẫn</button>'
+                                '<button type="button" class="ai-voice-stop">■ Dừng</button></div>'
+                                '<p class="ai-voice-status" role="status" aria-live="polite">'
+                                'Bấm Phát để nhân vật đọc kịch bản.</p></div></div></section>')
         for tool in draft.get("classroom_tools", []):
             if tool["activity"] == activity:
                 stage = classroom_stages.get(tool["id"])
@@ -218,6 +226,19 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
             'border-radius:24px;padding:1em;color:#123453;box-shadow:0 12px 32px #12345322}'
             '.reveal .ai-presenter-dialog h2{color:#105b85;font-size:1.1em;margin:0 0 .4em}'
             '.reveal .ai-presenter-dialog p{font-size:.8em;line-height:1.5;margin:0}'
+            '.reveal .ai-script{font-size:.72em;line-height:1.45;max-height:36vh;overflow:auto}'
+            '.reveal .ai-script-line{display:block;margin:.3em 0}'
+            '.reveal .ai-voice-controls{display:flex;gap:.35em;align-items:center;flex-wrap:wrap;margin-top:.7em}'
+            '.reveal .ai-voice-controls select,.reveal .ai-voice-controls button{font:600 .42em Segoe UI,Arial;'
+            'padding:.6em;border-radius:.6em;border:1px solid #267399;background:#fff;color:#123453}'
+            '.reveal .ai-voice-controls button{cursor:pointer;background:#075987;color:#fff}'
+            '.reveal .ai-voice-status{font-size:.48em!important;margin-top:.5em!important}'
+            '.reveal .ai-speaking .ai-presenter-avatar{animation:ai-talk .7s ease-in-out infinite alternate;'
+            'filter:drop-shadow(0 0 20px #35c6e6)}'
+            '.reveal .ai-speaking .ai-presenter-dialog{border-color:#11aace;'
+            'box-shadow:0 0 26px #11aace66}'
+            '@keyframes ai-talk{to{transform:translateY(-10px) rotate(1.5deg)}}'
+            '@media(prefers-reduced-motion:reduce){.reveal .ai-speaking .ai-presenter-avatar{animation:none}}'
             '@media(max-width:720px){.reveal .ai-presenter-layout{grid-template-columns:30% 1fr}}'
             + avatar_css +
             '</style></head><body>'
@@ -235,6 +256,7 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
             'document.querySelectorAll(".classroom-fullscreen").forEach(function(button){'
             'button.textContent=document.fullscreenElement===button.parentElement'
             '?"⤢ Thoát toàn màn hình":"⛶ Toàn màn hình";});});</script>'
+            + (presenter_speech_script() if draft.get("ai_presenters") else '') +
             '</body></html>')
 
 
