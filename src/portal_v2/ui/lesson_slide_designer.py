@@ -97,18 +97,25 @@ def build_presentation_html(draft: dict) -> str:
                             + "".join(blocks) + "</section>")
         for card in draft.get("activity_cards", []):
             if card["activity"] == activity:
+                choices = "".join(
+                    '<li><b>' + escape(row["label"]) + '.</b> ' + escape(row["text"]) + '</li>'
+                    for row in card.get("question_display", []))
                 sections.append(f'<section><small>{escape(label)}</small>'
                                 f'<h2>{escape(card["title"])}</h2>'
                                 f'<p>{escape(card["instruction"]).replace(chr(10), "<br>")}</p>'
-                                '</section>')
+                                + ('<ol class="question-choices">' + choices + '</ol>' if choices else '')
+                                + '</section>')
     if not sections:
         sections.append('<section><h2>Chưa có slide</h2><p>Thêm nội dung để xem trước.</p></section>')
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.css">'
             '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/theme/white.css">'
+            '<script>window.MathJax={tex:{inlineMath:[["$","$"],["\\\\(","\\\\)"]],displayMath:[["$$","$$"]]},options:{skipHtmlTags:["script","style","textarea","pre","code"]}};</script>'
+            '<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>'
             '<style>.reveal .slides{text-align:left}.reveal small{color:#2563a6}'
             '.reveal .content{padding:.4em .7em;margin:.5em 0;background:#eef4fc;border-radius:.35em}'
+            '.reveal .question-choices{font-size:.68em;line-height:1.5;list-style:none;padding-left:0}'
             '.reveal .content p{margin:.2em 0;font-size:.65em}</style></head><body>'
             '<div class="reveal"><div class="slides">' + "".join(sections) + '</div></div>'
             '<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.js"></script>'

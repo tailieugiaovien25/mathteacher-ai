@@ -45,6 +45,15 @@ def validate_card(card: object, *, allowed_sources: set[str] | None = None,
             raise ValueError("Thẻ kiểm tra nhanh cần truy vết câu hỏi.")
     elif question_id is not None:
         raise ValueError("Thẻ giao nhiệm vụ không được gắn đáp án câu hỏi.")
+    display = card.get("question_display")
+    if display is not None:
+        if card["kind"] != "QUICK_CHECK" or not isinstance(display, list) or len(display) > 12 or any(
+            not isinstance(row, dict) or not isinstance(row.get("label"), str) or
+            not isinstance(row.get("text"), str) or not row["text"].strip() or
+            len(row["label"]) > 20 or len(row["text"]) > 3000 or
+            set(row) != {"label", "text"} for row in display
+        ):
+            raise ValueError("Phương án trình chiếu của câu hỏi không hợp lệ.")
     return card
 
 

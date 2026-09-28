@@ -4,6 +4,7 @@ from portal_v2.ui.lesson_activity_cards import add_approved_card, validate_card
 from portal_v2.ui.lesson_activity_card_ai import build_ai_cards
 from portal_v2.ui.lesson_slide_designer import build_presentation_html, new_draft, validate_draft
 from portal_v2.ui.lesson_activity_card_authoring import select_catalog_lesson
+from portal_v2.ui.lesson_activity_card_authoring import load_question_display
 
 
 LESSON_ID = "unit-math-kntt-g6-lesson-001"
@@ -122,3 +123,35 @@ def test_quick_check_requires_matching_question_source():
                        "teacher_note": "", "duration_minutes": 2,
                        "source_refs": ["lesson:" + LESSON_ID],
                        "question_version_id": QUESTION_ID})
+
+
+def test_presentation_renders_reviewed_choices_without_answer_or_html_injection():
+    draft = new_draft()
+    card = dict(propose()[1], review_status="TEACHER_APPROVED",
+                instruction=r"Cho $M = \\{5; 7\\}$, chọn phương án đúng.",
+                question_display=[{"label": "A", "text": "5 thuộc M"},
+                                  {"label": "B", "text": "<script>alert(1)</script>"}])
+    add_approved_card(draft, card)
+    html = build_presentation_html(draft)
+    assert "MathJax" in html and "mathjax@3" in html
+    assert "<b>A.</b> 5 thuộc M" in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "is_correct" not in html
+
+
+def test_question_choices_load_without_correctness():
+    class Query:
+        def __init__(self, table): self.name = table
+        def select(self, *_): return self
+        def eq(self, *_): return self
+        def limit(self, *_): return self
+        def order(self, *_): return self
+        def execute(self):
+            class Result: pass
+            result = Result()
+            result.data = ([{"question_type_code": "MULTIPLE_CHOICE"}] if self.name == "assessment_question_versions"
+                           else [{"option_code": "A", "option_text": "5 thuộc M", "sequence_number": 1}])
+            return result
+    class Client:
+        def table(self, name): return Query(name)
+    assert load_question_display(Client(), QUESTION_ID) == [{"label": "A", "text": "5 thuộc M"}]

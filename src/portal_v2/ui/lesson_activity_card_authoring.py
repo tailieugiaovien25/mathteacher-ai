@@ -91,10 +91,37 @@ def select_catalog_lesson(st, draft: dict, *, lesson_id: str, title: str,
     st.session_state["slide_lesson_title_" + revision] = title
 
 
+def load_question_display(client, question_version_id: str) -> list[dict]:
+    """Snapshot visible choices from a reviewed version without reading correct answers."""
+    versions = _rows(client.table("assessment_question_versions")
+                     .select("question_type_code").eq("question_version_id", question_version_id)
+                     .eq("review_status", "APPROVED").limit(1))
+    if len(versions) != 1:
+        raise ValueError("Câu hỏi đã chọn không còn ở trạng thái duyệt.")
+    kind = versions[0]["question_type_code"]
+    if kind == "MULTIPLE_CHOICE":
+        rows = _rows(client.table("assessment_question_options")
+                     .select("option_code,option_text,sequence_number")
+                     .eq("question_version_id", question_version_id)
+                     .order("sequence_number").limit(13))
+        display = [{"label": str(row["option_code"]), "text": str(row["option_text"])} for row in rows]
+    elif kind == "TRUE_FALSE":
+        rows = _rows(client.table("assessment_question_statements")
+                     .select("statement_code,statement_text,sequence_number")
+                     .eq("question_version_id", question_version_id)
+                     .order("sequence_number").limit(13))
+        display = [{"label": str(row["statement_code"]), "text": str(row["statement_text"])} for row in rows]
+    else:
+        return []
+    if not display or len(display) > 12:
+        raise ValueError("Câu hỏi chưa có đủ phương án để trình chiếu.")
+    return display
+
+
 def render_card_authoring(st, *, draft: dict, client, user_id: str,
                           revision: str) -> None:
     with st.expander("Chọn bài SGK · AI tạo thẻ hoạt động", expanded=True):
-        _render_approved_cards(st, draft)
+        _render_approved_cards(st, draft, client=client)
         st.caption("Dùng bài SGK đã đăng ký; đoạn kiến thức phải do giáo viên kiểm tra trước khi gửi AI.")
         try:
             books = load_lesson_catalog(client, grade=draft["grade"], subject=draft["subject"])
@@ -204,6 +231,9 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
                                         instruction=instruction, expected_product=product,
                                         duration_minutes=int(duration), teacher_note=teacher_note,
                                         review_status="TEACHER_APPROVED")
+                        if approved["kind"] == "QUICK_CHECK":
+                            approved["question_display"] = load_question_display(
+                                client, approved["question_version_id"])
                         validate_card(approved, allowed_sources={"lesson:" + lesson_id, excerpt_ref,
                             *("requirement:" + code for code in selected_codes),
                             *("question:" + key for key in questions)},
@@ -218,13 +248,20 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
                         st.error(f"Chưa thêm được thẻ: {exc}")
 
 
-def _render_approved_cards(st, draft: dict) -> None:
+def _render_approved_cards(st, draft: dict, *, client) -> None:
     if not draft.get("activity_cards"):
         return
     st.subheader("Thẻ đã được giáo viên duyệt")
     for card in list(draft["activity_cards"]):
         with st.expander(card["title"], expanded=False):
             st.caption("Nguồn: " + ", ".join(card["source_refs"]))
+            if card["kind"] == "QUICK_CHECK" and "question_display" not in card:
+                if st.button("Bổ sung phương án từ câu hỏi đã duyệt", key="card_display_" + card["id"]):
+                    try:
+                        card["question_display"] = load_question_display(client, card["question_version_id"])
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Chưa bổ sung được phương án: {exc}")
             with st.form("card_edit_" + card["id"]):
                 title = st.text_input("Tên thẻ", value=card["title"], max_chars=180)
                 instruction = st.text_area("Nội dung", value=card["instruction"],
