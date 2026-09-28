@@ -6,6 +6,8 @@ from html import escape
 import json
 from uuid import uuid4
 
+from portal_v2.ui.lesson_activity_cards import validate_card
+
 
 ACTIVITIES = (
     ("MO_DAU", "1 · Mở đầu"),
@@ -18,7 +20,8 @@ BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt")
 
 def new_draft() -> dict:
     return {"schema_version": 1, "subject": "Toán", "grade": 6,
-            "lesson_title": "", "source_lesson_id": "", "slides": []}
+            "lesson_title": "", "source_lesson_id": "", "slides": [],
+            "activity_cards": []}
 
 
 def validate_draft(draft: object) -> dict:
@@ -49,6 +52,32 @@ def validate_draft(draft: object) -> dict:
         for block in blocks:
             if not isinstance(block, dict) or block.get("kind") not in BLOCK_KINDS or not isinstance(block.get("text"), str) or len(block["text"]) > 5000 or type(block.get("reveal_later")) is not bool:
                 raise ValueError("Khối nội dung không hợp lệ.")
+    cards = draft.get("activity_cards", [])  # Previously exported drafts have no cards.
+    if not isinstance(cards, list) or len(cards) > 80:
+        raise ValueError("Bài giảng vượt quá 80 thẻ hoạt động.")
+    for card in cards:
+        validate_card(card)
+        if card["review_status"] != "TEACHER_APPROVED" or card["id"] in ids:
+            raise ValueError("Chỉ lưu thẻ giáo viên đã duyệt và có mã riêng.")
+        ids.add(card["id"])
+    evidence = draft.get("source_evidence", {})
+    if not isinstance(evidence, dict) or len(evidence) > 80 or any(
+        not isinstance(key, str) or not key.startswith("teacher_excerpt:") or
+        len(key) > 80 or not isinstance(value, str) or len(value) > 4000
+        for key, value in evidence.items()
+    ):
+        raise ValueError("Nguồn kiến thức giáo viên lưu không hợp lệ.")
+    verified_source = draft.get("verified_source")
+    if verified_source is not None:
+        if not isinstance(verified_source, dict) or not all(
+            isinstance(verified_source.get(key), str) and
+            0 < len(verified_source[key]) <= 250
+            for key in ("textbook_id", "lesson_id")
+        ):
+            raise ValueError("Bài SGK đã xác thực không hợp lệ.")
+        if any("lesson:" + verified_source["lesson_id"] not in card["source_refs"]
+               for card in cards):
+            raise ValueError("Thẻ đang tham chiếu sang bài SGK khác.")
     return draft
 
 
@@ -58,8 +87,6 @@ def build_presentation_html(draft: dict) -> str:
     sections = []
     for activity, label in ACTIVITIES:
         activity_slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
-        if not activity_slides:
-            continue
         for slide in activity_slides:
             blocks = []
             for block in slide["blocks"]:
@@ -68,6 +95,12 @@ def build_presentation_html(draft: dict) -> str:
                               f'<p>{escape(block["text"]).replace(chr(10), "<br>")}</p></div>')
             sections.append(f'<section><small>{escape(label)}</small><h2>{escape(slide["title"])}</h2>'
                             + "".join(blocks) + "</section>")
+        for card in draft.get("activity_cards", []):
+            if card["activity"] == activity:
+                sections.append(f'<section><small>{escape(label)}</small>'
+                                f'<h2>{escape(card["title"])}</h2>'
+                                f'<p>{escape(card["instruction"]).replace(chr(10), "<br>")}</p>'
+                                '</section>')
     if not sections:
         sections.append('<section><h2>Chưa có slide</h2><p>Thêm nội dung để xem trước.</p></section>')
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8">'
@@ -83,7 +116,7 @@ def build_presentation_html(draft: dict) -> str:
             '</body></html>')
 
 
-def render_lesson_slide_designer(st) -> None:
+def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None) -> None:
     st.title("Thiết kế bài giảng")
     st.caption("Bản nháp của giáo viên; chưa công bố cho học sinh. Tải JSON để lưu và mở lại khi cần.")
     if "lesson_slide_draft" not in st.session_state:
@@ -115,6 +148,9 @@ def render_lesson_slide_designer(st) -> None:
     draft["source_lesson_id"] = st.text_input("Mã bài SGK tham khảo (chưa xác thực với lịch báo giảng)",
                                                value=draft["source_lesson_id"], max_chars=250,
                                                key="slide_source_lesson_" + revision)
+    if client is not None and user_id:
+        from portal_v2.ui.lesson_activity_card_authoring import render_card_authoring
+        render_card_authoring(st, draft=draft, client=client, user_id=user_id)
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
                             format_func=dict(ACTIVITIES).get)
     slides = [slide for slide in draft["slides"] if slide["activity"] == activity]

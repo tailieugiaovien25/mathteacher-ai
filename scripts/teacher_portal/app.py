@@ -1156,7 +1156,7 @@ def main() -> None:
 
     elif selected == "Thiết kế bài giảng":
         from portal_v2.ui.lesson_slide_designer import render_lesson_slide_designer
-        render_lesson_slide_designer(st)
+        render_lesson_slide_designer(st, client=client, user_id=str(user_id))
 
     elif selected == 'Công cụ soạn bài':
         from portal_v2.ui.weekly_schedule_streamlit import (
