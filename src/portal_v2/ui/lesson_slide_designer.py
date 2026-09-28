@@ -10,6 +10,9 @@ from uuid import uuid4
 
 from portal_v2.ui.lesson_activity_cards import validate_card
 from portal_v2.ui.lesson_classroom_tools import validate_tool, render_classroom_tools, TOOL_LABELS
+from portal_v2.ui.lesson_ai_presenter import (
+    validate_presenter, render_presenter_authoring, avatar_data_uri, ROLES,
+)
 
 
 ACTIVITIES = (
@@ -24,7 +27,7 @@ BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt")
 def new_draft() -> dict:
     return {"schema_version": 1, "subject": "Toán", "grade": 6,
             "lesson_title": "", "source_lesson_id": "", "slides": [],
-            "activity_cards": [], "classroom_tools": []}
+            "activity_cards": [], "classroom_tools": [], "ai_presenters": []}
 
 
 def save_teacher_draft(client, user_id: str, draft_id: str, draft: dict) -> None:
@@ -103,6 +106,14 @@ def validate_draft(draft: object) -> dict:
         if tool["id"] in ids:
             raise ValueError("Mã thẻ công cụ đã được sử dụng.")
         ids.add(tool["id"])
+    presenters = draft.get("ai_presenters", [])
+    if not isinstance(presenters, list) or len(presenters) > 40:
+        raise ValueError("Bài giảng vượt quá 40 thẻ nhân vật AI.")
+    for presenter in presenters:
+        validate_presenter(presenter)
+        if presenter["id"] in ids:
+            raise ValueError("Mã thẻ nhân vật AI đã được sử dụng.")
+        ids.add(presenter["id"])
     evidence = draft.get("source_evidence", {})
     if not isinstance(evidence, dict) or len(evidence) > 80 or any(
         not isinstance(key, str) or not key.startswith("teacher_excerpt:") or
@@ -149,6 +160,15 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
                                 f'<p>{escape(card["instruction"]).replace(chr(10), "<br>")}</p>'
                                 + ('<ol class="question-choices">' + choices + '</ol>' if choices else '')
                                 + '</section>')
+        for presenter in draft.get("ai_presenters", []):
+            if presenter["activity"] == activity:
+                sections.append('<section class="ai-presenter-slide"><small>' + escape(label)
+                                + '</small><div class="ai-presenter-layout">'
+                                '<div class="ai-presenter-avatar" role="img" aria-label="Nhân vật AI"></div>'
+                                '<div class="ai-presenter-dialog"><h2>'
+                                + escape(ROLES[presenter["role"]]) + '</h2><p>'
+                                + escape(presenter["message"]).replace(chr(10), '<br>')
+                                + '</p></div></div></section>')
         for tool in draft.get("classroom_tools", []):
             if tool["activity"] == activity:
                 stage = classroom_stages.get(tool["id"])
@@ -168,6 +188,8 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
                                 + '</h2>' + frame + '</section>')
     if not sections:
         sections.append('<section><h2>Chưa có slide</h2><p>Thêm nội dung để xem trước.</p></section>')
+    avatar_css = ('.ai-presenter-avatar{background-image:url("' + avatar_data_uri() + '")}'
+                  if draft.get("ai_presenters") else '')
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.css">'
@@ -188,6 +210,16 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
             'background:#0b3550;color:#fff;font:700 16px Segoe UI,Arial,sans-serif;cursor:pointer;'
             'box-shadow:0 4px 14px #071b34aa}'
             '.classroom-fullscreen:focus-visible{outline:3px solid #ffc857}'
+            '.reveal .ai-presenter-layout{display:grid;grid-template-columns:35% 1fr;gap:3%;'
+            'align-items:center;min-height:60vh}'
+            '.reveal .ai-presenter-avatar{height:58vh;background-position:center bottom;'
+            'background-repeat:no-repeat;background-size:contain}'
+            '.reveal .ai-presenter-dialog{background:#e9f7ff;border:2px solid #61bee4;'
+            'border-radius:24px;padding:1em;color:#123453;box-shadow:0 12px 32px #12345322}'
+            '.reveal .ai-presenter-dialog h2{color:#105b85;font-size:1.1em;margin:0 0 .4em}'
+            '.reveal .ai-presenter-dialog p{font-size:.8em;line-height:1.5;margin:0}'
+            '@media(max-width:720px){.reveal .ai-presenter-layout{grid-template-columns:30% 1fr}}'
+            + avatar_css +
             '</style></head><body>'
             '<div class="reveal"><div class="slides">' + "".join(sections) + '</div></div>'
             '<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.js"></script>'
@@ -285,6 +317,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                                                key="slide_source_lesson_" + revision)
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
                             format_func=dict(ACTIVITIES).get)
+    render_presenter_authoring(st, draft, activity)
     if client is not None and user_id and draft["subject"] == "Toán":
         render_classroom_tools(st, draft, client, user_id, activity)
     slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
