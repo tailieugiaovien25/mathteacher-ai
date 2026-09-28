@@ -24,6 +24,7 @@ _TEACHER_ROUTES = (
     ("dashboard", "Tổng quan", "Tổng quan"),
     ("lesson_standard", "Soạn bài cùng chuẩn giáo án", "Thiết kế bài học"),
     ("lesson_management", "Quản lý giáo án", "Thiết kế bài học"),
+    ("lesson_slide_designer", "Thiết kế bài giảng", "Thiết kế bài học"),
     ("prompt_library", "Thư viện Prompt & AI", "Học liệu"),
     ("openclaw", "Trợ lý OpenClaw", "Học liệu"),
     ("lesson_weekly", "Soạn bài theo tuần", "Thiết kế bài học"),
