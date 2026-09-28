@@ -309,7 +309,7 @@ def _load_owned_content_versions(client: Any, user_id: str, grade: int) -> tuple
     items = items[:500]
     item_codes = {str(item["question_id"]): str(item.get("question_code", "")) for item in items}
     versions = _rows(client.table("assessment_question_versions")
-                     .select("question_version_id,question_id,version_number,prompt_text,review_status,question_type_code,cognitive_level_code,metadata")
+                     .select("question_version_id,question_id,version_number,prompt_text,review_status,question_type_code,cognitive_level_code,default_score,metadata")
                      .in_("question_id", list(item_codes)).limit(1000))
     for version in versions:
         version["question_code"] = item_codes.get(str(version.get("question_id")), "")
@@ -337,7 +337,7 @@ def _brief_math_text(value: str, length: int = 90) -> str:
 
 
 def _question_status_label(value: str) -> str:
-    return {"AI_PROPOSED": "Bản nháp AI", "PENDING_REVIEW": "Chờ duyệt",
+    return {"DRAFT": "Bản nháp", "AI_PROPOSED": "Bản nháp AI", "PENDING_REVIEW": "Chờ duyệt",
             "APPROVED": "Đã duyệt", "REVISION_REQUIRED": "Cần sửa",
             "REJECTED": "Không duyệt"}.get(value, str(value or "Chưa rõ"))
 
@@ -353,7 +353,7 @@ def _load_question_detail(client: Any, version_id: str) -> dict[str, list[dict]]
         "options": ("assessment_question_options", "option_code,option_text,is_correct,sequence_number"),
         "statements": ("assessment_question_statements", "statement_code,statement_text,correct_value,sequence_number"),
         "answers": ("assessment_question_answers", "exact_answer_text,answer_explanation"),
-        "solutions": ("assessment_question_solutions", "solution_text,solution_id,sequence_number"),
+        "solutions": ("assessment_question_solutions", "solution_text,solution_id,sequence_number,is_primary"),
         "scoring": ("assessment_question_scoring_steps", "step_description,step_score,sequence_number"),
     }
     return {name: _rows(client.table(table).select(columns)
@@ -533,6 +533,8 @@ def _render_selected_question_detail(st: Any, client: Any, version: dict) -> Non
         st.error(f"Không đọc được phương án, đáp án và lời giải: {exc}")
         return
     _show_question_detail(st, detail, str(version.get("question_type_code", "")))
+    if version.get("review_status") in ("DRAFT", "AI_PROPOSED", "REVISION_REQUIRED"):
+        _render_edit_content_question(st, client, version, detail)
     st.caption("Câu đã duyệt được giữ nguyên để bảo toàn đề kiểm tra đã sử dụng câu này."
                if version.get("review_status") == "APPROVED" else
                "Sửa nội dung cần tạo bản nháp mới và gửi duyệt lại; không chỉnh trực tiếp bản đã lưu.")
@@ -545,6 +547,53 @@ def _render_selected_question_detail(st: Any, client: Any, version: dict) -> Non
                 st.rerun()
             except Exception as exc:
                 st.error(f"Không gửi duyệt được: {exc}")
+
+
+def _candidate_from_saved_question(version: dict, detail: dict[str, list[dict]]) -> dict:
+    """Populate the existing editor from a saved question and its answer parts."""
+    first_answer = (detail["answers"] or [{}])[0]
+    first_solution = next((row for row in detail["solutions"] if row.get("is_primary")),
+                          (detail["solutions"] or [{}])[0])
+    return {
+        "prompt_text": str(version.get("prompt_text") or ""),
+        "answer": str(first_answer.get("exact_answer_text") or ""),
+        "solution": str(first_solution.get("solution_text") or ""),
+        "options": [{"text": row["option_text"], "is_correct": row["is_correct"]}
+                    for row in sorted(detail["options"], key=lambda row: row["sequence_number"])],
+        "statements": [{"text": row["statement_text"], "correct_value": row["correct_value"]}
+                       for row in sorted(detail["statements"], key=lambda row: row["sequence_number"])],
+        "scoring_steps": [{"description": row["step_description"], "score": float(row["step_score"])}
+                          for row in sorted(detail["scoring"], key=lambda row: row["sequence_number"])],
+    }
+
+
+def _render_edit_content_question(st: Any, client: Any, version: dict,
+                                  detail: dict[str, list[dict]]) -> None:
+    version_id = str(version["question_version_id"])
+    if not st.button("Chỉnh sửa câu hỏi", key="content_edit_open_" + version_id):
+        if st.session_state.get("content_edit_version") != version_id:
+            return
+    st.session_state["content_edit_version"] = version_id
+    candidate = _candidate_from_saved_question(version, detail)
+    revised = _edit_question_in_vietnamese(st, candidate, str(version["question_type_code"]),
+                                            "content_edit_" + version_id)
+    issues = validate_candidate(revised, str(version["question_type_code"]), [],
+                                float(version["default_score"]))
+    issues.extend(_math_notation_issues(revised))
+    for issue in issues:
+        st.warning(issue)
+    checked = st.checkbox("Tôi đã kiểm tra bản sửa và đáp án", key="content_edit_checked_" + version_id)
+    if st.button("Lưu bản sửa", key="content_edit_save_" + version_id,
+                 disabled=bool(issues) or not checked):
+        try:
+            client.rpc("edit_owned_assessment_question_draft", {
+                "target_question_version_id": version_id, "target_candidate": revised,
+            }).execute()
+            st.session_state.pop("content_edit_version", None)
+            st.success("Đã lưu bản sửa. Kiểm tra lại trước khi gửi duyệt.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Không lưu được bản sửa: {exc}")
 
 
 def render_content_question_authoring(*, st: Any, client: Any, user_id: str) -> None:

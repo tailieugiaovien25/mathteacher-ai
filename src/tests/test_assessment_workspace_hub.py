@@ -6,6 +6,7 @@ from portal_v2.ui.assessment_workspace_hub import (
 )
 from portal_v2.ui.workspace_navigation import route_from_label, visible_teacher_labels
 from scripts.teacher_portal.app import select_portal_page
+from portal_v2.ui.assessment_content_question_streamlit import _candidate_from_saved_question
 
 
 def test_hub_destinations_keep_legacy_routes_without_duplicates():
@@ -43,3 +44,17 @@ def test_teacher_authoring_opens_existing_editor_directly():
     assert st.session_state["content_ai_workspace_view"] == "Soạn câu hỏi mới"
     assert targets == ["AI xây dựng ngân hàng câu hỏi"]
     assert st.reran
+
+
+def test_saved_question_prefills_editable_answer_and_scoring():
+    candidate = _candidate_from_saved_question({"prompt_text": "Tính 1+1"}, {
+        "answers": [{"exact_answer_text": "2"}],
+        "solutions": [{"solution_text": "1+1=2", "is_primary": True}],
+        "options": [], "statements": [],
+        "scoring": [{"step_description": "Lập luận đúng", "step_score": 1,
+                     "sequence_number": 1}],
+    })
+    assert candidate["prompt_text"] == "Tính 1+1"
+    assert candidate["answer"] == "2"
+    assert candidate["solution"] == "1+1=2"
+    assert candidate["scoring_steps"] == [{"description": "Lập luận đúng", "score": 1.0}]
