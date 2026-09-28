@@ -2,6 +2,7 @@ import pytest
 
 from portal_v2.ui.lesson_activity_cards import add_approved_card, validate_card
 from portal_v2.ui.lesson_activity_card_ai import build_ai_cards
+from portal_v2.ui.lesson_activity_card_ai import request_ai_cards
 from portal_v2.ui.lesson_slide_designer import build_presentation_html, new_draft, validate_draft
 from portal_v2.ui.lesson_activity_card_authoring import select_catalog_lesson
 from portal_v2.ui.lesson_activity_card_authoring import load_question_display
@@ -155,3 +156,28 @@ def test_question_choices_load_without_correctness():
     class Client:
         def table(self, name): return Query(name)
     assert load_question_display(Client(), QUESTION_ID) == [{"label": "A", "text": "5 thuộc M"}]
+
+
+def test_temporary_gemini_503_is_retried_without_changing_sources(monkeypatch):
+    import io
+    import json
+    from urllib.error import HTTPError
+    import portal_v2.ui.lesson_activity_card_ai as ai
+
+    calls = []
+
+    def urlopen(req, timeout):
+        calls.append(req)
+        if len(calls) == 1:
+            raise HTTPError(req.full_url, 503, "Service unavailable", None, None)
+        response = {"candidates": [{"content": {"parts": [{"text": json.dumps(payload())}]}}]}
+        return io.BytesIO(json.dumps(response).encode("utf-8"))
+
+    monkeypatch.setattr(ai.request, "urlopen", urlopen)
+    monkeypatch.setattr(ai.time, "sleep", lambda _: None)
+    cards = request_ai_cards(api_key="test-key", lesson_title="Tập hợp",
+        lesson_id=LESSON_ID, excerpt="Kiến thức giáo viên đã kiểm tra. " * 5,
+        excerpt_ref=EXCERPT_REF, requirements=[{"requirement_code": "REQ-1"}],
+        approved_questions={QUESTION_ID: "Câu hỏi đã được duyệt?"})
+    assert len(calls) == 2
+    assert cards[1]["instruction"] == "Câu hỏi đã được duyệt?"

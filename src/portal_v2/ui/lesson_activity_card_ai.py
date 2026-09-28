@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from urllib import error, request
 
 from portal_v2.ui.lesson_activity_cards import make_card, validate_card
@@ -99,11 +100,17 @@ def request_ai_cards(*, api_key: str, lesson_title: str, lesson_id: str,
         data=json.dumps(body).encode("utf-8"), method="POST",
         headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
     )
-    try:
-        with request.urlopen(req, timeout=90) as response:
-            output = json.load(response)
-    except error.HTTPError as exc:
-        raise RuntimeError(f"Gemini trả về HTTP {exc.code}.") from exc
+    for attempt in range(3):
+        try:
+            with request.urlopen(req, timeout=90) as response:
+                output = json.load(response)
+            break
+        except error.HTTPError as exc:
+            if exc.code not in (429, 500, 502, 503, 504) or attempt == 2:
+                raise RuntimeError(
+                    f"Gemini trả về HTTP {exc.code} sau {attempt + 1} lần gọi. "
+                    "Nguồn SGK và bản nháp vẫn được giữ; thử lại sau.") from exc
+            time.sleep(attempt + 1)
     parts = (output.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
     raw = json.loads("".join(part.get("text", "") for part in parts if isinstance(part, dict)))
     return build_ai_cards(raw, lesson_id=lesson_id, excerpt_ref=excerpt_ref,
