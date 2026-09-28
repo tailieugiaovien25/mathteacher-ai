@@ -85,7 +85,7 @@ def build_presentation_html(draft: dict) -> str:
 
 def render_lesson_slide_designer(st) -> None:
     st.title("Thiết kế bài giảng")
-    st.caption("Bản nháp trên trình duyệt · tải JSON để lưu và mở lại khi cần.")
+    st.caption("Bản nháp của giáo viên; chưa công bố cho học sinh. Tải JSON để lưu và mở lại khi cần.")
     if "lesson_slide_draft" not in st.session_state:
         st.session_state["lesson_slide_draft"] = new_draft()
     if "lesson_slide_revision" not in st.session_state:
@@ -112,7 +112,7 @@ def render_lesson_slide_designer(st) -> None:
                                       key="slide_grade_" + revision)
     draft["lesson_title"] = st.text_input("Tên bài học", value=draft["lesson_title"], max_chars=250,
                                            key="slide_lesson_title_" + revision)
-    draft["source_lesson_id"] = st.text_input("Mã bài SGK / lịch báo giảng (nếu có)",
+    draft["source_lesson_id"] = st.text_input("Mã bài SGK tham khảo (chưa xác thực với lịch báo giảng)",
                                                value=draft["source_lesson_id"], max_chars=250,
                                                key="slide_source_lesson_" + revision)
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
