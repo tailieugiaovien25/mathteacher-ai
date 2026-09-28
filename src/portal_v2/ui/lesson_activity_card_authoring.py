@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from hashlib import sha256
 import os
 
 from portal_v2.ui.lesson_activity_card_ai import request_ai_cards
 from portal_v2.ui.lesson_activity_cards import add_approved_card, validate_card
 from portal_v2.ui.lesson_slide_designer import ACTIVITIES
+from portal_v2.ui.lesson_textbook_sources import render_lesson_source_picker
 
 
 def _rows(query) -> list[dict]:
@@ -170,19 +170,20 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
             return
         st.caption(f"Câu hỏi đã duyệt gắn đúng bài: {len(questions)}. "
                    "Nếu không có, xưởng chỉ tạo thẻ Giao nhiệm vụ.")
-        excerpt = st.text_area("Kiến thức nguồn đã kiểm tra (không chỉ ghi tên bài)",
-                               max_chars=4000, key="card_excerpt_" + lesson_id,
-                               height=140)
-        confirmed = st.checkbox("Tôi đã đối chiếu đoạn kiến thức với SGK/học liệu nguồn",
-                                key="card_excerpt_confirm_" + lesson_id)
-        excerpt_ref = "teacher_excerpt:" + sha256(excerpt.strip().encode("utf-8")).hexdigest()[:20]
+        try:
+            excerpt, excerpt_ref = render_lesson_source_picker(
+                st, client=client, user_id=user_id, book_id=str(book["textbook_id"]),
+                lesson_id=lesson_id, lesson_title=str(lesson["title"]))
+        except Exception as exc:
+            st.error(f"Chưa đọc được kho nội dung SGK: {exc}")
+            return
         source_identity = (lesson_id, excerpt_ref, tuple(sorted(selected_codes)),
                            tuple(sorted(questions)))
         if st.session_state.get("card_proposal_identity") != source_identity:
             st.session_state["card_proposals"] = []
         if st.button("AI đề xuất thẻ hoạt động", key="card_generate"):
-            if not confirmed or len(excerpt.strip()) < 80:
-                st.error("Cần kiểm tra và nhập đoạn kiến thức ít nhất 80 ký tự.")
+            if not excerpt_ref or len(excerpt.strip()) < 80:
+                st.error("Bài học cần một đoạn kiến thức đã lưu và giáo viên đối chiếu trước khi tạo thẻ.")
             else:
                 try:
                     try:
