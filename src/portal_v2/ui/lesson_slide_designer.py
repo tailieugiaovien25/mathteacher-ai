@@ -124,7 +124,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     if "lesson_slide_revision" not in st.session_state:
         st.session_state["lesson_slide_revision"] = str(uuid4())
     draft = st.session_state["lesson_slide_draft"]
+    st.caption("Nếu bắt đầu bài mới, chọn môn và lớp rồi mở Xưởng thẻ để lấy bài SGK. Chỉ dùng Tải JSON khi đã có bản nháp trước đó.")
     uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
+    st.caption("File JSON tải lên giới hạn 2 MB; giới hạn 200 MB ở khung tải lên là mặc định của Streamlit.")
     if uploaded is not None and st.button("Nạp bản nháp", key="slide_import_button"):
         try:
             if uploaded.size > 2_000_000:
@@ -143,14 +145,15 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                                          key="slide_subject_" + revision)
     draft["grade"] = right.selectbox("Lớp", (6, 7, 8, 9), index=(6, 7, 8, 9).index(draft["grade"]),
                                       key="slide_grade_" + revision)
+    if client is not None and user_id:
+        from portal_v2.ui.lesson_activity_card_authoring import render_card_authoring
+        render_card_authoring(st, draft=draft, client=client, user_id=user_id,
+                              revision=revision)
     draft["lesson_title"] = st.text_input("Tên bài học", value=draft["lesson_title"], max_chars=250,
                                            key="slide_lesson_title_" + revision)
     draft["source_lesson_id"] = st.text_input("Mã bài SGK tham khảo (chưa xác thực với lịch báo giảng)",
                                                value=draft["source_lesson_id"], max_chars=250,
                                                key="slide_source_lesson_" + revision)
-    if client is not None and user_id:
-        from portal_v2.ui.lesson_activity_card_authoring import render_card_authoring
-        render_card_authoring(st, draft=draft, client=client, user_id=user_id)
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
                             format_func=dict(ACTIVITIES).get)
     slides = [slide for slide in draft["slides"] if slide["activity"] == activity]

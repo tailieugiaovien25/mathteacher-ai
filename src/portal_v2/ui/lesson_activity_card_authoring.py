@@ -82,8 +82,18 @@ def load_approved_questions(client, *, user_id: str, grade: int,
     return result
 
 
-def render_card_authoring(st, *, draft: dict, client, user_id: str) -> None:
-    with st.expander("Xưởng thẻ hoạt động · AI đề xuất và giáo viên duyệt", expanded=False):
+def select_catalog_lesson(st, draft: dict, *, lesson_id: str, title: str,
+                          revision: str) -> None:
+    """Write the verified catalog selection before text widgets are rendered."""
+    draft["source_lesson_id"] = lesson_id
+    draft["lesson_title"] = title
+    st.session_state["slide_source_lesson_" + revision] = lesson_id
+    st.session_state["slide_lesson_title_" + revision] = title
+
+
+def render_card_authoring(st, *, draft: dict, client, user_id: str,
+                          revision: str) -> None:
+    with st.expander("Chọn bài SGK · AI tạo thẻ hoạt động", expanded=True):
         _render_approved_cards(st, draft)
         st.caption("Dùng bài SGK đã đăng ký; đoạn kiến thức phải do giáo viên kiểm tra trước khi gửi AI.")
         try:
@@ -106,6 +116,14 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str) -> None:
                                   format_func=lambda row: row["title"],
                                   key="card_lesson_" + str(book["textbook_id"]))
             lesson_id = str(lesson["textbook_unit_id"])
+            if st.button("Dùng bài SGK này cho bài giảng", key="card_use_lesson_" + lesson_id):
+                if (draft.get("activity_cards") and draft.get("verified_source") and
+                        draft["verified_source"].get("lesson_id") != lesson_id):
+                    st.error("Bài giảng đã có thẻ của bài SGK khác. Bỏ các thẻ đó trước khi đổi bài.")
+                else:
+                    select_catalog_lesson(st, draft, lesson_id=lesson_id,
+                                          title=str(lesson["title"]), revision=revision)
+                    st.success("Đã điền tên và mã bài SGK vào bài giảng.")
             try:
                 requirements = load_reviewed_requirements(client, lesson_id)
             except Exception as exc:

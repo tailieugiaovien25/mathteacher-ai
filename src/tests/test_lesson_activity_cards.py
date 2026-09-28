@@ -3,6 +3,7 @@ import pytest
 from portal_v2.ui.lesson_activity_cards import add_approved_card, validate_card
 from portal_v2.ui.lesson_activity_card_ai import build_ai_cards
 from portal_v2.ui.lesson_slide_designer import build_presentation_html, new_draft, validate_draft
+from portal_v2.ui.lesson_activity_card_authoring import select_catalog_lesson
 
 
 LESSON_ID = "unit-math-kntt-g6-lesson-001"
@@ -78,6 +79,19 @@ def test_legacy_slide_drafts_remain_importable():
     draft = new_draft()
     draft.pop("activity_cards")
     assert validate_draft(draft) is draft
+
+
+def test_catalog_selection_prefills_lesson_fields_before_widgets():
+    class FakeStreamlit:
+        session_state = {}
+
+    draft = new_draft()
+    st = FakeStreamlit()
+    select_catalog_lesson(st, draft, lesson_id=LESSON_ID,
+                          title="Số nguyên", revision="r1")
+    assert draft["source_lesson_id"] == LESSON_ID
+    assert draft["lesson_title"] == "Số nguyên"
+    assert st.session_state["slide_source_lesson_r1"] == LESSON_ID
 
 
 def test_quick_check_requires_matching_question_source():
