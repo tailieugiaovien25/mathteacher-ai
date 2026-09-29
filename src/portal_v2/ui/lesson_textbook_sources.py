@@ -84,7 +84,7 @@ def render_lesson_source_picker(st, *, client, user_id: str, book_id: str,
     sources = load_reviewed_sources(client, user_id=user_id, book_id=book_id,
                                     lesson_id=lesson_id)
     if sources:
-        selected = st.selectbox("Đoạn kiến thức đã kiểm tra của đúng bài",
+        selected = st.selectbox("Nguồn đã kiểm tra",
                                 sources, format_func=lambda row: row["source_label"],
                                 key="lesson_source_" + lesson_id)
         st.caption("Trang PDF: " + (str(selected["pdf_page"]) if selected["pdf_page"] else "Giáo viên nhập"))
@@ -95,10 +95,10 @@ def render_lesson_source_picker(st, *, client, user_id: str, book_id: str,
     else:
         st.info("Bài này chưa có đoạn kiến thức đã kiểm tra. Hãy tạo nguồn bên dưới.")
         excerpt, ref = "", ""
-    with st.expander("Thêm hoặc cập nhật nguồn kiến thức của bài", expanded=not sources):
+    with st.expander("Nguồn kiến thức", expanded=not sources):
         st.caption("Chọn đúng bài SGK phía trên. Trích PDF chỉ là văn bản nháp; giáo viên cần sửa lỗi và xác nhận.")
-        label = st.text_input("Tên mục hoặc đoạn kiến thức", key="source_label_" + lesson_id)
-        pdf = st.file_uploader("PDF đúng tập SGK (tùy chọn, tối đa 100 MB)", type=["pdf"],
+        label = st.text_input("Tên đoạn", key="source_label_" + lesson_id)
+        pdf = st.file_uploader("PDF SGK (≤100 MB)", type=["pdf"],
                                key="source_pdf_" + lesson_id)
         pdf_bytes = pdf.getvalue() if pdf else None
         page = None
@@ -111,7 +111,7 @@ def render_lesson_source_picker(st, *, client, user_id: str, book_id: str,
                 count = len(PdfReader(BytesIO(pdf_bytes)).pages)
                 if not 1 <= count <= 500:
                     raise ValueError("PDF phải có từ 1 đến 500 trang.")
-                if st.button("Tìm trang theo tên bài", key="source_find_" + lesson_id):
+                if st.button("Tìm trang", key="source_find_" + lesson_id):
                     matches = find_lesson_pages(pdf_bytes, lesson_title)
                     st.session_state["source_page_matches_" + lesson_id] = (
                         sha256(pdf_bytes).hexdigest(), matches)
@@ -123,7 +123,7 @@ def render_lesson_source_picker(st, *, client, user_id: str, book_id: str,
                     st.caption("Nếu PDF là ảnh quét, tìm chữ có thể không thấy bài. Hãy chọn trang thủ công.")
                 page = st.number_input("Trang trong tệp PDF", min_value=1, max_value=count,
                                        value=1, key="source_page_" + lesson_id)
-                if st.button("Lấy chữ của trang này", key="source_extract_" + lesson_id):
+                if st.button("Lấy nội dung", key="source_extract_" + lesson_id):
                     extracted, _ = extract_pdf_page(pdf_bytes, int(page))
                     st.session_state["source_editor_" + lesson_id] = extracted
             except Exception as exc:
@@ -133,7 +133,7 @@ def render_lesson_source_picker(st, *, client, user_id: str, book_id: str,
                                 max_chars=4000, key="source_editor_" + lesson_id)
         confirmed = st.checkbox("Tôi đã đối chiếu đoạn này với đúng bài SGK đã chọn",
                                 key="source_confirm_" + lesson_id)
-        if st.button("Lưu nguồn đã kiểm tra", key="source_save_" + lesson_id):
+        if st.button("Lưu nguồn", key="source_save_" + lesson_id):
             try:
                 if not confirmed:
                     raise ValueError("Giáo viên cần xác nhận đã đối chiếu đúng bài.")

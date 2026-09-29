@@ -55,15 +55,28 @@ def _designer_style(st) -> None:
         .lesson-designer-band small{display:block;color:#bbd5e7;font-weight:500;margin-top:2px}
         .lesson-designer-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0}
         .lesson-designer-grid article{background:#edf5fa;border:1px solid #bfd4e5;
-            border-radius:10px;padding:9px 12px;color:#0b3550;box-shadow:0 2px 0 #a8c5d7}
+            border-radius:10px;padding:9px 12px;color:#08263e;box-shadow:0 1px 0 #a8c5d7}
         .lesson-designer-grid strong{display:block;font-size:.9rem}
         .lesson-designer-grid span{display:block;font-size:.75rem;margin-top:3px}
         @media(max-width:850px){.lesson-designer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
         div[data-testid="stButton"] > button,div[data-testid="stDownloadButton"] > button{
-            min-height:2.6rem;border-radius:10px;box-shadow:0 2px 0 #55758a,0 3px 6px #071b3426}
+            min-height:40px;border-radius:10px;box-shadow:0 1px 0 #55758a,0 2px 3px #071b3426}
         div[data-testid="stButton"] > button:active,div[data-testid="stDownloadButton"] > button:active{
-            box-shadow:0 1px 0 #55758a;transform:translateY(1px)}
-        label[data-testid="stWidgetLabel"]{color:#0b3550;font-weight:700}
+            box-shadow:0 .5px 0 #55758a;transform:translateY(1px)}
+        [data-testid="stWidgetLabel"],.lesson-control-label{
+            display:flex;align-items:center;width:170px;max-width:100%;height:34px;box-sizing:border-box;
+            margin:0 0 5px;padding:0 9px;border-radius:7px;background:#031629;
+            color:#fff!important;font-weight:700;font-size:.8rem;white-space:nowrap;overflow:hidden}
+        [data-testid="stWidgetLabel"] p{color:#fff!important;font-size:.8rem;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        [data-testid="stExpander"] summary{min-height:42px;background:#08263e!important;
+            color:#fff!important;font-weight:700}
+        [data-testid="stExpander"] summary p{color:#fff!important}
+        [data-testid="stFileUploaderDropzone"]{min-height:40px!important;height:40px!important;
+            padding:0 5px!important;display:flex;align-items:center;justify-content:center}
+        [data-testid="stFileUploaderDropzoneInstructions"]{display:none!important}
+        [data-testid="stPopover"] button{width:100%;min-height:40px}
+        [data-testid="stCaptionContainer"] p{color:#38536b!important}
         div[data-testid="stVerticalBlock"]{gap:.45rem}
     </style>''', unsafe_allow_html=True)
 
@@ -71,6 +84,11 @@ def _designer_style(st) -> None:
 def _designer_band(st, title: str, subtitle: str = "") -> None:
     st.markdown('<div class="lesson-designer-band">' + escape(title)
                 + ('<small>' + escape(subtitle) + '</small>' if subtitle else '') + '</div>',
+                unsafe_allow_html=True)
+
+
+def _control_label(st, title: str) -> None:
+    st.markdown('<div class="lesson-control-label">' + escape(title) + '</div>',
                 unsafe_allow_html=True)
 
 
@@ -383,7 +401,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
         st.session_state["lesson_slide_revision"] = str(uuid4())
     draft = st.session_state["lesson_slide_draft"]
     _designer_band(st, "BẢN NHÁP", "Chọn, lưu hoặc mở bản nháp JSON")
-    col_select, col_open, col_save, col_new, col_json = st.columns([2.2, 1.2, 1.2, 1.2, 1.8], gap="small")
+    col_select, col_open, col_save, col_new, col_json = st.columns(5, gap="small")
     if client is not None and user_id:
         try:
             saved = list_teacher_drafts(client, user_id)
@@ -391,13 +409,14 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
             saved = []
             st.warning(f"Chưa đọc được bản nháp đã lưu: {exc}")
         with col_select:
-            selected = st.selectbox("Chọn bản nháp", saved,
+            selected = st.selectbox("Bản nháp", saved,
                 format_func=lambda row: (row["title"] or "Bài chưa đặt tên") + " · " + str(row["updated_at"]),
                 key="slide_saved_draft_selection", disabled=not saved,
                 placeholder="Chưa có bản nháp" if not saved else None)
         with col_open:
-            st.caption("Mở")
-            if st.button("Mở bản nháp đã chọn", key="slide_open_saved", disabled=not saved,
+            _control_label(st, "Mở")
+            if st.button("Mở", key="slide_open_saved", disabled=not saved,
+                         help="Mở bản nháp đã chọn",
                          use_container_width=True):
                 loaded = open_teacher_draft(client, user_id, selected["draft_id"])
                 from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
@@ -409,8 +428,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.session_state.pop("lesson_slide_selected", None)
                 st.rerun()
         with col_save:
-            st.caption("Lưu")
-            if st.button("Lưu bản nháp", key="slide_save_cloud", use_container_width=True):
+            _control_label(st, "Lưu")
+            if st.button("Lưu", key="slide_save_cloud", help="Lưu bản nháp lên tài khoản",
+                         use_container_width=True):
                 try:
                     draft_id = st.session_state.get("lesson_slide_saved_id") or str(uuid4())
                     save_teacher_draft(client, user_id, draft_id, draft)
@@ -420,8 +440,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 except Exception as exc:
                     st.error(f"Chưa lưu được bản nháp: {exc}")
         with col_new:
-            st.caption("Tạo mới")
-            if st.button("Tạo bài giảng mới", key="slide_new_cloud", use_container_width=True):
+            _control_label(st, "Bài mới")
+            if st.button("Bài mới", key="slide_new_cloud", help="Tạo bài giảng mới",
+                         use_container_width=True):
                 from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
                 stop_owner_inbox(user_id)
                 st.session_state["lesson_slide_draft"] = new_draft()
@@ -432,16 +453,18 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.rerun()
     else:
         with col_select:
-            st.selectbox("Chọn bản nháp", [], disabled=True, placeholder="Đăng nhập để chọn")
-        for column, label in ((col_open, "Mở bản nháp đã chọn"), (col_save, "Lưu bản nháp"),
-                              (col_new, "Tạo bài giảng mới")):
+            st.selectbox("Bản nháp", [], disabled=True, placeholder="Đăng nhập để chọn")
+        for column, label in ((col_open, "Mở"), (col_save, "Lưu"),
+                              (col_new, "Bài mới")):
             with column:
-                st.caption(label)
+                _control_label(st, label)
                 st.button(label, disabled=True, use_container_width=True)
     with col_json:
-        uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
-        import_clicked = st.button("Nạp JSON", key="slide_import_button", disabled=uploaded is None,
-                                   use_container_width=True)
+        _control_label(st, "JSON")
+        with st.popover("JSON", use_container_width=True):
+            uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
+            import_clicked = st.button("Nạp", key="slide_import_button", disabled=uploaded is None,
+                                       help="Mở bản nháp JSON đã tải lên", use_container_width=True)
     if uploaded is not None and import_clicked:
         try:
             if uploaded.size > 2_000_000:
@@ -461,9 +484,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
             st.error(f"Không mở được bài giảng: {exc}")
     st.caption("JSON tối đa 2 MB. Bắt đầu bài mới bằng cách chọn môn và lớp, sau đó chọn bài trong Xưởng thẻ.")
     _designer_band(st, "THÔNG TIN BÀI HỌC", "Môn · lớp · bài · yêu cầu cần đạt · sách giáo khoa")
-    subject_col, grade_col, lesson_col, requirement_col, book_col = st.columns([1.1, .65, 2, 1.5, 1.5], gap="small")
+    subject_col, grade_col, lesson_col, requirement_col, book_col = st.columns(5, gap="small")
     revision = st.session_state["lesson_slide_revision"]
-    draft["subject"] = subject_col.selectbox("Môn học", ("Toán", "Tiếng Anh"),
+    draft["subject"] = subject_col.selectbox("Môn", ("Toán", "Tiếng Anh"),
                                          index=("Toán", "Tiếng Anh").index(draft["subject"]),
                                          key="slide_subject_" + revision)
     draft["grade"] = grade_col.selectbox("Lớp", (6, 7, 8, 9), index=(6, 7, 8, 9).index(draft["grade"]),
@@ -471,10 +494,10 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     draft["lesson_title"] = lesson_col.text_input("Bài", value=draft["lesson_title"], max_chars=250,
                                                   key="slide_lesson_title_" + revision)
     requirement_codes = st.session_state.get("card_requirements_" + draft.get("source_lesson_id", ""), [])
-    requirement_col.text_input("Yêu cầu cần đạt", value=", ".join(requirement_codes) if requirement_codes
+    requirement_col.text_input("YCCĐ", value=", ".join(requirement_codes) if requirement_codes
                                else "Chọn trong Xưởng thẻ", disabled=True)
     selected_book = st.session_state.get(f"card_book_{draft['subject']}_{draft['grade']}")
-    book_col.text_input("Sách giáo khoa", value=selected_book.get("title", "")
+    book_col.text_input("SGK", value=selected_book.get("title", "")
                         if isinstance(selected_book, dict) else "Chọn trong Xưởng thẻ", disabled=True)
     if client is not None and user_id:
         from portal_v2.ui.lesson_activity_card_authoring import render_card_authoring

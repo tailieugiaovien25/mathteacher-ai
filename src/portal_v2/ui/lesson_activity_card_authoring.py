@@ -121,7 +121,7 @@ def load_question_display(client, question_version_id: str) -> list[dict]:
 
 def render_card_authoring(st, *, draft: dict, client, user_id: str,
                           revision: str) -> None:
-    with st.expander("Chọn bài SGK · AI tạo thẻ hoạt động", expanded=True):
+    with st.expander("SGK · AI tạo thẻ", expanded=True):
         _render_approved_cards(st, draft, client=client)
         st.caption("Dùng bài SGK đã đăng ký; đoạn kiến thức phải do giáo viên kiểm tra trước khi gửi AI.")
         try:
@@ -129,7 +129,7 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
             if not books:
                 st.info("Chưa có danh mục sách ACTIVE của môn và lớp này.")
                 return
-            book = st.selectbox("Sách giáo khoa", books, format_func=lambda row: row["title"],
+            book = st.selectbox("SGK", books, format_func=lambda row: row["title"],
                                 key=f"card_book_{draft['subject']}_{draft['grade']}")
             lessons = _rows(client.table("textbook_units")
                             .select("textbook_unit_id,title,unit_type")
@@ -140,11 +140,11 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
             if not lessons:
                 st.info("Sách chưa có danh mục bài học ACTIVE.")
                 return
-            lesson = st.selectbox("Bài học", lessons,
+            lesson = st.selectbox("Bài", lessons,
                                   format_func=lambda row: row["title"],
                                   key="card_lesson_" + str(book["textbook_id"]))
             lesson_id = str(lesson["textbook_unit_id"])
-            if st.button("Dùng bài SGK này cho bài giảng", key="card_use_lesson_" + lesson_id):
+            if st.button("Chọn bài này", key="card_use_lesson_" + lesson_id):
                 if (draft.get("activity_cards") and draft.get("verified_source") and
                         draft["verified_source"].get("lesson_id") != lesson_id):
                     st.error("Bài giảng đã có thẻ của bài SGK khác. Bỏ các thẻ đó trước khi đổi bài.")
@@ -159,7 +159,7 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
             except Exception as exc:
                 st.warning(f"Chưa lấy được YCCĐ đã rà soát: {exc}")
                 requirements = []
-            selected_codes = st.multiselect("YCCĐ đề xuất để giáo viên chọn",
+            selected_codes = st.multiselect("YCCĐ",
                 [row["requirement_code"] for row in requirements],
                 format_func=lambda code: next((row["requirement_text"] for row in requirements
                                                if row["requirement_code"] == code), code),
