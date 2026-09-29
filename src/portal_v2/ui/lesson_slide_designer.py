@@ -414,7 +414,6 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
 def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None) -> None:
     _designer_style(st)
     _designer_band(st, "THIẾT KẾ BÀI GIẢNG", "Soạn hoạt động · chuẩn bị công cụ · trình chiếu trên lớp")
-    st.caption("Bản nháp của giáo viên; chưa công bố cho học sinh.")
     if "lesson_slide_draft" not in st.session_state:
         st.session_state["lesson_slide_draft"] = new_draft()
     if "lesson_slide_revision" not in st.session_state:
@@ -422,7 +421,6 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     draft = st.session_state["lesson_slide_draft"]
     save_requested = False
     save_status = None
-    _designer_band(st, "CÔNG CỤ BÀI GIẢNG", "Bản nháp · thông tin bài học · công cụ · slide")
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
                             format_func=dict(ACTIVITIES).get, key="lesson_tool_activity")
     draft_tab, info_tab, catalog_tab, presenter_tab, stage_tab, evidence_tab, slide_tab = st.tabs(DESIGN_TOOL_TABS)
