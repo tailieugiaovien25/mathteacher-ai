@@ -25,6 +25,7 @@ ACTIVITIES = (
     ("VAN_DUNG", "4 · Vận dụng"),
 )
 BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt")
+DESIGN_TOOL_TABS = ("SGK · AI", "Trợ giảng", "Sân khấu", "Ghi nhận", "Slide")
 ACTIVITY_MODES = {
     "MO_DAU": "Khởi động · ôn bài cũ",
     "HINH_THANH_KIEN_THUC": "Khám phá · làm việc nhóm",
@@ -509,78 +510,83 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     selected_book = st.session_state.get(f"card_book_{draft['subject']}_{draft['grade']}")
     book_col.text_input("SGK", value=selected_book.get("title", "")
                         if isinstance(selected_book, dict) else "Chọn trong Xưởng thẻ", disabled=True)
-    if client is not None and user_id:
-        from portal_v2.ui.lesson_activity_card_authoring import render_card_authoring
-        render_card_authoring(st, draft=draft, client=client, user_id=user_id,
-                              revision=revision)
-    with st.expander("Mã bài SGK tham khảo", expanded=False):
-        draft["source_lesson_id"] = st.text_input("Mã bài SGK tham khảo (chưa xác thực với lịch báo giảng)",
-                                                   value=draft["source_lesson_id"], max_chars=250,
-                                                   key="slide_source_lesson_" + revision)
     _designer_band(st, "KHÔNG GIAN THIẾT KẾ", "Chọn hoạt động rồi lắp thẻ, công cụ và slide")
     st.markdown(activity_overview_html(draft), unsafe_allow_html=True)
     activity = st.radio("Hoạt động đang thiết kế", [key for key, _ in ACTIVITIES],
                         format_func=dict(ACTIVITIES).get, horizontal=True)
-    st.caption("Hình thức gợi ý: " + ACTIVITY_MODES[activity]
-               + ". Có thể dùng công cụ bên dưới cho hoạt động này.")
-    _designer_band(st, "1 · CHUẨN BỊ TRƯỚC TIẾT HỌC", "Viết kịch bản AI, chọn sân khấu, tạo thẻ và slide")
-    st.caption("Các nội dung chuẩn bị được lưu cùng bản nháp; giáo viên kiểm tra trước khi trình chiếu.")
-    render_presenter_authoring(st, draft, activity)
-    if client is not None and user_id and draft["subject"] == "Toán":
-        render_classroom_tools(st, draft, client, user_id, activity)
-        if draft.get("classroom_tools") and st.button("Chuẩn bị sân khấu tích hợp",
-                                                      key="lesson_integrated_prepare"):
-            from portal_v2.ui.lesson_classroom_tools import build_owned_stage
-            prepared = {}
-            failures = []
-            for tool in draft["classroom_tools"]:
-                try:
-                    prepared[tool["id"]] = build_owned_stage(client, user_id, tool)
-                except Exception as exc:
-                    failures.append(f"{tool['title']} ({TOOL_LABELS[tool['kind']]}): {exc}")
-            st.session_state["lesson_integrated_stages"] = prepared
-            for failure in failures:
-                st.warning(failure)
-            if prepared:
-                st.success(f"Đã đưa {len(prepared)} sân khấu vào các slide hoạt động.")
-    _designer_band(st, "2 · CÔNG CỤ SỬ DỤNG TRỰC TIẾP", "Thử khi soạn · dùng khi dạy")
-    st.caption("Ghi nhận, nhận ảnh điện thoại và mở sân khấu có thể thử ngay ở đây. "
-               "Trên slide, giáo viên điều khiển sân khấu và lời dẫn AI.")
-    render_evidence_authoring(st, draft, activity, owner_id=user_id,
-                              lesson_key=revision, mode="design")
-    slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
-    if st.button("Thêm slide vào hoạt động này"):
-        slide = {"id": str(uuid4()), "activity": activity, "title": "Slide mới", "blocks": []}
-        draft["slides"].append(slide)
-        st.session_state["lesson_slide_selected"] = slide["id"]
-        st.rerun()
-    if slides:
-        slide_ids = [slide["id"] for slide in slides]
-        chosen = st.session_state.get("lesson_slide_selected")
-        slide_id = st.selectbox("Slide", slide_ids, index=slide_ids.index(chosen) if chosen in slide_ids else 0,
-                                format_func=lambda value: next(s["title"] for s in slides if s["id"] == value))
-        slide = next(s for s in slides if s["id"] == slide_id)
-        st.session_state["lesson_slide_selected"] = slide_id
-        slide["title"] = st.text_input("Tiêu đề slide", value=slide["title"], max_chars=200,
-                                       key="slide_title_" + revision + slide_id)
-        for index, block in enumerate(slide["blocks"]):
-            with st.expander(f"{index+1}. {block['kind']}", expanded=True):
-                block["kind"] = st.selectbox("Loại khối", BLOCK_KINDS, index=BLOCK_KINDS.index(block["kind"]),
-                                              key=f"slide_kind_{revision}_{slide_id}_{index}")
-                block["text"] = st.text_area("Nội dung", value=block["text"], max_chars=5000,
-                                              key=f"slide_text_{revision}_{slide_id}_{index}")
-                block["reveal_later"] = st.checkbox("Giáo viên bấm mới hiện", value=block["reveal_later"],
-                                                    key=f"slide_reveal_{revision}_{slide_id}_{index}")
-                if st.button("Xóa khối", key=f"slide_remove_block_{slide_id}_{index}"):
-                    slide["blocks"].pop(index)
-                    st.rerun()
-        if st.button("Thêm khối nội dung"):
-            slide["blocks"].append({"kind": "Nội dung", "text": "", "reveal_later": False})
+    st.caption("Hình thức gợi ý: " + ACTIVITY_MODES[activity])
+    catalog_tab, presenter_tab, stage_tab, evidence_tab, slide_tab = st.tabs(DESIGN_TOOL_TABS)
+    with catalog_tab:
+        if client is not None and user_id:
+            from portal_v2.ui.lesson_activity_card_authoring import render_card_authoring
+            render_card_authoring(st, draft=draft, client=client, user_id=user_id,
+                                  revision=revision)
+        else:
+            st.info("Đăng nhập để chọn SGK, bài học và tạo thẻ cùng AI.")
+        with st.expander("Mã bài SGK tham khảo", expanded=False):
+            draft["source_lesson_id"] = st.text_input("Mã bài SGK tham khảo (chưa xác thực với lịch báo giảng)",
+                                                       value=draft["source_lesson_id"], max_chars=250,
+                                                       key="slide_source_lesson_" + revision)
+    with presenter_tab:
+        render_presenter_authoring(st, draft, activity)
+    with stage_tab:
+        if client is not None and user_id and draft["subject"] == "Toán":
+            render_classroom_tools(st, draft, client, user_id, activity)
+            if draft.get("classroom_tools") and st.button("Chuẩn bị sân khấu tích hợp",
+                                                          key="lesson_integrated_prepare"):
+                from portal_v2.ui.lesson_classroom_tools import build_owned_stage
+                prepared = {}
+                failures = []
+                for tool in draft["classroom_tools"]:
+                    try:
+                        prepared[tool["id"]] = build_owned_stage(client, user_id, tool)
+                    except Exception as exc:
+                        failures.append(f"{tool['title']} ({TOOL_LABELS[tool['kind']]}): {exc}")
+                st.session_state["lesson_integrated_stages"] = prepared
+                for failure in failures:
+                    st.warning(failure)
+                if prepared:
+                    st.success(f"Đã đưa {len(prepared)} sân khấu vào các slide hoạt động.")
+        else:
+            st.info("Chọn Toán và đăng nhập để chuẩn bị sân khấu lớp học.")
+    with evidence_tab:
+        st.caption("Thử ghi nhận và nhận ảnh ngay khi soạn; các công cụ trực tiếp cũng có ở chế độ trình chiếu.")
+        render_evidence_authoring(st, draft, activity, owner_id=user_id,
+                                  lesson_key=revision, mode="design")
+    with slide_tab:
+        slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
+        if st.button("Thêm slide vào hoạt động này"):
+            slide = {"id": str(uuid4()), "activity": activity, "title": "Slide mới", "blocks": []}
+            draft["slides"].append(slide)
+            st.session_state["lesson_slide_selected"] = slide["id"]
             st.rerun()
-        if st.button("Xóa slide đang chọn"):
-            draft["slides"].remove(slide)
-            st.session_state.pop("lesson_slide_selected", None)
-            st.rerun()
+        if slides:
+            slide_ids = [slide["id"] for slide in slides]
+            chosen = st.session_state.get("lesson_slide_selected")
+            slide_id = st.selectbox("Slide", slide_ids, index=slide_ids.index(chosen) if chosen in slide_ids else 0,
+                                    format_func=lambda value: next(s["title"] for s in slides if s["id"] == value))
+            slide = next(s for s in slides if s["id"] == slide_id)
+            st.session_state["lesson_slide_selected"] = slide_id
+            slide["title"] = st.text_input("Tiêu đề slide", value=slide["title"], max_chars=200,
+                                           key="slide_title_" + revision + slide_id)
+            for index, block in enumerate(slide["blocks"]):
+                with st.expander(f"{index+1}. {block['kind']}", expanded=True):
+                    block["kind"] = st.selectbox("Loại khối", BLOCK_KINDS, index=BLOCK_KINDS.index(block["kind"]),
+                                                  key=f"slide_kind_{revision}_{slide_id}_{index}")
+                    block["text"] = st.text_area("Nội dung", value=block["text"], max_chars=5000,
+                                                  key=f"slide_text_{revision}_{slide_id}_{index}")
+                    block["reveal_later"] = st.checkbox("Giáo viên bấm mới hiện", value=block["reveal_later"],
+                                                        key=f"slide_reveal_{revision}_{slide_id}_{index}")
+                    if st.button("Xóa khối", key=f"slide_remove_block_{slide_id}_{index}"):
+                        slide["blocks"].pop(index)
+                        st.rerun()
+            if st.button("Thêm khối nội dung"):
+                slide["blocks"].append({"kind": "Nội dung", "text": "", "reveal_later": False})
+                st.rerun()
+            if st.button("Xóa slide đang chọn"):
+                draft["slides"].remove(slide)
+                st.session_state.pop("lesson_slide_selected", None)
+                st.rerun()
     validate_draft(draft)
     if client is not None and user_id and st.session_state.get("lesson_slide_saved_id"):
         current_digest = _draft_digest(draft)
