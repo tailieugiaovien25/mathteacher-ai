@@ -1,7 +1,7 @@
 import pytest
 
 from portal_v2.ui.lesson_slide_designer import (
-    ACTIVITIES, build_presentation_html, new_draft, validate_draft,
+    ACTIVITIES, activity_overview_html, build_presentation_html, new_draft, validate_draft,
     save_teacher_draft, list_teacher_drafts, open_teacher_draft,
 )
 from portal_v2.ui.workspace_navigation import route_from_label
@@ -35,6 +35,18 @@ def test_presentation_has_fullscreen_control_separate_from_stage():
     assert 'document.documentElement.requestFullscreen()' in html
     assert 'document.exitFullscreen()' in html
     assert 'Reveal.layout()' in html
+
+
+def test_designer_overview_keeps_four_saved_activities_and_counts_tools():
+    draft = new_draft()
+    draft["slides"].append({"activity": "MO_DAU"})
+    draft["evidence_cards"].append({"activity": "MO_DAU"})
+    html = activity_overview_html(draft)
+    assert html.count("<article>") == 4
+    assert "Khởi động · ôn bài cũ · 2 nội dung" in html
+    assert "Khám phá · làm việc nhóm" in html
+    assert "Luyện tập · củng cố" in html
+    assert "Vận dụng · tìm tòi mở rộng" in html
 
 
 def test_import_rejects_unknown_activity_and_duplicate_slide_ids():

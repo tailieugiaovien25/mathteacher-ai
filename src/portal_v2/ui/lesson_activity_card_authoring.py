@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from uuid import uuid4
 
 from portal_v2.ui.lesson_activity_card_ai import request_ai_cards
 from portal_v2.ui.lesson_activity_cards import add_approved_card, validate_card
@@ -148,9 +149,11 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
                         draft["verified_source"].get("lesson_id") != lesson_id):
                     st.error("Bài giảng đã có thẻ của bài SGK khác. Bỏ các thẻ đó trước khi đổi bài.")
                 else:
+                    next_revision = str(uuid4())
                     select_catalog_lesson(st, draft, lesson_id=lesson_id,
-                                          title=str(lesson["title"]), revision=revision)
-                    st.success("Đã điền tên và mã bài SGK vào bài giảng.")
+                                          title=str(lesson["title"]), revision=next_revision)
+                    st.session_state["lesson_slide_revision"] = next_revision
+                    st.rerun()
             try:
                 requirements = load_reviewed_requirements(client, lesson_id)
             except Exception as exc:

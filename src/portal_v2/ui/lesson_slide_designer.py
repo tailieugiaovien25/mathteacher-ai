@@ -25,6 +25,51 @@ ACTIVITIES = (
     ("VAN_DUNG", "4 · Vận dụng"),
 )
 BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt")
+ACTIVITY_MODES = {
+    "MO_DAU": "Khởi động · ôn bài cũ",
+    "HINH_THANH_KIEN_THUC": "Khám phá · làm việc nhóm",
+    "LUYEN_TAP": "Luyện tập · củng cố",
+    "VAN_DUNG": "Vận dụng · tìm tòi mở rộng",
+}
+
+
+def _designer_style(st) -> None:
+    """Page-local presentation styles; leave button colors and animations to the portal theme."""
+    st.markdown('''<style>
+        .lesson-designer-band{background:#08263e;color:#f4fbff;border-radius:12px;
+            padding:10px 16px;margin:8px 0 12px;font-weight:700;letter-spacing:.01em}
+        .lesson-designer-band small{display:block;color:#bbd5e7;font-weight:500;margin-top:2px}
+        .lesson-designer-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0}
+        .lesson-designer-grid article{background:#edf5fa;border:1px solid #bfd4e5;
+            border-radius:10px;padding:9px 12px;color:#0b3550;box-shadow:0 2px 0 #a8c5d7}
+        .lesson-designer-grid strong{display:block;font-size:.9rem}
+        .lesson-designer-grid span{display:block;font-size:.75rem;margin-top:3px}
+        @media(max-width:850px){.lesson-designer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        div[data-testid="stButton"] > button,div[data-testid="stDownloadButton"] > button{
+            min-height:2.6rem;border-radius:10px;box-shadow:0 2px 0 #55758a,0 3px 6px #071b3426}
+        div[data-testid="stButton"] > button:active,div[data-testid="stDownloadButton"] > button:active{
+            box-shadow:0 1px 0 #55758a;transform:translateY(1px)}
+        label[data-testid="stWidgetLabel"]{color:#0b3550;font-weight:700}
+        div[data-testid="stVerticalBlock"]{gap:.45rem}
+    </style>''', unsafe_allow_html=True)
+
+
+def _designer_band(st, title: str, subtitle: str = "") -> None:
+    st.markdown('<div class="lesson-designer-band">' + escape(title)
+                + ('<small>' + escape(subtitle) + '</small>' if subtitle else '') + '</div>',
+                unsafe_allow_html=True)
+
+
+def activity_overview_html(draft: dict) -> str:
+    labels = dict(ACTIVITIES)
+    cells = []
+    for key, _ in ACTIVITIES:
+        count = sum(item["activity"] == key for collection in
+                    ("slides", "activity_cards", "classroom_tools", "ai_presenters", "evidence_cards")
+                    for item in draft.get(collection, []))
+        cells.append('<article><strong>' + escape(labels[key]) + '</strong><span>'
+                     + escape(ACTIVITY_MODES[key]) + ' · ' + str(count) + ' nội dung</span></article>')
+    return '<div class="lesson-designer-grid">' + ''.join(cells) + '</div>'
 
 
 def new_draft() -> dict:
@@ -315,36 +360,43 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
 
 
 def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None) -> None:
-    st.title("Thiết kế bài giảng")
-    st.caption("Bản nháp của giáo viên; chưa công bố cho học sinh. Tải JSON để lưu và mở lại khi cần.")
+    _designer_style(st)
+    _designer_band(st, "THIẾT KẾ BÀI GIẢNG", "Soạn hoạt động · chuẩn bị công cụ · trình chiếu trên lớp")
+    st.caption("Bản nháp của giáo viên; chưa công bố cho học sinh.")
     if "lesson_slide_draft" not in st.session_state:
         st.session_state["lesson_slide_draft"] = new_draft()
     if "lesson_slide_revision" not in st.session_state:
         st.session_state["lesson_slide_revision"] = str(uuid4())
     draft = st.session_state["lesson_slide_draft"]
+    _designer_band(st, "BẢN NHÁP", "Chọn, lưu hoặc mở bản nháp JSON")
+    col_select, col_open, col_save, col_new, col_json = st.columns([2.2, 1.2, 1.2, 1.2, 1.8], gap="small")
     if client is not None and user_id:
-        with st.expander("Bản nháp đã lưu của tôi", expanded=True):
-            try:
-                saved = list_teacher_drafts(client, user_id)
-                if saved:
-                    selected = st.selectbox("Chọn bản nháp", saved,
-                        format_func=lambda row: (row["title"] or "Bài chưa đặt tên") + " · " + str(row["updated_at"]),
-                        key="slide_saved_draft_selection")
-                    if st.button("Mở bản nháp đã chọn", key="slide_open_saved"):
-                        loaded = open_teacher_draft(client, user_id, selected["draft_id"])
-                        from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
-                        stop_owner_inbox(user_id)
-                        st.session_state["lesson_slide_draft"] = loaded
-                        st.session_state["lesson_slide_saved_id"] = selected["draft_id"]
-                        st.session_state["lesson_slide_saved_digest"] = _draft_digest(loaded)
-                        st.session_state["lesson_slide_revision"] = str(uuid4())
-                        st.session_state.pop("lesson_slide_selected", None)
-                        st.rerun()
-                else:
-                    st.caption("Chưa có bản nháp đã lưu trên tài khoản này.")
-            except Exception as exc:
-                st.warning(f"Chưa đọc được bản nháp đã lưu: {exc}")
-            if st.button("Lưu bản nháp lên tài khoản", key="slide_save_cloud"):
+        try:
+            saved = list_teacher_drafts(client, user_id)
+        except Exception as exc:
+            saved = []
+            st.warning(f"Chưa đọc được bản nháp đã lưu: {exc}")
+        with col_select:
+            selected = st.selectbox("Chọn bản nháp", saved,
+                format_func=lambda row: (row["title"] or "Bài chưa đặt tên") + " · " + str(row["updated_at"]),
+                key="slide_saved_draft_selection", disabled=not saved,
+                placeholder="Chưa có bản nháp" if not saved else None)
+        with col_open:
+            st.caption("Mở")
+            if st.button("Mở bản nháp đã chọn", key="slide_open_saved", disabled=not saved,
+                         use_container_width=True):
+                loaded = open_teacher_draft(client, user_id, selected["draft_id"])
+                from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
+                stop_owner_inbox(user_id)
+                st.session_state["lesson_slide_draft"] = loaded
+                st.session_state["lesson_slide_saved_id"] = selected["draft_id"]
+                st.session_state["lesson_slide_saved_digest"] = _draft_digest(loaded)
+                st.session_state["lesson_slide_revision"] = str(uuid4())
+                st.session_state.pop("lesson_slide_selected", None)
+                st.rerun()
+        with col_save:
+            st.caption("Lưu")
+            if st.button("Lưu bản nháp", key="slide_save_cloud", use_container_width=True):
                 try:
                     draft_id = st.session_state.get("lesson_slide_saved_id") or str(uuid4())
                     save_teacher_draft(client, user_id, draft_id, draft)
@@ -353,7 +405,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                     st.success("Đã lưu bản nháp. Các chỉnh sửa tiếp theo sẽ được tự lưu.")
                 except Exception as exc:
                     st.error(f"Chưa lưu được bản nháp: {exc}")
-            if st.button("Tạo bài giảng mới", key="slide_new_cloud"):
+        with col_new:
+            st.caption("Tạo mới")
+            if st.button("Tạo bài giảng mới", key="slide_new_cloud", use_container_width=True):
                 from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
                 stop_owner_inbox(user_id)
                 st.session_state["lesson_slide_draft"] = new_draft()
@@ -362,10 +416,19 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                     st.session_state.pop(key, None)
                 st.session_state.pop("lesson_integrated_stages", None)
                 st.rerun()
-    st.caption("Nếu bắt đầu bài mới, chọn môn và lớp rồi mở Xưởng thẻ để lấy bài SGK. Chỉ dùng Tải JSON khi đã có bản nháp trước đó.")
-    uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
-    st.caption("File JSON tải lên giới hạn 2 MB; giới hạn 200 MB ở khung tải lên là mặc định của Streamlit.")
-    if uploaded is not None and st.button("Nạp bản nháp", key="slide_import_button"):
+    else:
+        with col_select:
+            st.selectbox("Chọn bản nháp", [], disabled=True, placeholder="Đăng nhập để chọn")
+        for column, label in ((col_open, "Mở bản nháp đã chọn"), (col_save, "Lưu bản nháp"),
+                              (col_new, "Tạo bài giảng mới")):
+            with column:
+                st.caption(label)
+                st.button(label, disabled=True, use_container_width=True)
+    with col_json:
+        uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
+        import_clicked = st.button("Nạp JSON", key="slide_import_button", disabled=uploaded is None,
+                                   use_container_width=True)
+    if uploaded is not None and import_clicked:
         try:
             if uploaded.size > 2_000_000:
                 raise ValueError("File bản nháp vượt quá 2 MB.")
@@ -382,24 +445,38 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
             st.rerun()
         except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
             st.error(f"Không mở được bài giảng: {exc}")
-    left, right = st.columns(2)
+    st.caption("JSON tối đa 2 MB. Bắt đầu bài mới bằng cách chọn môn và lớp, sau đó chọn bài trong Xưởng thẻ.")
+    _designer_band(st, "THÔNG TIN BÀI HỌC", "Môn · lớp · bài · yêu cầu cần đạt · sách giáo khoa")
+    subject_col, grade_col, lesson_col, requirement_col, book_col = st.columns([1.1, .65, 2, 1.5, 1.5], gap="small")
     revision = st.session_state["lesson_slide_revision"]
-    draft["subject"] = left.selectbox("Môn học", ("Toán", "Tiếng Anh"),
+    draft["subject"] = subject_col.selectbox("Môn học", ("Toán", "Tiếng Anh"),
                                          index=("Toán", "Tiếng Anh").index(draft["subject"]),
                                          key="slide_subject_" + revision)
-    draft["grade"] = right.selectbox("Lớp", (6, 7, 8, 9), index=(6, 7, 8, 9).index(draft["grade"]),
+    draft["grade"] = grade_col.selectbox("Lớp", (6, 7, 8, 9), index=(6, 7, 8, 9).index(draft["grade"]),
                                       key="slide_grade_" + revision)
+    draft["lesson_title"] = lesson_col.text_input("Bài", value=draft["lesson_title"], max_chars=250,
+                                                  key="slide_lesson_title_" + revision)
+    requirement_codes = st.session_state.get("card_requirements_" + draft.get("source_lesson_id", ""), [])
+    requirement_col.text_input("Yêu cầu cần đạt", value=", ".join(requirement_codes) if requirement_codes
+                               else "Chọn trong Xưởng thẻ", disabled=True)
+    selected_book = st.session_state.get(f"card_book_{draft['subject']}_{draft['grade']}")
+    book_col.text_input("Sách giáo khoa", value=selected_book.get("title", "")
+                        if isinstance(selected_book, dict) else "Chọn trong Xưởng thẻ", disabled=True)
     if client is not None and user_id:
         from portal_v2.ui.lesson_activity_card_authoring import render_card_authoring
         render_card_authoring(st, draft=draft, client=client, user_id=user_id,
                               revision=revision)
-    draft["lesson_title"] = st.text_input("Tên bài học", value=draft["lesson_title"], max_chars=250,
-                                           key="slide_lesson_title_" + revision)
-    draft["source_lesson_id"] = st.text_input("Mã bài SGK tham khảo (chưa xác thực với lịch báo giảng)",
-                                               value=draft["source_lesson_id"], max_chars=250,
-                                               key="slide_source_lesson_" + revision)
-    activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
-                            format_func=dict(ACTIVITIES).get)
+    with st.expander("Mã bài SGK tham khảo", expanded=False):
+        draft["source_lesson_id"] = st.text_input("Mã bài SGK tham khảo (chưa xác thực với lịch báo giảng)",
+                                                   value=draft["source_lesson_id"], max_chars=250,
+                                                   key="slide_source_lesson_" + revision)
+    _designer_band(st, "KHÔNG GIAN THIẾT KẾ", "Chọn hoạt động rồi lắp thẻ, công cụ và slide")
+    st.markdown(activity_overview_html(draft), unsafe_allow_html=True)
+    activity = st.radio("Hoạt động đang thiết kế", [key for key, _ in ACTIVITIES],
+                        format_func=dict(ACTIVITIES).get, horizontal=True)
+    st.caption("Hình thức gợi ý: " + ACTIVITY_MODES[activity]
+               + ". Có thể dùng công cụ bên dưới cho hoạt động này.")
+    _designer_band(st, "CÔNG CỤ HOẠT ĐỘNG", "AI dẫn dắt · ghi nhận · sân khấu · slide")
     render_presenter_authoring(st, draft, activity)
     render_evidence_authoring(st, draft, activity, owner_id=user_id,
                               lesson_key=revision)
@@ -450,6 +527,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.error(f"Chưa tự lưu được thay đổi: {exc}. Hãy tải bản nháp JSON để giữ nội dung.")
     st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
                        file_name="bai_giang_nhap.json", mime="application/json")
+    _designer_band(st, "TRÌNH CHIẾU", "Xem trước, bật toàn màn hình và tổ chức hoạt động học")
     with st.expander("Xem trước và trình chiếu", expanded=False):
         st.caption("Sân khấu tích hợp hiện ngay trong slide hoạt động. Chuẩn bị lại nếu bộ câu hỏi của buổi học thay đổi.")
         if client is not None and user_id and draft.get("classroom_tools"):
@@ -472,3 +550,4 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                   if key in known_ids}
         st.components.v1.html(build_presentation_html(draft, classroom_stages=staged),
                               height=780, scrolling=False)
+    _designer_band(st, "MATH TEACHER AI · THIẾT KẾ BÀI GIẢNG")
