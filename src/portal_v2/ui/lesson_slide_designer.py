@@ -77,13 +77,17 @@ def _designer_style(st) -> None:
             padding:0 5px!important;display:flex;align-items:center;justify-content:center}
         [data-testid="stFileUploaderDropzoneInstructions"]{display:none!important}
         [data-testid="stPopover"] button{width:100%;min-height:40px}
+        [data-testid="stTabs"]{border-radius:12px;background:#f6f9fc;
+            box-shadow:0 13px 28px #08263e38,0 3px 7px #08263e25}
         [data-testid="stTabs"] [role="tablist"]{position:sticky;top:2.75rem;z-index:10;
             background:#f6f9fc;border-radius:9px;padding:3px 6px}
         [data-testid="stTabs"] :is([role="tabpanel"],[data-baseweb="tab-panel"]){
-            height:clamp(210px,30vh,320px);overflow-y:auto!important;overflow-x:hidden;
+            height:390px;
+            overflow-y:auto!important;overflow-x:hidden;
             overscroll-behavior:contain;scrollbar-gutter:stable;
             background:#f6f9fc;border:1px solid #bdd1df;border-radius:0 0 10px 10px;
             padding:8px 12px}
+        @media(max-height:650px){[data-testid="stTabs"] :is([role="tabpanel"],[data-baseweb="tab-panel"]){height:260px}}
         [data-testid="stCaptionContainer"] p{color:#38536b!important}
         div[data-testid="stVerticalBlock"]{gap:.45rem}
     </style>''', unsafe_allow_html=True)
@@ -517,13 +521,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     selected_book = st.session_state.get(f"card_book_{draft['subject']}_{draft['grade']}")
     book_col.text_input("SGK", value=selected_book.get("title", "")
                         if isinstance(selected_book, dict) else "Chọn trong Xưởng thẻ", disabled=True)
-    _designer_band(st, "KHÔNG GIAN THIẾT KẾ", "Chọn hoạt động rồi lắp thẻ, công cụ và slide")
-    st.markdown(activity_overview_html(draft), unsafe_allow_html=True)
-    activity = st.radio("Hoạt động đang thiết kế", [key for key, _ in ACTIVITIES],
-                        format_func=dict(ACTIVITIES).get, horizontal=True)
-    st.caption("Hình thức gợi ý: " + ACTIVITY_MODES[activity])
-    download_slot = st.empty()
-    _designer_band(st, "TRÌNH CHIẾU", "Công cụ nằm trong khung tab; cuộn trong khung để thao tác")
+    _designer_band(st, "CÔNG CỤ BÀI GIẢNG", "Chọn hoạt động và chỉnh nội dung trong từng tab")
+    activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
+                            format_func=dict(ACTIVITIES).get, key="lesson_tool_activity")
     catalog_tab, presenter_tab, stage_tab, evidence_tab, slide_tab = st.tabs(DESIGN_TOOL_TABS)
     with catalog_tab:
         if client is not None and user_id:
@@ -596,7 +596,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 draft["slides"].remove(slide)
                 st.session_state.pop("lesson_slide_selected", None)
                 st.rerun()
-    validate_draft(draft)
+        validate_draft(draft)
+        st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
+                           file_name="bai_giang_nhap.json", mime="application/json")
     if client is not None and user_id and st.session_state.get("lesson_slide_saved_id"):
         current_digest = _draft_digest(draft)
         if current_digest != st.session_state.get("lesson_slide_saved_digest"):
@@ -606,9 +608,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.caption("Đã tự lưu thay đổi vào tài khoản.")
             except Exception as exc:
                 st.error(f"Chưa tự lưu được thay đổi: {exc}. Hãy tải bản nháp JSON để giữ nội dung.")
-    with download_slot:
-        st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
-                           file_name="bai_giang_nhap.json", mime="application/json")
+    _designer_band(st, "TRÌNH CHIẾU", "Xem bài giảng và điều khiển hoạt động học")
     st.caption("Sân khấu đã chuẩn bị xuất hiện trong slide tương ứng. Chuẩn bị lại nếu bộ câu hỏi thay đổi.")
     st.markdown("**Điều khiển trực tiếp trong chế độ trình chiếu**")
     st.caption("Sân khấu và lời dẫn AI chạy trong slide. Ghi nhận học sinh và duyệt ảnh ở khung "
