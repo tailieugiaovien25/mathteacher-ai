@@ -1,7 +1,7 @@
 import pytest
 
 from portal_v2.ui.lesson_slide_designer import (
-    ACTIVITIES, activity_overview_html, build_presentation_html, new_draft, validate_draft,
+    ACTIVITIES, activity_overview_html, build_presentation_html, new_draft, tool_workflow, validate_draft,
     save_teacher_draft, list_teacher_drafts, open_teacher_draft,
 )
 from portal_v2.ui.workspace_navigation import route_from_label
@@ -47,6 +47,16 @@ def test_designer_overview_keeps_four_saved_activities_and_counts_tools():
     assert "Khám phá · làm việc nhóm" in html
     assert "Luyện tập · củng cố" in html
     assert "Vận dụng · tìm tòi mở rộng" in html
+
+
+def test_tool_workflow_separates_preparation_from_live_operation():
+    assert tool_workflow("slide") == "prepare"
+    assert tool_workflow("classroom_stage_setup") == "prepare"
+    assert tool_workflow("presenter_script") == "prepare"
+    assert tool_workflow("stage_play") == "both"
+    assert tool_workflow("presenter_speech") == "both"
+    assert tool_workflow("evidence_capture") == "both"
+    assert tool_workflow("phone_photo_inbox") == "both"
 
 
 def test_import_rejects_unknown_activity_and_duplicate_slide_ids():

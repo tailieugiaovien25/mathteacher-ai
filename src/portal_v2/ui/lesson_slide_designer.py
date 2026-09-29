@@ -31,6 +31,20 @@ ACTIVITY_MODES = {
     "LUYEN_TAP": "Luyện tập · củng cố",
     "VAN_DUNG": "Vận dụng · tìm tòi mở rộng",
 }
+TOOL_WORKFLOW = {
+    "slide": "prepare",
+    "approved_question": "prepare",
+    "presenter_script": "prepare",
+    "classroom_stage_setup": "prepare",
+    "stage_play": "both",
+    "presenter_speech": "both",
+    "evidence_capture": "both",
+    "phone_photo_inbox": "both",
+}
+
+
+def tool_workflow(kind: str) -> str:
+    return TOOL_WORKFLOW[kind]
 
 
 def _designer_style(st) -> None:
@@ -476,12 +490,31 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                         format_func=dict(ACTIVITIES).get, horizontal=True)
     st.caption("Hình thức gợi ý: " + ACTIVITY_MODES[activity]
                + ". Có thể dùng công cụ bên dưới cho hoạt động này.")
-    _designer_band(st, "CÔNG CỤ HOẠT ĐỘNG", "AI dẫn dắt · ghi nhận · sân khấu · slide")
+    _designer_band(st, "1 · CHUẨN BỊ TRƯỚC TIẾT HỌC", "Viết kịch bản AI, chọn sân khấu, tạo thẻ và slide")
+    st.caption("Các nội dung chuẩn bị được lưu cùng bản nháp; giáo viên kiểm tra trước khi trình chiếu.")
     render_presenter_authoring(st, draft, activity)
-    render_evidence_authoring(st, draft, activity, owner_id=user_id,
-                              lesson_key=revision)
     if client is not None and user_id and draft["subject"] == "Toán":
         render_classroom_tools(st, draft, client, user_id, activity)
+        if draft.get("classroom_tools") and st.button("Chuẩn bị sân khấu tích hợp",
+                                                      key="lesson_integrated_prepare"):
+            from portal_v2.ui.lesson_classroom_tools import build_owned_stage
+            prepared = {}
+            failures = []
+            for tool in draft["classroom_tools"]:
+                try:
+                    prepared[tool["id"]] = build_owned_stage(client, user_id, tool)
+                except Exception as exc:
+                    failures.append(f"{tool['title']} ({TOOL_LABELS[tool['kind']]}): {exc}")
+            st.session_state["lesson_integrated_stages"] = prepared
+            for failure in failures:
+                st.warning(failure)
+            if prepared:
+                st.success(f"Đã đưa {len(prepared)} sân khấu vào các slide hoạt động.")
+    _designer_band(st, "2 · CÔNG CỤ SỬ DỤNG TRỰC TIẾP", "Thử khi soạn · dùng khi dạy")
+    st.caption("Ghi nhận, nhận ảnh điện thoại và mở sân khấu có thể thử ngay ở đây. "
+               "Trên slide, giáo viên điều khiển sân khấu và lời dẫn AI.")
+    render_evidence_authoring(st, draft, activity, owner_id=user_id,
+                              lesson_key=revision, mode="design")
     slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
     if st.button("Thêm slide vào hoạt động này"):
         slide = {"id": str(uuid4()), "activity": activity, "title": "Slide mới", "blocks": []}
@@ -529,22 +562,12 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                        file_name="bai_giang_nhap.json", mime="application/json")
     _designer_band(st, "TRÌNH CHIẾU", "Xem trước, bật toàn màn hình và tổ chức hoạt động học")
     with st.expander("Xem trước và trình chiếu", expanded=False):
-        st.caption("Sân khấu tích hợp hiện ngay trong slide hoạt động. Chuẩn bị lại nếu bộ câu hỏi của buổi học thay đổi.")
-        if client is not None and user_id and draft.get("classroom_tools"):
-            if st.button("Chuẩn bị sân khấu tích hợp", key="lesson_integrated_prepare"):
-                from portal_v2.ui.lesson_classroom_tools import build_owned_stage
-                prepared = {}
-                failures = []
-                for tool in draft["classroom_tools"]:
-                    try:
-                        prepared[tool["id"]] = build_owned_stage(client, user_id, tool)
-                    except Exception as exc:
-                        failures.append(f"{tool['title']} ({TOOL_LABELS[tool['kind']]}): {exc}")
-                st.session_state["lesson_integrated_stages"] = prepared
-                for failure in failures:
-                    st.warning(failure)
-                if prepared:
-                    st.success(f"Đã đưa {len(prepared)} sân khấu vào các slide hoạt động.")
+        st.caption("Sân khấu đã chuẩn bị xuất hiện trong slide tương ứng. Chuẩn bị lại ở vùng thiết kế nếu bộ câu hỏi thay đổi.")
+        st.markdown("**Điều khiển trực tiếp trong chế độ trình chiếu**")
+        st.caption("Sân khấu và lời dẫn AI chạy trong slide. Ghi nhận học sinh và duyệt ảnh ở khung "
+                   "bên dưới; thoát toàn màn hình để thao tác khung này.")
+        render_evidence_authoring(st, draft, activity, owner_id=user_id,
+                                  lesson_key=revision, mode="presentation")
         known_ids = {tool["id"] for tool in draft.get("classroom_tools", [])}
         staged = {key: value for key, value in st.session_state.get("lesson_integrated_stages", {}).items()
                   if key in known_ids}

@@ -143,20 +143,25 @@ def attach_photo(draft, card, *, source_id, device, data):
     return photo
 
 
-def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=None):
-    with st.expander("Thẻ thu thập thông tin hoạt động học sinh", expanded=False):
-        sources = available_sources(draft, activity)
-        st.caption("Kết nối nhiều công cụ trong bài. Dữ liệu học sinh do giáo viên ghi nhận; sân khấu chưa đồng bộ lượt chơi tự động.")
-        title = st.text_input("Tên thẻ ghi nhận", value="Minh chứng hoạt động học tập", max_chars=180,
-                              key="lesson_evidence_new_title")
-        selected = st.multiselect("Kết nối nguồn", list(sources), default=[MANUAL],
-                                  format_func=sources.get, key="lesson_evidence_new_sources")
-        if st.button("Thêm thẻ ghi nhận vào hoạt động", key="lesson_evidence_add"):
-            try:
-                add_evidence_card(draft, activity=activity, title=title, source_ids=selected)
-                st.rerun()
-            except ValueError as exc:
-                st.warning(str(exc))
+def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=None,
+                              mode="design"):
+    if mode not in ("design", "presentation"):
+        raise ValueError("Chế độ thẻ ghi nhận không hợp lệ.")
+    suffix = "_" + mode
+    if mode == "design":
+        with st.expander("Thiết kế thẻ thu thập thông tin hoạt động học sinh", expanded=False):
+            sources = available_sources(draft, activity)
+            st.caption("Chọn nguồn trước khi dạy. Dữ liệu học sinh do giáo viên ghi nhận; sân khấu chưa đồng bộ lượt chơi tự động.")
+            title = st.text_input("Tên thẻ ghi nhận", value="Minh chứng hoạt động học tập", max_chars=180,
+                                  key="lesson_evidence_new_title")
+            selected = st.multiselect("Kết nối nguồn", list(sources), default=[MANUAL],
+                                      format_func=sources.get, key="lesson_evidence_new_sources")
+            if st.button("Thêm thẻ ghi nhận vào hoạt động", key="lesson_evidence_add"):
+                try:
+                    add_evidence_card(draft, activity=activity, title=title, source_ids=selected)
+                    st.rerun()
+                except ValueError as exc:
+                    st.warning(str(exc))
     for card in list(draft.get("evidence_cards", [])):
         if card["activity"] != activity:
             continue
@@ -166,18 +171,18 @@ def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=
             active_sources = [source for source in card["source_ids"] if source in sources]
             source_id = st.selectbox("Ghi nhận từ nguồn", active_sources,
                                      format_func=sources.get, disabled=not active_sources,
-                                     key="lesson_evidence_source_" + card["id"])
+                                     key="lesson_evidence_source_" + card["id"] + suffix)
             a, b, c = st.columns(3)
             participated = a.number_input("Tham gia", min_value=0, max_value=999, step=1,
-                                          key="lesson_evidence_part_" + card["id"])
+                                          key="lesson_evidence_part_" + card["id"] + suffix)
             completed = b.number_input("Hoàn thành", min_value=0, max_value=999, step=1,
-                                       key="lesson_evidence_done_" + card["id"])
+                                       key="lesson_evidence_done_" + card["id"] + suffix)
             needs_help = c.number_input("Cần hỗ trợ", min_value=0, max_value=999, step=1,
-                                        key="lesson_evidence_help_" + card["id"])
+                                        key="lesson_evidence_help_" + card["id"] + suffix)
             note = st.text_area("Quan sát / câu trả lời tiêu biểu (không nhập tên học sinh)",
-                                max_chars=1000, key="lesson_evidence_note_" + card["id"])
+                                max_chars=1000, key="lesson_evidence_note_" + card["id"] + suffix)
             if st.button("Lưu lần ghi nhận", disabled=not active_sources,
-                         key="lesson_evidence_record_" + card["id"]):
+                         key="lesson_evidence_record_" + card["id"] + suffix):
                 try:
                     record_evidence(card, source_id=source_id, participated=int(participated),
                                     completed=int(completed), needs_help=int(needs_help), note=note)
@@ -192,11 +197,11 @@ def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=
                     st.write(entry["note"])
             with st.expander("Thiết bị · ảnh và video hoạt động học sinh", expanded=False):
                 device = st.selectbox("Thiết bị tạo nội dung", DEVICE_TYPES,
-                                      key="lesson_evidence_device_" + card["id"])
+                                      key="lesson_evidence_device_" + card["id"] + suffix)
                 st.caption("Máy tính, điện thoại và iPad có thể chụp ảnh hoặc chọn tệp; máy ảnh, máy quay dùng tệp đã chép sang thiết bị đang mở ứng dụng.")
-                captured = st.camera_input("Chụp ảnh hoạt động", key="lesson_evidence_camera_" + card["id"])
+                captured = st.camera_input("Chụp ảnh hoạt động", key="lesson_evidence_camera_" + card["id"] + suffix)
                 image_file = st.file_uploader("Chọn ảnh từ thiết bị", type=["jpg", "jpeg", "png", "webp"],
-                                              key="lesson_evidence_image_" + card["id"])
+                                              key="lesson_evidence_image_" + card["id"] + suffix)
                 chosen_photo = captured or image_file
                 if chosen_photo is not None:
                     photo_bytes = chosen_photo.getvalue()
@@ -204,7 +209,7 @@ def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=
                                         for c in draft.get("evidence_cards", []) for p in c.get("media", []))
                     st.image(chosen_photo, caption="Ảnh đã lưu" if already_saved else "Ảnh vừa chọn · chưa lưu vào bản nháp")
                     if st.button("Lưu ảnh vào thẻ", disabled=not active_sources or already_saved,
-                                 key="lesson_evidence_save_photo_" + card["id"]):
+                                 key="lesson_evidence_save_photo_" + card["id"] + suffix):
                         try:
                             attach_photo(draft, card, source_id=source_id, device=device,
                                          data=photo_bytes)
@@ -214,12 +219,12 @@ def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=
                 for photo in reversed(card.get("media", [])):
                     st.image(b64decode(photo["data_b64"]),
                              caption=f"{photo['device']} · {photo['captured_at']} · ảnh đã lưu")
-                    if st.button("Bỏ ảnh này", key="lesson_evidence_remove_photo_" + photo["id"]):
+                    if mode == "design" and st.button("Bỏ ảnh này", key="lesson_evidence_remove_photo_" + photo["id"]):
                         card["media"].remove(photo)
                         st.rerun()
                 video = st.file_uploader("Chọn video từ điện thoại, iPad hoặc máy quay (MP4/WebM)",
                                          type=["mp4", "webm"],
-                                         key="lesson_evidence_video_" + card["id"])
+                                         key="lesson_evidence_video_" + card["id"] + suffix)
                 if video is not None:
                     if video.size > 25_000_000:
                         st.warning("Video vượt 25 MB; hãy chọn đoạn ngắn hơn.")
@@ -234,7 +239,7 @@ def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=
                 with st.expander("Nhận ảnh từ điện thoại / iPad giáo viên qua hotspot", expanded=False):
                     inbox = current_inbox(owner_id, lesson_key)
                     if inbox is None:
-                        if st.button("Bật hộp nhận ảnh nội bộ", key="lesson_phone_start_" + card["id"]):
+                        if st.button("Bật hộp nhận ảnh nội bộ", key="lesson_phone_start_" + card["id"] + suffix):
                             try:
                                 start_inbox(owner_id, lesson_key)
                                 st.rerun()
@@ -245,16 +250,16 @@ def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=
                         st.code(f"http://{local_ip()}:{inbox.port}/", language=None)
                         st.write("Mã ghép cặp (hết hạn sau 20 phút):")
                         st.code(inbox.code, language=None)
-                        if st.button("Tạo mã ghép cặp mới", key="lesson_phone_rotate_" + card["id"]):
+                        if st.button("Tạo mã ghép cặp mới", key="lesson_phone_rotate_" + card["id"] + suffix):
                             inbox.rotate_code()
                             st.rerun()
                         st.caption("Ảnh vào hộp chờ trên máy tính; chỉ ảnh được duyệt mới lên slide. Dừng hộp nhận sau tiết học.")
-                        if st.button("Làm mới hộp chờ", key="lesson_phone_refresh_" + card["id"]):
+                        if st.button("Làm mới hộp chờ", key="lesson_phone_refresh_" + card["id"] + suffix):
                             st.rerun()
                         for pending in inbox.list_pending():
                             st.image(pending["data"], caption=pending["device"] + " · " + pending["at"])
                             if st.button("Duyệt và đưa ảnh vào thẻ", disabled=not active_sources,
-                                         key="lesson_phone_approve_" + card["id"] + pending["id"]):
+                                         key="lesson_phone_approve_" + card["id"] + pending["id"] + suffix):
                                 try:
                                     attach_photo(draft, card, source_id=source_id,
                                                  device=pending["device"], data=pending["data"])
@@ -262,13 +267,13 @@ def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=
                                     st.rerun()
                                 except ValueError as exc:
                                     st.warning(str(exc))
-                            if st.button("Bỏ ảnh chờ", key="lesson_phone_discard_" + card["id"] + pending["id"]):
+                            if st.button("Bỏ ảnh chờ", key="lesson_phone_discard_" + card["id"] + pending["id"] + suffix):
                                 inbox.remove(pending["id"])
                                 st.rerun()
-                        if st.button("Dừng hộp nhận ảnh", key="lesson_phone_stop_" + card["id"]):
+                        if st.button("Dừng hộp nhận ảnh", key="lesson_phone_stop_" + card["id"] + suffix):
                             stop_inbox(owner_id, lesson_key)
                             st.rerun()
-            if st.button("Bỏ thẻ ghi nhận", key="lesson_evidence_remove_" + card["id"]):
+            if mode == "design" and st.button("Bỏ thẻ ghi nhận", key="lesson_evidence_remove_" + card["id"]):
                 draft["evidence_cards"].remove(card)
                 if owner_id and not draft["evidence_cards"]:
                     from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox

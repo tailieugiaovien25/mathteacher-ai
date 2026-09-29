@@ -4,8 +4,14 @@ from portal_v2.ui.lesson_activity_cards import make_card
 from portal_v2.ui.lesson_classroom_tools import add_tool
 from portal_v2.ui.lesson_evidence_card import (
     add_evidence_card, record_evidence, validate_evidence_card, attach_photo, DEVICE_TYPES,
+    render_evidence_authoring,
 )
 from portal_v2.ui.lesson_slide_designer import build_presentation_html, new_draft, validate_draft
+
+
+def test_evidence_rejects_unknown_render_mode():
+    with pytest.raises(ValueError, match="Chế độ"):
+        render_evidence_authoring(None, {}, "MO_DAU", mode="unknown")
 
 
 def test_multiple_sources_record_real_teacher_observations():
