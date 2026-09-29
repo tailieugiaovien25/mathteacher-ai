@@ -25,7 +25,7 @@ ACTIVITIES = (
     ("VAN_DUNG", "4 · Vận dụng"),
 )
 BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt")
-DESIGN_TOOL_TABS = ("SGK · AI", "Trợ giảng", "Sân khấu", "Ghi nhận", "Slide")
+DESIGN_TOOL_TABS = ("Bản nháp", "Thông tin", "SGK · AI", "Trợ giảng", "Sân khấu", "Ghi nhận", "Slide")
 ACTIVITY_MODES = {
     "MO_DAU": "Khởi động · ôn bài cũ",
     "HINH_THANH_KIEN_THUC": "Khám phá · làm việc nhóm",
@@ -77,17 +77,15 @@ def _designer_style(st) -> None:
             padding:0 5px!important;display:flex;align-items:center;justify-content:center}
         [data-testid="stFileUploaderDropzoneInstructions"]{display:none!important}
         [data-testid="stPopover"] button{width:100%;min-height:40px}
-        [data-testid="stTabs"]{border-radius:12px;background:#f6f9fc;
+        [data-testid="stTabs"]{width:100%;max-width:100%;box-sizing:border-box;
+            border-radius:12px;background:#f6f9fc;
             box-shadow:0 13px 28px #08263e38,0 3px 7px #08263e25}
         [data-testid="stTabs"] [role="tablist"]{position:sticky;top:2.75rem;z-index:10;
             background:#f6f9fc;border-radius:9px;padding:3px 6px}
         [data-testid="stTabs"] :is([role="tabpanel"],[data-baseweb="tab-panel"]){
-            height:390px;
-            overflow-y:auto!important;overflow-x:hidden;
-            overscroll-behavior:contain;scrollbar-gutter:stable;
+            min-height:780px;height:auto;overflow:visible!important;
             background:#f6f9fc;border:1px solid #bdd1df;border-radius:0 0 10px 10px;
             padding:8px 12px}
-        @media(max-height:650px){[data-testid="stTabs"] :is([role="tabpanel"],[data-baseweb="tab-panel"]){height:260px}}
         [data-testid="stCaptionContainer"] p{color:#38536b!important}
         div[data-testid="stVerticalBlock"]{gap:.45rem}
     </style>''', unsafe_allow_html=True)
@@ -422,109 +420,107 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     if "lesson_slide_revision" not in st.session_state:
         st.session_state["lesson_slide_revision"] = str(uuid4())
     draft = st.session_state["lesson_slide_draft"]
-    _designer_band(st, "BẢN NHÁP", "Chọn, lưu hoặc mở bản nháp JSON")
-    col_select, col_open, col_save, col_new, col_json = st.columns(5, gap="small")
-    if client is not None and user_id:
-        try:
-            saved = list_teacher_drafts(client, user_id)
-        except Exception as exc:
-            saved = []
-            st.warning(f"Chưa đọc được bản nháp đã lưu: {exc}")
-        with col_select:
-            selected = st.selectbox("Bản nháp", saved,
-                format_func=lambda row: (row["title"] or "Bài chưa đặt tên") + " · " + str(row["updated_at"]),
-                key="slide_saved_draft_selection", disabled=not saved,
-                placeholder="Chưa có bản nháp" if not saved else None)
-        with col_open:
-            _control_label(st, "Mở")
-            if st.button("Mở", key="slide_open_saved", disabled=not saved,
-                         help="Mở bản nháp đã chọn",
-                         use_container_width=True):
-                loaded = open_teacher_draft(client, user_id, selected["draft_id"])
-                from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
-                stop_owner_inbox(user_id)
-                st.session_state["lesson_slide_draft"] = loaded
-                st.session_state["lesson_slide_saved_id"] = selected["draft_id"]
-                st.session_state["lesson_slide_saved_digest"] = _draft_digest(loaded)
-                st.session_state["lesson_slide_revision"] = str(uuid4())
-                st.session_state.pop("lesson_slide_selected", None)
-                st.rerun()
-        with col_save:
-            _control_label(st, "Lưu")
-            if st.button("Lưu", key="slide_save_cloud", help="Lưu bản nháp lên tài khoản",
-                         use_container_width=True):
-                try:
-                    draft_id = st.session_state.get("lesson_slide_saved_id") or str(uuid4())
-                    save_teacher_draft(client, user_id, draft_id, draft)
-                    st.session_state["lesson_slide_saved_id"] = draft_id
-                    st.session_state["lesson_slide_saved_digest"] = _draft_digest(draft)
-                    st.success("Đã lưu bản nháp. Các chỉnh sửa tiếp theo sẽ được tự lưu.")
-                except Exception as exc:
-                    st.error(f"Chưa lưu được bản nháp: {exc}")
-        with col_new:
-            _control_label(st, "Bài mới")
-            if st.button("Bài mới", key="slide_new_cloud", help="Tạo bài giảng mới",
-                         use_container_width=True):
-                from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
-                stop_owner_inbox(user_id)
-                st.session_state["lesson_slide_draft"] = new_draft()
-                st.session_state["lesson_slide_revision"] = str(uuid4())
-                for key in ("lesson_slide_saved_id", "lesson_slide_saved_digest", "lesson_slide_selected"):
-                    st.session_state.pop(key, None)
-                st.session_state.pop("lesson_integrated_stages", None)
-                st.rerun()
-    else:
-        with col_select:
-            st.selectbox("Bản nháp", [], disabled=True, placeholder="Đăng nhập để chọn")
-        for column, label in ((col_open, "Mở"), (col_save, "Lưu"),
-                              (col_new, "Bài mới")):
-            with column:
-                _control_label(st, label)
-                st.button(label, disabled=True, use_container_width=True)
-    with col_json:
-        _control_label(st, "JSON")
-        with st.popover("JSON", use_container_width=True):
-            uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
-            import_clicked = st.button("Nạp", key="slide_import_button", disabled=uploaded is None,
-                                       help="Mở bản nháp JSON đã tải lên", use_container_width=True)
-    if uploaded is not None and import_clicked:
-        try:
-            if uploaded.size > 2_000_000:
-                raise ValueError("File bản nháp vượt quá 2 MB.")
-            imported = validate_draft(json.load(uploaded))
-            if user_id:
-                from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
-                stop_owner_inbox(user_id)
-            st.session_state["lesson_slide_draft"] = imported
-            st.session_state["lesson_slide_revision"] = str(uuid4())
-            st.session_state.pop("lesson_slide_saved_id", None)
-            st.session_state.pop("lesson_slide_saved_digest", None)
-            st.session_state.pop("lesson_slide_selected", None)
-            st.session_state.pop("lesson_integrated_stages", None)
-            st.rerun()
-        except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
-            st.error(f"Không mở được bài giảng: {exc}")
-    st.caption("JSON tối đa 2 MB. Bắt đầu bài mới bằng cách chọn môn và lớp, sau đó chọn bài trong Xưởng thẻ.")
-    _designer_band(st, "THÔNG TIN BÀI HỌC", "Môn · lớp · bài · yêu cầu cần đạt · sách giáo khoa")
-    subject_col, grade_col, lesson_col, requirement_col, book_col = st.columns(5, gap="small")
-    revision = st.session_state["lesson_slide_revision"]
-    draft["subject"] = subject_col.selectbox("Môn", ("Toán", "Tiếng Anh"),
-                                         index=("Toán", "Tiếng Anh").index(draft["subject"]),
-                                         key="slide_subject_" + revision)
-    draft["grade"] = grade_col.selectbox("Lớp", (6, 7, 8, 9), index=(6, 7, 8, 9).index(draft["grade"]),
-                                      key="slide_grade_" + revision)
-    draft["lesson_title"] = lesson_col.text_input("Bài", value=draft["lesson_title"], max_chars=250,
-                                                  key="slide_lesson_title_" + revision)
-    requirement_summary, requirement_identity = lesson_requirement_summary(st.session_state, draft)
-    requirement_col.text_input("YCCĐ", value=requirement_summary, disabled=True,
-                               key="slide_requirements_" + revision + "_" + requirement_identity)
-    selected_book = st.session_state.get(f"card_book_{draft['subject']}_{draft['grade']}")
-    book_col.text_input("SGK", value=selected_book.get("title", "")
-                        if isinstance(selected_book, dict) else "Chọn trong Xưởng thẻ", disabled=True)
-    _designer_band(st, "CÔNG CỤ BÀI GIẢNG", "Chọn hoạt động và chỉnh nội dung trong từng tab")
+    save_requested = False
+    save_status = None
+    _designer_band(st, "CÔNG CỤ BÀI GIẢNG", "Bản nháp · thông tin bài học · công cụ · slide")
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
                             format_func=dict(ACTIVITIES).get, key="lesson_tool_activity")
-    catalog_tab, presenter_tab, stage_tab, evidence_tab, slide_tab = st.tabs(DESIGN_TOOL_TABS)
+    draft_tab, info_tab, catalog_tab, presenter_tab, stage_tab, evidence_tab, slide_tab = st.tabs(DESIGN_TOOL_TABS)
+    with draft_tab:
+        _designer_band(st, "BẢN NHÁP", "Chọn, lưu hoặc mở bản nháp JSON")
+        col_select, col_open, col_save, col_new, col_json = st.columns(5, gap="small")
+        if client is not None and user_id:
+            try:
+                saved = list_teacher_drafts(client, user_id)
+            except Exception as exc:
+                saved = []
+                st.warning(f"Chưa đọc được bản nháp đã lưu: {exc}")
+            with col_select:
+                selected = st.selectbox("Bản nháp", saved,
+                    format_func=lambda row: (row["title"] or "Bài chưa đặt tên") + " · " + str(row["updated_at"]),
+                    key="slide_saved_draft_selection", disabled=not saved,
+                    placeholder="Chưa có bản nháp" if not saved else None)
+            with col_open:
+                _control_label(st, "Mở")
+                if st.button("Mở", key="slide_open_saved", disabled=not saved,
+                             help="Mở bản nháp đã chọn",
+                             use_container_width=True):
+                    loaded = open_teacher_draft(client, user_id, selected["draft_id"])
+                    from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
+                    stop_owner_inbox(user_id)
+                    st.session_state["lesson_slide_draft"] = loaded
+                    st.session_state["lesson_slide_saved_id"] = selected["draft_id"]
+                    st.session_state["lesson_slide_saved_digest"] = _draft_digest(loaded)
+                    st.session_state["lesson_slide_revision"] = str(uuid4())
+                    st.session_state.pop("lesson_slide_selected", None)
+                    st.rerun()
+            with col_save:
+                _control_label(st, "Lưu")
+                if st.button("Lưu", key="slide_save_cloud", help="Lưu bản nháp lên tài khoản",
+                             use_container_width=True):
+                    save_requested = True
+                save_status = st.empty()
+            with col_new:
+                _control_label(st, "Bài mới")
+                if st.button("Bài mới", key="slide_new_cloud", help="Tạo bài giảng mới",
+                             use_container_width=True):
+                    from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
+                    stop_owner_inbox(user_id)
+                    st.session_state["lesson_slide_draft"] = new_draft()
+                    st.session_state["lesson_slide_revision"] = str(uuid4())
+                    for key in ("lesson_slide_saved_id", "lesson_slide_saved_digest", "lesson_slide_selected"):
+                        st.session_state.pop(key, None)
+                    st.session_state.pop("lesson_integrated_stages", None)
+                    st.rerun()
+        else:
+            with col_select:
+                st.selectbox("Bản nháp", [], disabled=True, placeholder="Đăng nhập để chọn")
+            for column, label in ((col_open, "Mở"), (col_save, "Lưu"),
+                                  (col_new, "Bài mới")):
+                with column:
+                    _control_label(st, label)
+                    st.button(label, disabled=True, use_container_width=True)
+        with col_json:
+            _control_label(st, "JSON")
+            with st.popover("JSON", use_container_width=True):
+                uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
+                import_clicked = st.button("Nạp", key="slide_import_button", disabled=uploaded is None,
+                                           help="Mở bản nháp JSON đã tải lên", use_container_width=True)
+        if uploaded is not None and import_clicked:
+            try:
+                if uploaded.size > 2_000_000:
+                    raise ValueError("File bản nháp vượt quá 2 MB.")
+                imported = validate_draft(json.load(uploaded))
+                if user_id:
+                    from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
+                    stop_owner_inbox(user_id)
+                st.session_state["lesson_slide_draft"] = imported
+                st.session_state["lesson_slide_revision"] = str(uuid4())
+                st.session_state.pop("lesson_slide_saved_id", None)
+                st.session_state.pop("lesson_slide_saved_digest", None)
+                st.session_state.pop("lesson_slide_selected", None)
+                st.session_state.pop("lesson_integrated_stages", None)
+                st.rerun()
+            except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
+                st.error(f"Không mở được bài giảng: {exc}")
+        st.caption("JSON tối đa 2 MB. Bắt đầu bài mới bằng cách chọn môn và lớp, sau đó chọn bài trong Xưởng thẻ.")
+    with info_tab:
+        _designer_band(st, "THÔNG TIN BÀI HỌC", "Môn · lớp · bài · yêu cầu cần đạt · sách giáo khoa")
+        subject_col, grade_col, lesson_col, requirement_col, book_col = st.columns(5, gap="small")
+        revision = st.session_state["lesson_slide_revision"]
+        draft["subject"] = subject_col.selectbox("Môn", ("Toán", "Tiếng Anh"),
+                                             index=("Toán", "Tiếng Anh").index(draft["subject"]),
+                                             key="slide_subject_" + revision)
+        draft["grade"] = grade_col.selectbox("Lớp", (6, 7, 8, 9), index=(6, 7, 8, 9).index(draft["grade"]),
+                                          key="slide_grade_" + revision)
+        draft["lesson_title"] = lesson_col.text_input("Bài", value=draft["lesson_title"], max_chars=250,
+                                                      key="slide_lesson_title_" + revision)
+        requirement_summary, requirement_identity = lesson_requirement_summary(st.session_state, draft)
+        requirement_col.text_input("YCCĐ", value=requirement_summary, disabled=True,
+                                   key="slide_requirements_" + revision + "_" + requirement_identity)
+        selected_book = st.session_state.get(f"card_book_{draft['subject']}_{draft['grade']}")
+        book_col.text_input("SGK", value=selected_book.get("title", "")
+                            if isinstance(selected_book, dict) else "Chọn trong Xưởng thẻ", disabled=True)
     with catalog_tab:
         if client is not None and user_id:
             from portal_v2.ui.lesson_activity_card_authoring import render_card_authoring
@@ -599,6 +595,15 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
         validate_draft(draft)
         st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
                            file_name="bai_giang_nhap.json", mime="application/json")
+    if save_requested:
+        try:
+            draft_id = st.session_state.get("lesson_slide_saved_id") or str(uuid4())
+            save_teacher_draft(client, user_id, draft_id, draft)
+            st.session_state["lesson_slide_saved_id"] = draft_id
+            st.session_state["lesson_slide_saved_digest"] = _draft_digest(draft)
+            save_status.success("Đã lưu bản nháp. Các chỉnh sửa tiếp theo sẽ được tự lưu.")
+        except Exception as exc:
+            save_status.error(f"Chưa lưu được bản nháp: {exc}")
     if client is not None and user_id and st.session_state.get("lesson_slide_saved_id"):
         current_digest = _draft_digest(draft)
         if current_digest != st.session_state.get("lesson_slide_saved_digest"):
