@@ -1,7 +1,8 @@
 import pytest
 
 from portal_v2.ui.lesson_slide_designer import (
-    ACTIVITIES, activity_overview_html, build_presentation_html, new_draft, tool_workflow, validate_draft,
+    ACTIVITIES, activity_overview_html, build_presentation_html, lesson_requirement_summary,
+    new_draft, tool_workflow, validate_draft,
     save_teacher_draft, list_teacher_drafts, open_teacher_draft,
 )
 from portal_v2.ui.workspace_navigation import route_from_label
@@ -13,6 +14,22 @@ def test_designer_route_and_four_activities():
     assert "Thiết kế bài giảng" in PORTAL_PAGES
     assert tuple(key for key, _ in ACTIVITIES) == (
         "MO_DAU", "HINH_THANH_KIEN_THUC", "LUYEN_TAP", "VAN_DUNG")
+
+
+def test_header_requirements_track_committed_lesson_and_selection():
+    draft = new_draft()
+    state = {"card_requirements_other": ["OLD"]}
+    assert lesson_requirement_summary(state, draft)[0] == "Chọn trong Xưởng thẻ"
+    draft["source_lesson_id"] = "lesson-1"
+    state["card_requirements_lesson-1"] = ["YC1"]
+    first = lesson_requirement_summary(state, draft)
+    assert first[0] == "YC1"
+    state["card_requirements_lesson-1"].append("YC2")
+    second = lesson_requirement_summary(state, draft)
+    assert second[0] == "YC1, YC2"
+    assert first[1] != second[1]
+    draft["source_lesson_id"] = "lesson-2"
+    assert lesson_requirement_summary(state, draft)[0] == "Chọn trong Xưởng thẻ"
 
 
 def test_presentation_escapes_teacher_text_and_orders_activities():

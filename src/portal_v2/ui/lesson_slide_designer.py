@@ -92,6 +92,16 @@ def _control_label(st, title: str) -> None:
                 unsafe_allow_html=True)
 
 
+def lesson_requirement_summary(session_state, draft: dict) -> tuple[str, str]:
+    """Show requirements for the committed lesson, refreshing the read-only widget on edits."""
+    lesson_id = draft.get("source_lesson_id", "")
+    selected = session_state.get("card_requirements_" + lesson_id, []) if lesson_id else []
+    codes = tuple(str(code) for code in selected) if isinstance(selected, list) else ()
+    summary = ", ".join(codes) if codes else "Chọn trong Xưởng thẻ"
+    identity = sha256(repr((lesson_id, codes)).encode("utf-8")).hexdigest()[:16]
+    return summary, identity
+
+
 def activity_overview_html(draft: dict) -> str:
     labels = dict(ACTIVITIES)
     cells = []
@@ -493,9 +503,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                                       key="slide_grade_" + revision)
     draft["lesson_title"] = lesson_col.text_input("Bài", value=draft["lesson_title"], max_chars=250,
                                                   key="slide_lesson_title_" + revision)
-    requirement_codes = st.session_state.get("card_requirements_" + draft.get("source_lesson_id", ""), [])
-    requirement_col.text_input("YCCĐ", value=", ".join(requirement_codes) if requirement_codes
-                               else "Chọn trong Xưởng thẻ", disabled=True)
+    requirement_summary, requirement_identity = lesson_requirement_summary(st.session_state, draft)
+    requirement_col.text_input("YCCĐ", value=requirement_summary, disabled=True,
+                               key="slide_requirements_" + revision + "_" + requirement_identity)
     selected_book = st.session_state.get(f"card_book_{draft['subject']}_{draft['grade']}")
     book_col.text_input("SGK", value=selected_book.get("title", "")
                         if isinstance(selected_book, dict) else "Chọn trong Xưởng thẻ", disabled=True)
