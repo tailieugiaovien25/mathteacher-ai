@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 from base64 import b64decode, b64encode
 from binascii import Error as Base64Error
+import os
 
 from portal_v2.ui.lesson_classroom_tools import TOOL_LABELS
 
@@ -142,7 +143,7 @@ def attach_photo(draft, card, *, source_id, device, data):
     return photo
 
 
-def render_evidence_authoring(st, draft, activity):
+def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=None):
     with st.expander("Thẻ thu thập thông tin hoạt động học sinh", expanded=False):
         sources = available_sources(draft, activity)
         st.caption("Kết nối nhiều công cụ trong bài. Dữ liệu học sinh do giáo viên ghi nhận; sân khấu chưa đồng bộ lượt chơi tự động.")
@@ -226,6 +227,50 @@ def render_evidence_authoring(st, draft, activity):
                         st.video(video)
                         st.caption(f"{device} · {video.name} · {video.size / 1_000_000:.1f} MB. "
                                    "Video chỉ xem trước trong phiên này, chưa lưu hoặc chuyển tới thiết bị khác.")
+            if owner_id and lesson_key and os.getenv("MATHTEACHER_LOCAL_PHONE_INBOX") == "1":
+                from portal_v2.ui.lesson_phone_inbox import (
+                    current_inbox, local_ip, start_inbox, stop_inbox,
+                )
+                with st.expander("Nhận ảnh từ điện thoại / iPad giáo viên qua hotspot", expanded=False):
+                    inbox = current_inbox(owner_id, lesson_key)
+                    if inbox is None:
+                        if st.button("Bật hộp nhận ảnh nội bộ", key="lesson_phone_start_" + card["id"]):
+                            try:
+                                start_inbox(owner_id, lesson_key)
+                                st.rerun()
+                            except (ValueError, OSError) as exc:
+                                st.error(f"Chưa bật được hộp nhận: {exc}")
+                    else:
+                        st.write("Điện thoại kết nối cùng hotspot với máy tính rồi mở:")
+                        st.code(f"http://{local_ip()}:{inbox.port}/", language=None)
+                        st.write("Mã ghép cặp (hết hạn sau 20 phút):")
+                        st.code(inbox.code, language=None)
+                        if st.button("Tạo mã ghép cặp mới", key="lesson_phone_rotate_" + card["id"]):
+                            inbox.rotate_code()
+                            st.rerun()
+                        st.caption("Ảnh vào hộp chờ trên máy tính; chỉ ảnh được duyệt mới lên slide. Dừng hộp nhận sau tiết học.")
+                        if st.button("Làm mới hộp chờ", key="lesson_phone_refresh_" + card["id"]):
+                            st.rerun()
+                        for pending in inbox.list_pending():
+                            st.image(pending["data"], caption=pending["device"] + " · " + pending["at"])
+                            if st.button("Duyệt và đưa ảnh vào thẻ", disabled=not active_sources,
+                                         key="lesson_phone_approve_" + card["id"] + pending["id"]):
+                                try:
+                                    attach_photo(draft, card, source_id=source_id,
+                                                 device=pending["device"], data=pending["data"])
+                                    inbox.remove(pending["id"])
+                                    st.rerun()
+                                except ValueError as exc:
+                                    st.warning(str(exc))
+                            if st.button("Bỏ ảnh chờ", key="lesson_phone_discard_" + card["id"] + pending["id"]):
+                                inbox.remove(pending["id"])
+                                st.rerun()
+                        if st.button("Dừng hộp nhận ảnh", key="lesson_phone_stop_" + card["id"]):
+                            stop_inbox(owner_id, lesson_key)
+                            st.rerun()
             if st.button("Bỏ thẻ ghi nhận", key="lesson_evidence_remove_" + card["id"]):
                 draft["evidence_cards"].remove(card)
+                if owner_id and not draft["evidence_cards"]:
+                    from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
+                    stop_owner_inbox(owner_id)
                 st.rerun()

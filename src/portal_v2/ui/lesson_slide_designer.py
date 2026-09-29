@@ -313,6 +313,8 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                         key="slide_saved_draft_selection")
                     if st.button("Mở bản nháp đã chọn", key="slide_open_saved"):
                         loaded = open_teacher_draft(client, user_id, selected["draft_id"])
+                        from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
+                        stop_owner_inbox(user_id)
                         st.session_state["lesson_slide_draft"] = loaded
                         st.session_state["lesson_slide_saved_id"] = selected["draft_id"]
                         st.session_state["lesson_slide_saved_digest"] = _draft_digest(loaded)
@@ -333,6 +335,8 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 except Exception as exc:
                     st.error(f"Chưa lưu được bản nháp: {exc}")
             if st.button("Tạo bài giảng mới", key="slide_new_cloud"):
+                from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
+                stop_owner_inbox(user_id)
                 st.session_state["lesson_slide_draft"] = new_draft()
                 st.session_state["lesson_slide_revision"] = str(uuid4())
                 for key in ("lesson_slide_saved_id", "lesson_slide_saved_digest", "lesson_slide_selected"):
@@ -347,6 +351,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
             if uploaded.size > 2_000_000:
                 raise ValueError("File bản nháp vượt quá 2 MB.")
             imported = validate_draft(json.load(uploaded))
+            if user_id:
+                from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
+                stop_owner_inbox(user_id)
             st.session_state["lesson_slide_draft"] = imported
             st.session_state["lesson_slide_revision"] = str(uuid4())
             st.session_state.pop("lesson_slide_saved_id", None)
@@ -375,7 +382,8 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     activity = st.selectbox("Hoạt động", [key for key, _ in ACTIVITIES],
                             format_func=dict(ACTIVITIES).get)
     render_presenter_authoring(st, draft, activity)
-    render_evidence_authoring(st, draft, activity)
+    render_evidence_authoring(st, draft, activity, owner_id=user_id,
+                              lesson_key=revision)
     if client is not None and user_id and draft["subject"] == "Toán":
         render_classroom_tools(st, draft, client, user_id, activity)
     slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
