@@ -79,6 +79,11 @@ def _designer_style(st) -> None:
         [data-testid="stPopover"] button{width:100%;min-height:40px}
         [data-testid="stTabs"] [role="tablist"]{position:sticky;top:2.75rem;z-index:10;
             background:#f6f9fc;border-radius:9px;padding:3px 6px}
+        [data-testid="stTabs"] :is([role="tabpanel"],[data-baseweb="tab-panel"]){
+            height:clamp(210px,30vh,320px);overflow-y:auto!important;overflow-x:hidden;
+            overscroll-behavior:contain;scrollbar-gutter:stable;
+            background:#f6f9fc;border:1px solid #bdd1df;border-radius:0 0 10px 10px;
+            padding:8px 12px}
         [data-testid="stCaptionContainer"] p{color:#38536b!important}
         div[data-testid="stVerticalBlock"]{gap:.45rem}
     </style>''', unsafe_allow_html=True)
@@ -518,7 +523,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                         format_func=dict(ACTIVITIES).get, horizontal=True)
     st.caption("Hình thức gợi ý: " + ACTIVITY_MODES[activity])
     download_slot = st.empty()
-    _designer_band(st, "TRÌNH CHIẾU", "Chọn công cụ soạn bài ở các tab; xem slide ngay bên dưới")
+    _designer_band(st, "TRÌNH CHIẾU", "Công cụ nằm trong khung tab; cuộn trong khung để thao tác")
     catalog_tab, presenter_tab, stage_tab, evidence_tab, slide_tab = st.tabs(DESIGN_TOOL_TABS)
     with catalog_tab:
         if client is not None and user_id:
