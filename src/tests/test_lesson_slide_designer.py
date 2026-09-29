@@ -29,6 +29,14 @@ def test_presentation_escapes_teacher_text_and_orders_activities():
     assert "content fragment" in html
 
 
+def test_presentation_has_fullscreen_control_separate_from_stage():
+    html = build_presentation_html(new_draft())
+    assert 'aria-label="Toàn màn hình bài giảng"' in html
+    assert 'document.documentElement.requestFullscreen()' in html
+    assert 'document.exitFullscreen()' in html
+    assert 'Reveal.layout()' in html
+
+
 def test_import_rejects_unknown_activity_and_duplicate_slide_ids():
     draft = new_draft()
     slide = {"id": "a", "activity": "MO_DAU", "title": "A", "blocks": []}
