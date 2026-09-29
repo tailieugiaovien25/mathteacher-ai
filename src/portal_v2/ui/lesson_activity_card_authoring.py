@@ -121,7 +121,7 @@ def load_question_display(client, question_version_id: str) -> list[dict]:
 
 def render_card_authoring(st, *, draft: dict, client, user_id: str,
                           revision: str) -> None:
-    with st.expander("SGK · AI tạo thẻ", expanded=True):
+    with st.container():
         _render_approved_cards(st, draft, client=client)
         st.caption("Dùng bài SGK đã đăng ký; đoạn kiến thức phải do giáo viên kiểm tra trước khi gửi AI.")
         try:

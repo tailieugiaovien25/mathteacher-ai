@@ -425,7 +425,6 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                             format_func=dict(ACTIVITIES).get, key="lesson_tool_activity")
     draft_tab, info_tab, catalog_tab, presenter_tab, stage_tab, evidence_tab, slide_tab = st.tabs(DESIGN_TOOL_TABS)
     with draft_tab:
-        _designer_band(st, "BẢN NHÁP", "Chọn, lưu hoặc mở bản nháp JSON")
         col_select, col_open, col_save, col_new, col_json = st.columns(5, gap="small")
         if client is not None and user_id:
             try:
@@ -501,9 +500,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.rerun()
             except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
                 st.error(f"Không mở được bài giảng: {exc}")
-        st.caption("JSON tối đa 2 MB. Bắt đầu bài mới bằng cách chọn môn và lớp, sau đó chọn bài trong Xưởng thẻ.")
     with info_tab:
-        _designer_band(st, "THÔNG TIN BÀI HỌC", "Môn · lớp · bài · yêu cầu cần đạt · sách giáo khoa")
         subject_col, grade_col, lesson_col, requirement_col, book_col = st.columns(5, gap="small")
         revision = st.session_state["lesson_slide_revision"]
         draft["subject"] = subject_col.selectbox("Môn", ("Toán", "Tiếng Anh"),
@@ -553,7 +550,6 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
         else:
             st.info("Chọn Toán và đăng nhập để chuẩn bị sân khấu lớp học.")
     with evidence_tab:
-        st.caption("Thử ghi nhận và nhận ảnh ngay khi soạn; các công cụ trực tiếp cũng có ở chế độ trình chiếu.")
         render_evidence_authoring(st, draft, activity, owner_id=user_id,
                                   lesson_key=revision, mode="design")
     with slide_tab:

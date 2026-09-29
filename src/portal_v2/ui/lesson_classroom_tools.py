@@ -69,7 +69,7 @@ def build_owned_stage(client, user_id, tool):
 
 
 def render_classroom_tools(st, draft, client, user_id, activity):
-    with st.expander("Cắm công cụ lớp học vào hoạt động", expanded=False):
+    with st.container():
         st.caption("Dùng buổi học đã chuẩn bị ở Lớp học ôn tập. Câu hỏi được kiểm tra lại khi mở sân khấu.")
         try:
             sessions = owned_sessions(client, user_id)

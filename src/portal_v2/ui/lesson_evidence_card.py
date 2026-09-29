@@ -149,7 +149,7 @@ def render_evidence_authoring(st, draft, activity, *, owner_id=None, lesson_key=
         raise ValueError("Chế độ thẻ ghi nhận không hợp lệ.")
     suffix = "_" + mode
     if mode == "design":
-        with st.expander("Thiết kế thẻ thu thập thông tin hoạt động học sinh", expanded=False):
+        with st.container():
             sources = available_sources(draft, activity)
             st.caption("Chọn nguồn trước khi dạy. Dữ liệu học sinh do giáo viên ghi nhận; sân khấu chưa đồng bộ lượt chơi tự động.")
             title = st.text_input("Tên thẻ ghi nhận", value="Minh chứng hoạt động học tập", max_chars=180,
