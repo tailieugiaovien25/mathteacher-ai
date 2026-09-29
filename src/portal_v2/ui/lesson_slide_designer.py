@@ -77,6 +77,8 @@ def _designer_style(st) -> None:
             padding:0 5px!important;display:flex;align-items:center;justify-content:center}
         [data-testid="stFileUploaderDropzoneInstructions"]{display:none!important}
         [data-testid="stPopover"] button{width:100%;min-height:40px}
+        [data-testid="stTabs"] [role="tablist"]{position:sticky;top:2.75rem;z-index:10;
+            background:#f6f9fc;border-radius:9px;padding:3px 6px}
         [data-testid="stCaptionContainer"] p{color:#38536b!important}
         div[data-testid="stVerticalBlock"]{gap:.45rem}
     </style>''', unsafe_allow_html=True)
@@ -515,6 +517,8 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     activity = st.radio("Hoạt động đang thiết kế", [key for key, _ in ACTIVITIES],
                         format_func=dict(ACTIVITIES).get, horizontal=True)
     st.caption("Hình thức gợi ý: " + ACTIVITY_MODES[activity])
+    download_slot = st.empty()
+    _designer_band(st, "TRÌNH CHIẾU", "Chọn công cụ soạn bài ở các tab; xem slide ngay bên dưới")
     catalog_tab, presenter_tab, stage_tab, evidence_tab, slide_tab = st.tabs(DESIGN_TOOL_TABS)
     with catalog_tab:
         if client is not None and user_id:
@@ -597,19 +601,18 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.caption("Đã tự lưu thay đổi vào tài khoản.")
             except Exception as exc:
                 st.error(f"Chưa tự lưu được thay đổi: {exc}. Hãy tải bản nháp JSON để giữ nội dung.")
-    st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
-                       file_name="bai_giang_nhap.json", mime="application/json")
-    _designer_band(st, "TRÌNH CHIẾU", "Xem trước, bật toàn màn hình và tổ chức hoạt động học")
-    with st.expander("Xem trước và trình chiếu", expanded=False):
-        st.caption("Sân khấu đã chuẩn bị xuất hiện trong slide tương ứng. Chuẩn bị lại ở vùng thiết kế nếu bộ câu hỏi thay đổi.")
-        st.markdown("**Điều khiển trực tiếp trong chế độ trình chiếu**")
-        st.caption("Sân khấu và lời dẫn AI chạy trong slide. Ghi nhận học sinh và duyệt ảnh ở khung "
-                   "bên dưới; thoát toàn màn hình để thao tác khung này.")
-        render_evidence_authoring(st, draft, activity, owner_id=user_id,
-                                  lesson_key=revision, mode="presentation")
-        known_ids = {tool["id"] for tool in draft.get("classroom_tools", [])}
-        staged = {key: value for key, value in st.session_state.get("lesson_integrated_stages", {}).items()
-                  if key in known_ids}
-        st.components.v1.html(build_presentation_html(draft, classroom_stages=staged),
-                              height=780, scrolling=False)
+    with download_slot:
+        st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
+                           file_name="bai_giang_nhap.json", mime="application/json")
+    st.caption("Sân khấu đã chuẩn bị xuất hiện trong slide tương ứng. Chuẩn bị lại nếu bộ câu hỏi thay đổi.")
+    st.markdown("**Điều khiển trực tiếp trong chế độ trình chiếu**")
+    st.caption("Sân khấu và lời dẫn AI chạy trong slide. Ghi nhận học sinh và duyệt ảnh ở khung "
+               "bên dưới; thoát toàn màn hình để thao tác khung này.")
+    render_evidence_authoring(st, draft, activity, owner_id=user_id,
+                              lesson_key=revision, mode="presentation")
+    known_ids = {tool["id"] for tool in draft.get("classroom_tools", [])}
+    staged = {key: value for key, value in st.session_state.get("lesson_integrated_stages", {}).items()
+              if key in known_ids}
+    st.components.v1.html(build_presentation_html(draft, classroom_stages=staged),
+                          height=780, scrolling=False)
     _designer_band(st, "MATH TEACHER AI · THIẾT KẾ BÀI GIẢNG")
