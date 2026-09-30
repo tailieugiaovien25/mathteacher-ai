@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import json
 from uuid import uuid4
 
+from portal_v2.ui.lesson_tool_buttons import tool_button, tool_download_button
 from portal_v2.ui.lesson_activity_cards import validate_card
 from portal_v2.ui.lesson_classroom_tools import validate_tool, render_classroom_tools, TOOL_LABELS
 from portal_v2.ui.lesson_ai_presenter import (
@@ -86,6 +87,30 @@ def _designer_style(st) -> None:
             min-height:780px;height:auto;overflow:visible!important;
             background:#f6f9fc;border:1px solid #bdd1df;border-radius:0 0 10px 10px;
             padding:8px 12px}
+        [data-testid="stTabs"] :is([data-testid="stButton"],[data-testid="stDownloadButton"],
+            [data-testid="stFormSubmitButton"]) > button{
+            width:96px!important;min-width:96px!important;height:96px!important;min-height:96px!important;
+            box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;align-items:center;
+            gap:5px;padding:6px!important;white-space:normal!important;text-align:center;
+            background:linear-gradient(155deg,#fff 0%,#e5f4ff 100%)!important;
+            border:1px solid #8bb9d6!important;border-radius:12px!important;color:#063653!important;
+            box-shadow:0 3px 6px #092a4533!important}
+        [data-testid="stTabs"] :is([data-testid="stButton"],[data-testid="stDownloadButton"],
+            [data-testid="stFormSubmitButton"]) > button p{
+            color:inherit!important;font-size:.72rem!important;line-height:1.12!important;
+            white-space:normal!important;overflow:hidden;display:-webkit-box;
+            -webkit-box-orient:vertical;-webkit-line-clamp:3}
+        [data-testid="stTabs"] :is([data-testid="stButton"],[data-testid="stDownloadButton"],
+            [data-testid="stFormSubmitButton"]) > button [data-testid="stIconMaterial"]{
+            font-size:25px!important;line-height:1!important}
+        [data-testid="stTabs"] :is([data-testid="stButton"],[data-testid="stDownloadButton"],
+            [data-testid="stFormSubmitButton"]) > button:hover:not(:disabled){
+            background:linear-gradient(155deg,#e8f7ff,#b7e0ff)!important;
+            border-color:#3080b7!important;color:#033150!important}
+        [data-testid="stTabs"] :is([data-testid="stButton"],[data-testid="stDownloadButton"],
+            [data-testid="stFormSubmitButton"]) > button:active:not(:disabled){
+            background:#83c9ef!important;transform:translateY(2px)!important;
+            box-shadow:0 1px 2px #092a4533!important}
         [data-testid="stCaptionContainer"] p{color:#38536b!important}
         div[data-testid="stVerticalBlock"]{gap:.45rem}
     </style>''', unsafe_allow_html=True)
@@ -439,7 +464,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                     placeholder="Chưa có bản nháp" if not saved else None)
             with col_open:
                 _control_label(st, "Mở")
-                if st.button("Mở", key="slide_open_saved", disabled=not saved,
+                if tool_button(st, "Mở", key="slide_open_saved", disabled=not saved,
                              help="Mở bản nháp đã chọn",
                              use_container_width=True):
                     loaded = open_teacher_draft(client, user_id, selected["draft_id"])
@@ -453,13 +478,13 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                     st.rerun()
             with col_save:
                 _control_label(st, "Lưu")
-                if st.button("Lưu", key="slide_save_cloud", help="Lưu bản nháp lên tài khoản",
+                if tool_button(st, "Lưu", key="slide_save_cloud", help="Lưu bản nháp lên tài khoản",
                              use_container_width=True):
                     save_requested = True
                 save_status = st.empty()
             with col_new:
                 _control_label(st, "Bài mới")
-                if st.button("Bài mới", key="slide_new_cloud", help="Tạo bài giảng mới",
+                if tool_button(st, "Bài mới", key="slide_new_cloud", help="Tạo bài giảng mới",
                              use_container_width=True):
                     from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
                     stop_owner_inbox(user_id)
@@ -476,12 +501,12 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                                   (col_new, "Bài mới")):
                 with column:
                     _control_label(st, label)
-                    st.button(label, disabled=True, use_container_width=True)
+                    tool_button(st, label, disabled=True, use_container_width=True)
         with col_json:
             _control_label(st, "JSON")
             with st.popover("JSON", use_container_width=True):
                 uploaded = st.file_uploader("Mở bản nháp JSON", type=["json"], key="slide_import")
-                import_clicked = st.button("Nạp", key="slide_import_button", disabled=uploaded is None,
+                import_clicked = tool_button(st, "Nạp", key="slide_import_button", disabled=uploaded is None,
                                            help="Mở bản nháp JSON đã tải lên", use_container_width=True)
         if uploaded is not None and import_clicked:
             try:
@@ -532,7 +557,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     with stage_tab:
         if client is not None and user_id and draft["subject"] == "Toán":
             render_classroom_tools(st, draft, client, user_id, activity)
-            if draft.get("classroom_tools") and st.button("Chuẩn bị sân khấu tích hợp",
+            if draft.get("classroom_tools") and tool_button(st, "Chuẩn bị sân khấu tích hợp",
                                                           key="lesson_integrated_prepare"):
                 from portal_v2.ui.lesson_classroom_tools import build_owned_stage
                 prepared = {}
@@ -554,7 +579,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                                   lesson_key=revision, mode="design")
     with slide_tab:
         slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
-        if st.button("Thêm slide vào hoạt động này"):
+        if tool_button(st, "Thêm slide vào hoạt động này"):
             slide = {"id": str(uuid4()), "activity": activity, "title": "Slide mới", "blocks": []}
             draft["slides"].append(slide)
             st.session_state["lesson_slide_selected"] = slide["id"]
@@ -576,18 +601,18 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                                                   key=f"slide_text_{revision}_{slide_id}_{index}")
                     block["reveal_later"] = st.checkbox("Giáo viên bấm mới hiện", value=block["reveal_later"],
                                                         key=f"slide_reveal_{revision}_{slide_id}_{index}")
-                    if st.button("Xóa khối", key=f"slide_remove_block_{slide_id}_{index}"):
+                    if tool_button(st, "Xóa khối", key=f"slide_remove_block_{slide_id}_{index}"):
                         slide["blocks"].pop(index)
                         st.rerun()
-            if st.button("Thêm khối nội dung"):
+            if tool_button(st, "Thêm khối nội dung"):
                 slide["blocks"].append({"kind": "Nội dung", "text": "", "reveal_later": False})
                 st.rerun()
-            if st.button("Xóa slide đang chọn"):
+            if tool_button(st, "Xóa slide đang chọn"):
                 draft["slides"].remove(slide)
                 st.session_state.pop("lesson_slide_selected", None)
                 st.rerun()
         validate_draft(draft)
-        st.download_button("Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
+        tool_download_button(st, "Tải bản nháp JSON", json.dumps(draft, ensure_ascii=False, indent=2),
                            file_name="bai_giang_nhap.json", mime="application/json")
     if save_requested:
         try:

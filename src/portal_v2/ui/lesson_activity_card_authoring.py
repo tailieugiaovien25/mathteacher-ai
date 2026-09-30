@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from uuid import uuid4
 
+from portal_v2.ui.lesson_tool_buttons import tool_button
 from portal_v2.ui.lesson_activity_card_ai import request_ai_cards
 from portal_v2.ui.lesson_activity_cards import add_approved_card, validate_card
 from portal_v2.ui.lesson_slide_designer import ACTIVITIES
@@ -144,7 +145,7 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
                                   format_func=lambda row: row["title"],
                                   key="card_lesson_" + str(book["textbook_id"]))
             lesson_id = str(lesson["textbook_unit_id"])
-            if st.button("Chọn bài này", key="card_use_lesson_" + lesson_id):
+            if tool_button(st, "Chọn bài này", key="card_use_lesson_" + lesson_id):
                 if (draft.get("activity_cards") and draft.get("verified_source") and
                         draft["verified_source"].get("lesson_id") != lesson_id):
                     st.error("Bài giảng đã có thẻ của bài SGK khác. Bỏ các thẻ đó trước khi đổi bài.")
@@ -184,7 +185,7 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
                            tuple(sorted(questions)))
         if st.session_state.get("card_proposal_identity") != source_identity:
             st.session_state["card_proposals"] = []
-        if st.button("AI đề xuất thẻ hoạt động", key="card_generate"):
+        if tool_button(st, "AI đề xuất thẻ hoạt động", key="card_generate"):
             if not excerpt_ref or len(excerpt.strip()) < 80:
                 st.error("Bài học cần một đoạn kiến thức đã lưu và giáo viên đối chiếu trước khi tạo thẻ.")
             else:
@@ -225,7 +226,7 @@ def render_card_authoring(st, *, draft: dict, client, user_id: str,
                     value=proposal["duration_minutes"], step=1, key="card_duration_" + card_id)
                 teacher_note = st.text_area("Ghi chú riêng cho giáo viên", value="",
                     max_chars=1000, key="card_note_" + card_id)
-                if st.button("Duyệt và thêm vào bài", key="card_approve_" + card_id):
+                if tool_button(st, "Duyệt và thêm vào bài", key="card_approve_" + card_id):
                     try:
                         previous_source = draft.get("verified_source")
                         if previous_source and draft.get("activity_cards") and (previous_source.get("lesson_id") != lesson_id or
@@ -260,7 +261,7 @@ def _render_approved_cards(st, draft: dict, *, client) -> None:
         with st.expander(card["title"], expanded=False):
             st.caption("Nguồn: " + ", ".join(card["source_refs"]))
             if card["kind"] == "QUICK_CHECK" and "question_display" not in card:
-                if st.button("Bổ sung phương án từ câu hỏi đã duyệt", key="card_display_" + card["id"]):
+                if tool_button(st, "Bổ sung phương án từ câu hỏi đã duyệt", key="card_display_" + card["id"]):
                     try:
                         card["question_display"] = load_question_display(client, card["question_version_id"])
                         st.rerun()
@@ -272,7 +273,7 @@ def _render_approved_cards(st, draft: dict, *, client) -> None:
                     max_chars=3000, disabled=card["kind"] == "QUICK_CHECK")
                 product = st.text_input("Sản phẩm", value=card["expected_product"], max_chars=500)
                 note = st.text_area("Ghi chú giáo viên", value=card["teacher_note"], max_chars=1000)
-                save = st.form_submit_button("Lưu chỉnh sửa")
+                save = st.form_submit_button("Lưu chỉnh sửa", icon=":material/save:")
             if save:
                 updated = dict(card, title=title, instruction=instruction,
                                expected_product=product, teacher_note=note)
@@ -282,6 +283,6 @@ def _render_approved_cards(st, draft: dict, *, client) -> None:
                     st.rerun()
                 except ValueError as exc:
                     st.error(str(exc))
-            if st.button("Bỏ thẻ khỏi bài", key="card_remove_" + card["id"]):
+            if tool_button(st, "Bỏ thẻ khỏi bài", key="card_remove_" + card["id"]):
                 draft["activity_cards"].remove(card)
                 st.rerun()

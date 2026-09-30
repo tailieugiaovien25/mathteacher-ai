@@ -1,5 +1,6 @@
 """Teacher authored visual AI presenter cards for lesson activities."""
 
+from portal_v2.ui.lesson_tool_buttons import tool_button
 from base64 import b64encode
 from functools import lru_cache
 from pathlib import Path
@@ -45,7 +46,7 @@ def render_presenter_authoring(st, draft, activity):
                                placeholder="Ví dụ: Chào các em! Hôm nay chúng ta cùng tìm hiểu cách ghi số tự nhiên.",
                                key="lesson_ai_presenter_message")
         st.caption("Trên slide, giáo viên bấm Phát lời dẫn. Máy dùng giọng tiếng Việt sẵn có trong trình duyệt; không tự nói khi chuyển slide.")
-        if st.button("Thêm nhân vật vào hoạt động này", key="lesson_ai_presenter_add"):
+        if tool_button(st, "Thêm nhân vật vào hoạt động này", key="lesson_ai_presenter_add"):
             try:
                 add_presenter(draft, activity=activity, role=role, message=message)
                 st.rerun()
@@ -56,7 +57,7 @@ def render_presenter_authoring(st, draft, activity):
             continue
         with st.expander(f"{ROLES[card['role']]} · {card['message'][:60]}", expanded=False):
             st.write(card["message"])
-            if st.button("Bỏ nhân vật khỏi hoạt động", key="lesson_ai_presenter_remove_" + card["id"]):
+            if tool_button(st, "Bỏ nhân vật khỏi hoạt động", key="lesson_ai_presenter_remove_" + card["id"]):
                 draft["ai_presenters"].remove(card)
                 st.rerun()
 

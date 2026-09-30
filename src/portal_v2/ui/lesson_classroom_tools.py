@@ -1,5 +1,6 @@
 """Teacher owned classroom stages linked to lesson activities."""
 
+from portal_v2.ui.lesson_tool_buttons import tool_button, tool_download_button
 from uuid import uuid4
 
 TOOL_LABELS = {"QUESTION_STAGE": "Trình chiếu câu hỏi", "LUCKY_WHEEL": "Vòng quay may mắn", "GAMESHOW": "Gameshow"}
@@ -82,7 +83,7 @@ def render_classroom_tools(st, draft, client, user_id, activity):
                                   key="lesson_tool_session")
             kind = st.selectbox("Công cụ", list(TOOL_LABELS), format_func=TOOL_LABELS.get,
                                 key="lesson_tool_kind")
-            if st.button("Thêm công cụ vào hoạt động này", key="lesson_tool_add"):
+            if tool_button(st, "Thêm công cụ vào hoạt động này", key="lesson_tool_add"):
                 try:
                     add_tool(draft, activity=activity, kind=kind,
                              session_id=str(chosen["session_id"]), title=chosen["title"])
@@ -95,17 +96,17 @@ def render_classroom_tools(st, draft, client, user_id, activity):
         if tool["activity"] != activity:
             continue
         with st.expander(f"{TOOL_LABELS[tool['kind']]} · {tool['title']}", expanded=False):
-            if st.button("Mở sân khấu", key="lesson_tool_open_" + tool["id"]):
+            if tool_button(st, "Mở sân khấu", key="lesson_tool_open_" + tool["id"]):
                 try:
                     st.session_state["lesson_tool_stage"] = (tool["id"], build_owned_stage(client, user_id, tool))
                 except Exception as exc:
                     st.error(f"Chưa mở được sân khấu: {exc}")
             stage = st.session_state.get("lesson_tool_stage")
             if stage and stage[0] == tool["id"]:
-                st.download_button("Tải sân khấu HTML", stage[1], file_name="san-khau-lop-hoc.html",
+                tool_download_button(st, "Tải sân khấu HTML", stage[1], file_name="san-khau-lop-hoc.html",
                                    mime="text/html", key="lesson_tool_download_" + tool["id"])
                 st.components.v1.html(stage[1].decode("utf-8"), height=800, scrolling=True)
-            if st.button("Bỏ công cụ khỏi hoạt động", key="lesson_tool_remove_" + tool["id"]):
+            if tool_button(st, "Bỏ công cụ khỏi hoạt động", key="lesson_tool_remove_" + tool["id"]):
                 draft["classroom_tools"].remove(tool)
                 st.session_state.pop("lesson_tool_stage", None)
                 st.rerun()

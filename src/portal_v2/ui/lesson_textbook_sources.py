@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from portal_v2.ui.lesson_tool_buttons import tool_button
+
 from hashlib import sha256
 from io import BytesIO
 import re
@@ -111,7 +113,7 @@ def render_lesson_source_picker(st, *, client, user_id: str, book_id: str,
                 count = len(PdfReader(BytesIO(pdf_bytes)).pages)
                 if not 1 <= count <= 500:
                     raise ValueError("PDF phải có từ 1 đến 500 trang.")
-                if st.button("Tìm trang", key="source_find_" + lesson_id):
+                if tool_button(st, "Tìm trang", key="source_find_" + lesson_id):
                     matches = find_lesson_pages(pdf_bytes, lesson_title)
                     st.session_state["source_page_matches_" + lesson_id] = (
                         sha256(pdf_bytes).hexdigest(), matches)
@@ -123,7 +125,7 @@ def render_lesson_source_picker(st, *, client, user_id: str, book_id: str,
                     st.caption("Nếu PDF là ảnh quét, tìm chữ có thể không thấy bài. Hãy chọn trang thủ công.")
                 page = st.number_input("Trang trong tệp PDF", min_value=1, max_value=count,
                                        value=1, key="source_page_" + lesson_id)
-                if st.button("Lấy nội dung", key="source_extract_" + lesson_id):
+                if tool_button(st, "Lấy nội dung", key="source_extract_" + lesson_id):
                     extracted, _ = extract_pdf_page(pdf_bytes, int(page))
                     st.session_state["source_editor_" + lesson_id] = extracted
             except Exception as exc:
@@ -133,7 +135,7 @@ def render_lesson_source_picker(st, *, client, user_id: str, book_id: str,
                                 max_chars=4000, key="source_editor_" + lesson_id)
         confirmed = st.checkbox("Tôi đã đối chiếu đoạn này với đúng bài SGK đã chọn",
                                 key="source_confirm_" + lesson_id)
-        if st.button("Lưu nguồn", key="source_save_" + lesson_id):
+        if tool_button(st, "Lưu nguồn", key="source_save_" + lesson_id):
             try:
                 if not confirmed:
                     raise ValueError("Giáo viên cần xác nhận đã đối chiếu đúng bài.")
