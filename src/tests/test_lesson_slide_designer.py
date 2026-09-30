@@ -118,3 +118,14 @@ def test_owned_draft_roundtrip_uses_scoped_queries():
     assert open_teacher_draft(client, "teacher-A", "draft-A") == draft
     with pytest.raises(ValueError, match="Không tìm thấy"):
         open_teacher_draft(client, "teacher-B", "draft-A")
+
+
+def test_shared_lesson_surface_opens_selected_slide_in_activity_order():
+    draft = new_draft()
+    draft["slides"] = [
+        {"id": "practice", "activity": "LUYEN_TAP", "title": "B", "blocks": []},
+        {"id": "opening", "activity": "MO_DAU", "title": "A", "blocks": []},
+    ]
+    html = build_presentation_html(draft, selected_slide_id="practice")
+    assert "initialSlide:1" in html
+    assert "initialSlide:0" in build_presentation_html(draft, selected_slide_id="removed")

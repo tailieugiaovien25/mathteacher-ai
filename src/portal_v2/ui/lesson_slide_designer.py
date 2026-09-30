@@ -272,14 +272,18 @@ def validate_draft(draft: object) -> dict:
     return draft
 
 
-def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] | None = None) -> str:
+def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] | None = None,
+                            selected_slide_id: str | None = None) -> str:
     """Escape all teacher text; presentation uses pinned reveal.js assets."""
     validate_draft(draft)
     classroom_stages = classroom_stages or {}
     sections = []
+    initial_slide = 0
     for activity, label in ACTIVITIES:
         activity_slides = [slide for slide in draft["slides"] if slide["activity"] == activity]
         for slide in activity_slides:
+            if slide["id"] == selected_slide_id:
+                initial_slide = len(sections)
             blocks = []
             for block in slide["blocks"]:
                 classes = "content fragment" if block["reveal_later"] else "content"
@@ -410,7 +414,8 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
             'aria-label="Toàn màn hình bài giảng">⛶ Toàn màn hình bài giảng</button>'
             '<div class="reveal"><div class="slides">' + "".join(sections) + '</div></div>'
             '<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.js"></script>'
-            '<script>if(window.Reveal){Reveal.initialize({hash:false,controls:true,progress:true,center:true});}'
+            '<script>if(window.Reveal){Reveal.initialize({hash:false,controls:true,progress:true,center:true,'
+            + 'initialSlide:' + str(initial_slide) + '});}'
             'document.querySelector(".lesson-presentation-fullscreen").addEventListener("click",function(){'
             'if(document.fullscreenElement===document.documentElement){document.exitFullscreen();return;}'
             'document.documentElement.requestFullscreen().catch(function(){'
@@ -632,9 +637,10 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.caption("Đã tự lưu thay đổi vào tài khoản.")
             except Exception as exc:
                 st.error(f"Chưa tự lưu được thay đổi: {exc}. Hãy tải bản nháp JSON để giữ nội dung.")
-    _designer_band(st, "TRÌNH CHIẾU", "Xem bài giảng và điều khiển hoạt động học")
+    _designer_band(st, "BÀI GIẢNG", "Không gian chung cho thiết kế và trình chiếu toàn màn hình")
     st.caption("Sân khấu đã chuẩn bị xuất hiện trong slide tương ứng. Chuẩn bị lại nếu bộ câu hỏi thay đổi.")
-    st.markdown("**Điều khiển trực tiếp trong chế độ trình chiếu**")
+    st.caption("Slide đang soạn được mở bên dưới. Bấm Toàn màn hình bài giảng để dạy học; "
+               "nhấn Esc để trở về các tab công cụ.")
     st.caption("Sân khấu và lời dẫn AI chạy trong slide. Ghi nhận học sinh và duyệt ảnh ở khung "
                "bên dưới; thoát toàn màn hình để thao tác khung này.")
     render_evidence_authoring(st, draft, activity, owner_id=user_id,
@@ -642,6 +648,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
     known_ids = {tool["id"] for tool in draft.get("classroom_tools", [])}
     staged = {key: value for key, value in st.session_state.get("lesson_integrated_stages", {}).items()
               if key in known_ids}
-    st.components.v1.html(build_presentation_html(draft, classroom_stages=staged),
+    st.components.v1.html(build_presentation_html(draft, classroom_stages=staged,
+                          selected_slide_id=st.session_state.get("lesson_slide_selected")),
                           height=780, scrolling=False)
     _designer_band(st, "MATH TEACHER AI · THIẾT KẾ BÀI GIẢNG")
