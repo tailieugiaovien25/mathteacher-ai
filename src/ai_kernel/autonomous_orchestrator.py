@@ -107,7 +107,7 @@ class JSONAutonomousRunStore:
                     AutonomousRun(
                         **{
                             **row,
-                            "owner": AIOwnership(row.get("owner", AIOwnership.SYSTEM.value)),
+                            "owner": AIOwnership(row.get("owner", AIOwnership.USER.value)),
                             "status": AutonomousRunStatus(row.get("status", AutonomousRunStatus.FAILED.value)),
                             "plan_ids": tuple(row.get("plan_ids", ()) or ()),
                             "approval_ids": tuple(row.get("approval_ids", ()) or ()),
