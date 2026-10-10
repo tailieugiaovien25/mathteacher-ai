@@ -375,5 +375,141 @@ def main(*, embedded: bool = False) -> None:
                 st.rerun()
 
 
+
+
+    # NOTEBOOKLM_BRIDGE_UI_V1
+    st.divider()
+    with st.expander(
+        "\u0054\u1ea1o g\u00f3i ngu\u1ed3n cho NotebookLM",
+        expanded=False,
+    ):
+        st.write(
+            "Ch\u1ecdn c\u00e1c h\u1ecdc li\u1ec7u trong danh s\u00e1ch "
+            "hi\u1ec7n t\u1ea1i \u0111\u1ec3 t\u1ea1o g\u00f3i ngu\u1ed3n "
+            "cho NotebookLM c\u00e1 nh\u00e2n."
+        )
+        st.caption(
+            "G\u00f3i ZIP ch\u1ee9a b\u1ea3n sao t\u1ec7p ngu\u1ed3n, "
+            "ch\u1ec9 m\u1ee5c, manifest SHA-256 v\u00e0 m\u1eabu "
+            "c\u00e2u l\u1ec7nh ti\u1ebfng Vi\u1ec7t. "
+            "Sau khi gi\u1ea3i n\u00e9n, gi\u00e1o vi\u00ean th\u00eam "
+            "t\u1eebng t\u1ec7p trong sources/ v\u00e0o NotebookLM."
+        )
+
+        bridge_storage = None
+        credentials = st.session_state.get("google_drive_credentials")
+        if credentials:
+            try:
+                bridge_storage = GoogleDriveFileStorage(
+                    credentials_from_dict(credentials)
+                )
+            except Exception as error:
+                st.error(
+                    f"Kh\u00f4ng kh\u1edfi t\u1ea1o \u0111\u01b0\u1ee3c "
+                    f"k\u1ebft n\u1ed1i Google Drive: {error}"
+                )
+
+        if bridge_storage is None:
+            st.info(
+                "H\u00e3y k\u1ebft n\u1ed1i Google Drive "
+                "\u1edf thanh b\u00ean \u0111\u1ec3 t\u1ea1o g\u00f3i ngu\u1ed3n."
+            )
+        elif not documents:
+            st.info(
+                "Kh\u00f4ng c\u00f3 t\u00e0i li\u1ec7u "
+                "ph\u00f9 h\u1ee3p b\u1ed9 l\u1ecdc hi\u1ec7n t\u1ea1i."
+            )
+        else:
+            label_to_document = {
+                f"{item.title} | {item.file_name} | {item.document_id[:8]}": item
+                for item in documents
+            }
+            selected_labels = st.multiselect(
+                "Ch\u1ecdn h\u1ecdc li\u1ec7u \u0111\u01b0a v\u00e0o g\u00f3i",
+                options=list(label_to_document),
+                key="notebooklm_bridge_selected_sources_v1",
+                help=(
+                    "Ch\u1ec9 c\u00e1c t\u00e0i li\u1ec7u "
+                    "\u0111\u01b0\u1ee3c ch\u1ecdn m\u1edbi "
+                    "\u0111\u01b0\u1ee3c t\u1ea3i xu\u1ed1ng v\u00e0 "
+                    "\u0111\u00f3ng g\u00f3i."
+                ),
+            )
+
+            if st.button(
+                "T\u1ea1o g\u00f3i ngu\u1ed3n NotebookLM",
+                key="notebooklm_bridge_build_package_v1",
+                disabled=not selected_labels,
+                use_container_width=True,
+            ):
+                try:
+                    from notebooklm_bridge import build_notebooklm_source_pack
+
+                    selected_documents = tuple(
+                        label_to_document[label] for label in selected_labels
+                    )
+
+                    def download_selected(document):
+                        if (
+                            str(document.storage_provider).casefold()
+                            != "google_drive_oauth"
+                        ):
+                            raise ValueError(
+                                "T\u00e0i li\u1ec7u n\u00e0y "
+                                "kh\u00f4ng \u0111\u01b0\u1ee3c l\u01b0u "
+                                "b\u1eb1ng k\u1ebft n\u1ed1i Google Drive "
+                                "hi\u1ec7n t\u1ea1i."
+                            )
+                        return bridge_storage.download(document.storage_file_id)
+
+                    with st.spinner(
+                        "\u0110ang t\u1ea1o g\u00f3i ngu\u1ed3n NotebookLM..."
+                    ):
+                        pack = build_notebooklm_source_pack(
+                            selected_documents, download_selected
+                        )
+
+                    st.session_state["notebooklm_bridge_pack_v1"] = {
+                        "filename": pack.filename,
+                        "content": pack.content,
+                        "included_count": len(pack.included_sources),
+                        "failed_sources": [
+                            dict(row) for row in pack.failed_sources
+                        ],
+                    }
+                except Exception as error:
+                    st.error(
+                        f"Kh\u00f4ng t\u1ea1o \u0111\u01b0\u1ee3c "
+                        f"g\u00f3i NotebookLM: {error}"
+                    )
+
+        pack_state = st.session_state.get("notebooklm_bridge_pack_v1")
+        if pack_state:
+            st.success(
+                f"\u0110\u00e3 \u0111\u00f3ng g\u00f3i "
+                f"{pack_state['included_count']} ngu\u1ed3n."
+            )
+            st.download_button(
+                "T\u1ea3i g\u00f3i ngu\u1ed3n NotebookLM (.zip)",
+                data=pack_state["content"],
+                file_name=pack_state["filename"],
+                mime="application/zip",
+                key="notebooklm_bridge_download_package_v1",
+                use_container_width=True,
+            )
+            if pack_state["failed_sources"]:
+                st.warning(
+                    f"C\u00f3 {len(pack_state['failed_sources'])} "
+                    "ngu\u1ed3n ch\u01b0a t\u1ea3i \u0111\u01b0\u1ee3c."
+                )
+                with st.expander(
+                    "Chi ti\u1ebft ngu\u1ed3n ch\u01b0a \u0111\u00f3ng g\u00f3i"
+                ):
+                    for failed in pack_state["failed_sources"]:
+                        st.write(
+                            f"- {failed.get('title', '')} "
+                            f"({failed.get('file_name', '')}): "
+                            f"{failed.get('error', '')}"
+                        )
 if __name__ == "__main__":
     main()
