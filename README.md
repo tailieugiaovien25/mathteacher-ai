@@ -303,3 +303,9 @@ python scripts\math6_mvp_demo.py
 
 Xem phạm vi, lệnh compile và giới hạn tích hợp production tại
 [`docs/math6-mvp-vertical-slice.md`](docs/math6-mvp-vertical-slice.md).
+
+## NotebookLM Bridge (personal NotebookLM)
+
+Trong mục **Kho tài liệu**, giáo viên có thể chọn học liệu đang lưu trên Google Drive và tạo một gói ZIP để đưa nguồn vào NotebookLM cá nhân. Gói gồm bản sao file, chỉ mục, manifest kèm SHA-256 và mẫu câu lệnh tiếng Việt để khai thác các chức năng gốc của NotebookLM. Sau khi giải nén, giáo viên thêm từng tệp nguồn vào notebook; không tải nguyên ZIP lên như một nguồn.
+
+Chi tiết: [`docs/NOTEBOOKLM_BRIDGE.md`](docs/NOTEBOOKLM_BRIDGE.md). Bridge này không gọi API riêng tư hoặc tự động điều khiển giao diện NotebookLM cá nhân.
