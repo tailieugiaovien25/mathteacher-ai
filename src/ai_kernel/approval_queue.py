@@ -77,7 +77,7 @@ class JSONApprovalQueueStore:
             try:
                 result.append(ApprovalRequest(
                     **{**row, "status": ApprovalStatus(row.get("status", ApprovalStatus.PENDING.value)),
-                       "requester": AIOwnership(row.get("requester", AIOwnership.SYSTEM.value))}
+                       "requester": AIOwnership(row.get("requester", AIOwnership.USER.value))}
                 ))
             except (TypeError, ValueError):
                 continue
