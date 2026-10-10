@@ -159,7 +159,7 @@ small {
 [data-testid="stFormSubmitButton"] > button,
 [data-testid="baseButton-secondary"],
 [data-testid="baseButton-primary"] {
-    min-height: 44px;
+    min-height: 40px;
     border: 1px solid rgba(73, 143, 205, 0.72) !important;
     border-radius: var(--mt-radius-sm) !important;
     color: #f7fbff !important;
@@ -171,8 +171,8 @@ small {
             #06182e 100%
         ) !important;
     box-shadow:
-        0 7px 0 #041224,
-        0 12px 22px rgba(2, 17, 38, 0.26),
+        0 3.5px 0 #041224,
+        0 6px 11px rgba(2, 17, 38, 0.26),
         inset 0 1px 0 rgba(255, 255, 255, 0.16),
         inset 0 -1px 0 rgba(0, 0, 0, 0.42) !important;
     font-weight: 650 !important;
@@ -197,10 +197,10 @@ small {
             #0d3156 48%,
             #071c34 100%
         ) !important;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow:
-        0 9px 0 #041224,
-        0 16px 28px rgba(2, 17, 38, 0.30),
+        0 4.5px 0 #041224,
+        0 8px 14px rgba(2, 17, 38, 0.30),
         inset 0 1px 0 rgba(255, 255, 255, 0.20) !important;
 }
 
@@ -209,11 +209,11 @@ small {
 [data-testid="stFormSubmitButton"] > button:active:not(:disabled),
 [data-testid="baseButton-secondary"]:active:not(:disabled),
 [data-testid="baseButton-primary"]:active:not(:disabled) {
-    transform: translateY(5px);
+    transform: translateY(2.5px);
     box-shadow:
-        0 2px 0 #041224,
-        0 5px 10px rgba(2, 17, 38, 0.22),
-        inset 0 3px 8px rgba(0, 0, 0, 0.30) !important;
+        0 1px 0 #041224,
+        0 3px 5px rgba(2, 17, 38, 0.22),
+        inset 0 2px 4px rgba(0, 0, 0, 0.30) !important;
 }
 
 /* Keep disabled buttons readable instead of washed-out/near-invisible.
@@ -234,8 +234,8 @@ small {
             #111f2d 100%
         ) !important;
     box-shadow:
-        0 4px 0 #0b1420,
-        0 8px 14px rgba(3, 14, 28, 0.18),
+        0 2px 0 #0b1420,
+        0 4px 7px rgba(3, 14, 28, 0.18),
         inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
     opacity: 0.82 !important;
     cursor: not-allowed !important;
@@ -251,7 +251,7 @@ small {
     background:
         linear-gradient(145deg, var(--mt-blue-500), var(--mt-blue-700)) !important;
     box-shadow:
-        0 12px 25px rgba(30, 92, 170, 0.27),
+        0 6px 12px rgba(30, 92, 170, 0.27),
         inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
 }
 
@@ -259,7 +259,7 @@ small {
     border-color: rgba(125, 187, 229, 0.3) !important;
     color: #f4faff !important;
     background: linear-gradient(180deg, rgba(27, 73, 116, 0.9), rgba(14, 49, 84, 0.95)) !important;
-    box-shadow: 0 8px 18px rgba(1, 12, 29, 0.25), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+    box-shadow: 0 4px 9px rgba(1, 12, 29, 0.25), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
 
 /* Inputs and selectors. */
@@ -997,8 +997,8 @@ header[data-testid="stHeader"], [data-testid="stToolbar"] {
  box-shadow:0 0 14px rgba(53,216,255,.24);
 }
 .stButton > button:hover,.stDownloadButton > button:hover,[data-testid="stFormSubmitButton"] > button:hover {
- transform:translateY(-2px)!important;
- box-shadow:0 14px 28px rgba(7,62,132,.19),0 0 0 1px rgba(53,216,255,.10),inset 0 1px 0 rgba(255,255,255,.82)!important;
+ transform:translateY(-1px)!important;
+ box-shadow:0 7px 14px rgba(7,62,132,.19),0 0 0 1px rgba(53,216,255,.10),inset 0 1px 0 rgba(255,255,255,.82)!important;
 }
 .mt-weekly-hero {
  position:relative;overflow:hidden;padding:1.35rem 1.5rem!important;
@@ -1037,7 +1037,7 @@ section[data-testid="stMain"]:has(.mt-weekly-hero)
     border: 1px solid rgba(76, 194, 255, 0.46) !important;
     border-radius: 13px !important;
     background: linear-gradient(180deg, #0b2949 0%, #06192f 55%, #030d1d 100%) !important;
-    box-shadow: 0 12px 24px rgba(1, 17, 40, 0.28),
+    box-shadow: 0 6px 12px rgba(1, 17, 40, 0.28),
                 inset 0 1px 0 rgba(255, 255, 255, 0.11),
                 inset 0 -1px 0 rgba(31, 125, 210, 0.18) !important;
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.36);
@@ -1048,9 +1048,9 @@ section[data-testid="stMain"]:has(.mt-weekly-hero)
     color: #ffffff !important;
     border-color: rgba(74, 218, 255, 0.82) !important;
     background: linear-gradient(180deg, #0f3d6d 0%, #09284b 55%, #041426 100%) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 16px 30px rgba(0, 30, 72, 0.34),
-                0 0 18px rgba(53, 216, 255, 0.16),
+    transform: translateY(-1px) !important;
+    box-shadow: 0 8px 15px rgba(0, 30, 72, 0.34),
+                0 0 9px rgba(53, 216, 255, 0.16),
                 inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
 }
 section[data-testid="stMain"]:has(.mt-weekly-hero)
@@ -1069,7 +1069,7 @@ section[data-testid="stMain"]:has(.mt-weekly-hero)
     color: #ffffff !important;
     border: 1px solid rgba(54, 199, 255, 0.72) !important;
     border-radius: 14px !important;
-    box-shadow: 0 12px 24px rgba(0, 13, 32, 0.42), 0 0 0 1px rgba(42, 151, 255, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 105, 210, 0.22) !important;
+    box-shadow: 0 6px 12px rgba(0, 13, 32, 0.42), 0 0 0 1px rgba(42, 151, 255, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 105, 210, 0.22) !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.48) !important;
 }
 [class*="st-key-weekly_standardize_"] button *,
@@ -1079,8 +1079,8 @@ section[data-testid="stMain"]:has(.mt-weekly-hero)
     background: linear-gradient(180deg, #10467d 0%, #0a2c51 52%, #041326 100%) !important;
     color: #ffffff !important;
     border-color: #4fd8ff !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 16px 30px rgba(0, 22, 55, 0.50), 0 0 20px rgba(55, 210, 255, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 8px 15px rgba(0, 22, 55, 0.50), 0 0 10px rgba(55, 210, 255, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
 }
 [class*="st-key-weekly_standardize_"] button:active,
 [class*="st-key-weekly_ai_"] button:active {
@@ -1173,10 +1173,10 @@ def apply_g1b_shared_navy_3d_foundation(st) -> None:
             border-radius: 12px;
             box-shadow:
                 inset 0 1px 0 rgba(255,255,255,.18),
-                0 2px 0 #07182d,
-                0 7px 16px rgba(11,31,58,.18);
+                0 1px 0 #07182d,
+                0 4px 8px rgba(11,31,58,.18);
             font-weight: 650;
-            min-height: 2.55rem;
+            min-height: 2.5rem;
             transition:
                 transform .12s ease,
                 box-shadow .12s ease,
@@ -1191,7 +1191,7 @@ def apply_g1b_shared_navy_3d_foundation(st) -> None:
             border-color: #0b1f3a;
             box-shadow:
                 inset 0 1px 0 rgba(255,255,255,.22),
-                0 3px 0 #07182d,
+                0 1.5px 0 #07182d,
                 var(--g1b-shadow-hover);
             transform: translateY(-1px);
             color: #ffffff !important;
@@ -1203,8 +1203,8 @@ def apply_g1b_shared_navy_3d_foundation(st) -> None:
             transform: translateY(1px);
             box-shadow:
                 inset 0 1px 2px rgba(0,0,0,.15),
-                0 1px 0 #07182d,
-                0 3px 8px rgba(11,31,58,.16);
+                0 .5px 0 #07182d,
+                0 2px 4px rgba(11,31,58,.16);
         }
 
         .stButton > button:focus-visible,
