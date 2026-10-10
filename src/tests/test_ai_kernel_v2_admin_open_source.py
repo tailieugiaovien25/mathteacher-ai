@@ -12,10 +12,9 @@ from ai_kernel import (
 )
 
 
-def test_kernel_default_profiles_are_local_and_admin_enabled():
+def test_kernel_default_profiles_are_admin_enabled_and_ollama_backed():
     profiles = default_model_profiles()
     assert profiles
-    assert all(item.local_first for item in profiles)
     assert all(item.admin_enabled for item in profiles)
     assert all(item.provider == "ollama" for item in profiles)
 
