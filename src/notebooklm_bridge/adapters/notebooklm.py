@@ -1,4 +1,4 @@
-"""NotebookLM adapter boundary.
+﻿"""NotebookLM adapter boundary.
 
 This module intentionally does not implement private or unsupported
 NotebookLM APIs. It provides a replaceable adapter boundary so the
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from notebooklm_bridge.adapters.notebooklm_client import NotebookLMClient
 from notebooklm_bridge.sync import NotebookSourceAdapter
 
 
@@ -20,7 +21,7 @@ class NotebookLMAdapterConfig:
 
 
 class NotebookLMAdapter(NotebookSourceAdapter):
-    """Safe placeholder for a future supported NotebookLM integration.
+    """Safe boundary for a future supported NotebookLM integration.
 
     No Google credentials, cookies, session tokens, or private NotebookLM
     endpoints are accepted or stored here.
@@ -29,8 +30,10 @@ class NotebookLMAdapter(NotebookSourceAdapter):
     def __init__(
         self,
         config: NotebookLMAdapterConfig | None = None,
+        client: NotebookLMClient | None = None,
     ) -> None:
         self._config = config or NotebookLMAdapterConfig()
+        self._client = client
 
     @property
     def enabled(self) -> bool:
@@ -42,11 +45,8 @@ class NotebookLMAdapter(NotebookSourceAdapter):
         notebook_id: str,
         document_id: str,
     ) -> str | None:
-        """Synchronize one source through a supported external mechanism.
+        """Synchronize one source through the configured client."""
 
-        The real implementation must be added only after the supported
-        NotebookLM integration mechanism is established.
-        """
         if not notebook_id.strip():
             raise ValueError("notebook_id must not be empty")
 
@@ -58,7 +58,13 @@ class NotebookLMAdapter(NotebookSourceAdapter):
                 "NotebookLM integration is disabled"
             )
 
-        raise NotImplementedError(
-            "No supported NotebookLM integration mechanism "
-            "has been configured yet"
+        if self._client is None:
+            raise NotImplementedError(
+                "No supported NotebookLM integration mechanism "
+                "has been configured yet"
+            )
+
+        return self._client.sync_source(
+            notebook_id=notebook_id,
+            document_id=document_id,
         )
