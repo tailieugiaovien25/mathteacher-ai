@@ -27,6 +27,8 @@ from teacher_document_library_v2.adapters import (
     validate_signed_oauth_state,
 )
 
+from notebooklm_bridge import build_notebooklm_source_pack
+
 
 MIME_OPTIONS = {
     "Word (.docx)": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -41,6 +43,8 @@ def supabase_settings(environment: Mapping[str, str] | None = None) -> tuple[str
     values = environment if environment is not None else os.environ
     url = values.get("SUPABASE_URL", "").strip()
     key = values.get("SUPABASE_PUBLISHABLE_KEY", "").strip()
+
+
     return (url, key) if url and key else None
 
 
@@ -374,6 +378,107 @@ def main(*, embedded: bool = False) -> None:
                 st.success("Đã xóa thông tin tài liệu. File trên Google Drive không bị xóa.")
                 st.rerun()
 
+
+    # ===== NOTEBOOKLM SOURCE PACK START =====
+    st.divider()
+    st.subheader("📚 NotebookLM")
+    st.caption(
+        "Chọn tài liệu thật trong Kho tài liệu để tạo gói nguồn "
+        "nhập thủ công vào NotebookLM."
+    )
+
+    if not documents:
+        st.info("Chưa có tài liệu phù hợp để đưa vào NotebookLM.")
+    else:
+        st.markdown("**Nguồn tài liệu**")
+
+        selected_document_ids = []
+
+        for document in documents:
+            label = (
+                f"{document.title} · "
+                f"{document.subject} · "
+                f"Khối {document.grade_level} · "
+                f"{document.academic_year}"
+            )
+
+            if st.checkbox(
+                label,
+                key=f"notebooklm_source_{document.document_id}",
+            ):
+                selected_document_ids.append(document.document_id)
+
+        selected_documents = [
+            document
+            for document in documents
+            if document.document_id in selected_document_ids
+        ]
+
+        st.caption(
+            f"Đã chọn {len(selected_documents)}/{len(documents)} tài liệu."
+        )
+
+        if st.button(
+            "📦 Tạo gói nguồn NotebookLM",
+            key="notebooklm_build_source_pack",
+            use_container_width=True,
+            disabled=not selected_documents,
+        ):
+            if "google_drive_credentials" not in st.session_state:
+                st.error(
+                    "Chưa kết nối Google Drive. "
+                    "Hãy kết nối Google Drive trước khi tạo gói nguồn."
+                )
+            else:
+                try:
+                    credentials = credentials_from_dict(
+                        st.session_state["google_drive_credentials"]
+                    )
+                    storage = GoogleDriveFileStorage(credentials)
+
+                    def download_document(document: TeacherDocument) -> bytes:
+                        return storage.download(document.storage_file_id)
+
+                    with st.spinner(
+                        "Đang tải các tài liệu đã chọn và tạo gói nguồn..."
+                    ):
+                        source_pack = build_notebooklm_source_pack(
+                            selected_documents,
+                            download_document,
+                        )
+
+                    if source_pack.failed_sources:
+                        st.warning(
+                            f"Đã tạo gói nhưng có "
+                            f"{len(source_pack.failed_sources)} nguồn không tải được."
+                        )
+
+                    st.success(
+                        f"Đã tạo gói nguồn với "
+                        f"{len(source_pack.included_sources)} tài liệu thành công."
+                    )
+
+                    st.download_button(
+                        label="⬇️ Tải gói nguồn NotebookLM",
+                        data=source_pack.content,
+                        file_name=source_pack.filename,
+                        mime="application/zip",
+                        key="notebooklm_download_source_pack",
+                        use_container_width=True,
+                    )
+
+                    st.info(
+                        "Đây là gói nguồn để giáo viên tải về và nhập thủ công "
+                        "vào NotebookLM. MathTeacher AI chưa thực hiện đồng bộ "
+                        "trực tiếp với NotebookLM."
+                    )
+
+                except Exception as error:
+                    st.error(
+                        f"Không thể tạo gói nguồn NotebookLM: {error}"
+                    )
+
+    # ===== NOTEBOOKLM SOURCE PACK END =====
 
 if __name__ == "__main__":
     main()
