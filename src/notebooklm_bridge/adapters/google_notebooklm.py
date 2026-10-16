@@ -1,4 +1,4 @@
-﻿"""Google NotebookLM official-client boundary.
+"""Google NotebookLM official-client boundary.
 
 STUB ONLY:
 - no network calls
@@ -10,6 +10,7 @@ STUB ONLY:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from notebooklm_bridge.adapters.google_auth import GoogleAuthProvider
 from notebooklm_bridge.adapters.notebooklm_client import NotebookLMClient
@@ -83,6 +84,35 @@ class GoogleNotebookLMClient(NotebookLMClient):
         raise NotImplementedError(
             "Official Google NotebookLM API client is not "
             "implemented in the STUB stage"
+        )
+
+    def upload_file(
+        self,
+        *,
+        notebook_id: str,
+        file_path: str | Path,
+        display_name: str,
+        content_type: str,
+    ) -> str:
+        """STUB for official notebooks.sources.uploadFile.
+
+        No network access is performed at this stage.
+        """
+        if not notebook_id.strip():
+            raise ValueError("notebook_id must not be empty")
+
+        if not str(file_path).strip():
+            raise ValueError("file_path must not be empty")
+
+        if not display_name.strip():
+            raise ValueError("display_name must not be empty")
+
+        if not content_type.strip():
+            raise ValueError("content_type must not be empty")
+
+        raise NotImplementedError(
+            "Official Google NotebookLM uploadFile API client "
+            "is not implemented in the STUB stage"
         )
 
 
