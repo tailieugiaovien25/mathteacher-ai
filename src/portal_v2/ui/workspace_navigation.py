@@ -37,6 +37,7 @@ _TEACHER_ROUTES = (
     ("assessment_blueprint", "Ma trận & bản đặc tả", "Đề kiểm tra"),
     ("question_bank_ai", "AI xây dựng ngân hàng câu hỏi", "Đề kiểm tra"),
     ("classroom", "Lớp học ôn tập", "Lớp học"),
+    ("ai_teaching_assistant", "AI Trợ giảng", "Lớp học"),
     ("assessment_generate", "Tạo đề kiểm tra", "Đề kiểm tra"),
     ("assessment_math6", "Tạo đề kiểm tra Toán 6", "Đề kiểm tra"),
     ("assessment_export", "Xuất đề kiểm tra", "Đề kiểm tra"),
@@ -88,6 +89,11 @@ _ADMIN_GROUPS = {
     "canonical_code_catalog": "Chương trình & dữ liệu",
     "context_control_center": "Vận hành",
     "lesson_plan_coordination_center": "Nội dung & duyệt",
+    "system_admin_ai": "Vận hành",
+    "marketing_ai": "Thương mại",
+    "ai_approval_center": "Vận hành",
+    "ai_runtime_center": "Vận hành",
+    "ai_autonomous_center": "Vận hành",
     "math_question_reviews": "Nội dung & duyệt",
 }
 

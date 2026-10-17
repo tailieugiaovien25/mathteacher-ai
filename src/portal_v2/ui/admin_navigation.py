@@ -26,6 +26,11 @@ ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION = "academic_year_configuration"
 ADMIN_PAGE_CANONICAL_CODE_CATALOG = "canonical_code_catalog"
 ADMIN_PAGE_CONTEXT_CONTROL_CENTER = "context_control_center"
 ADMIN_PAGE_LESSON_PLAN_COORDINATION_CENTER = "lesson_plan_coordination_center"
+ADMIN_PAGE_SYSTEM_ADMIN_AI = "system_admin_ai"
+ADMIN_PAGE_MARKETING_AI = "marketing_ai"
+ADMIN_PAGE_AI_APPROVAL_CENTER = "ai_approval_center"
+ADMIN_PAGE_AI_RUNTIME_CENTER = "ai_runtime_center"
+ADMIN_PAGE_AI_AUTONOMOUS_CENTER = "ai_autonomous_center"
 
 
 @dataclass(frozen=True)
@@ -113,6 +118,11 @@ ADMIN_PORTAL_PAGES = (
         ADMIN_PAGE_LESSON_PLAN_COORDINATION_CENTER,
         "Trung tâm điều phối giáo án",
     ),
+    AdminPortalPage(ADMIN_PAGE_SYSTEM_ADMIN_AI, "AI Quản trị hệ thống"),
+    AdminPortalPage(ADMIN_PAGE_MARKETING_AI, "AI Marketing"),
+    AdminPortalPage(ADMIN_PAGE_AI_APPROVAL_CENTER, "AI Approval Center"),
+    AdminPortalPage(ADMIN_PAGE_AI_RUNTIME_CENTER, "AI Runtime & Model Center"),
+    AdminPortalPage(ADMIN_PAGE_AI_AUTONOMOUS_CENTER, "AI Autonomous Control Center"),
 
 )
 
