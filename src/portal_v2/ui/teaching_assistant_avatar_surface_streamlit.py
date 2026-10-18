@@ -43,6 +43,7 @@ def build_avatar_surface_html(
     """
     safe_name = html.escape(display_name)
     safe_state = html.escape(state)
+    speech_payload = json.dumps(speech_text or "", ensure_ascii=False)
     svg = avatar_svg.strip()
     if not svg:
         avatar_markup = "<div class='avatar-fallback'>AI</div>"
@@ -97,7 +98,7 @@ body {{ margin:0; font-family: Arial, sans-serif; background: transparent; }}
     <div>
       <div class='name'>{safe_name}</div>
       <div class='state'><span class='pulse'></span>{safe_state}</div>
-      <div class='hint'>Lip-sync nhẹ chạy cục bộ theo biên độ audio. Avatar chỉ trình bày; Quyền điều khiển lớp học vẫn thuộc Kernel/Policy.</div>
+      <div class=hint>Lip-sync nhẹ chạy cục bộ theo biên độ audio. Avatar chỉ trình bày; Quyền điều khiển lớp học vẫn thuộc Kernel/Policy.</div>
     </div>
   </div>
   {audio_markup}
@@ -286,12 +287,12 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
             st.rerun()
 
     # V13N: one TeachingSessionManager is the source of truth for the live lesson.
-    with st.expander("🧭 Phiên dạy hiện tại", expanded=True):
+    with st.expander("ðŸ§­ PhiÃªn dáº¡y hiá»‡n táº¡i", expanded=True):
         snapshot = teaching_session.snapshot()
         st.info(
             f"Trạng thái: **{session_status_label(snapshot.status)}** · "
-            f"Hoạt động {snapshot.activity_index + 1 if snapshot.current_activity_id else 0}/{snapshot.total_activities} · "
-            f"{snapshot.current_activity_id or 'chưa bắt đầu'} · "
+            f"Hoáº¡t Ä‘á»™ng {snapshot.activity_index + 1 if snapshot.current_activity_id else 0}/{snapshot.total_activities} Â· "
+            f"{snapshot.current_activity_id or 'chÆ°a báº¯t Ä‘áº§u'} Â· "
             f"event={snapshot.event_count}"
         )
         draft = st.session_state.get("lesson_slide_draft") or {}
@@ -303,7 +304,7 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
         start_col, next_col, release_col, stop_col = st.columns(4)
         if snapshot.status in {TeachingSessionStatus.PREPARING, TeachingSessionStatus.COMPLETED, TeachingSessionStatus.STOPPED}:
             with start_col:
-                if st.button("▶️ Bắt đầu tiết dạy", type="primary", use_container_width=True, disabled=not bool(lesson_id)):
+                if st.button("â–¶ï¸ Báº¯t Ä‘áº§u tiáº¿t dáº¡y", type="primary", use_container_width=True, disabled=not bool(lesson_id)):
                     try:
                         if snapshot.status in {snapshot.status.COMPLETED, snapshot.status.STOPPED}:
                             teaching_session = reset_teaching_session(st.session_state)
@@ -318,21 +319,21 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                         st.session_state[state_key] = AvatarState.IDLE.value
                         st.rerun()
                     except Exception as exc:
-                        st.error(f"Không thể bắt đầu phiên dạy: {exc}")
+                        st.error(f"KhÃ´ng thá»ƒ báº¯t Ä‘áº§u phiÃªn dáº¡y: {exc}")
             if not lesson_id:
-                st.caption("Hãy mở bài giảng có lesson_id trước khi bắt đầu phiên dạy.")
+                st.caption("HÃ£y má»Ÿ bÃ i giáº£ng cÃ³ lesson_id trÆ°á»›c khi báº¯t Ä‘áº§u phiÃªn dáº¡y.")
         else:
             with next_col:
-                if st.button("⏭️ Chuyển hoạt động", use_container_width=True):
+                if st.button("â­ï¸ Chuyá»ƒn hoáº¡t Ä‘á»™ng", use_container_width=True):
                     try:
                         teaching_session.advance()
                         st.session_state["ta_v13i_plan"] = None
                         st.session_state["ta_v13j_action_results"] = {}
                         st.rerun()
                     except Exception as exc:
-                        st.warning(f"Chưa thể chuyển hoạt động: {exc}")
+                        st.warning(f"ChÆ°a thá»ƒ chuyá»ƒn hoáº¡t Ä‘á»™ng: {exc}")
             with release_col:
-                if snapshot.status.name == "TEACHER_CONTROL" and st.button("▶️ Trả quyền cho Trợ giảng", use_container_width=True):
+                if snapshot.status.name == "TEACHER_CONTROL" and st.button("â–¶ï¸ Tráº£ quyá»n cho Trá»£ giáº£ng", use_container_width=True):
                     teaching_session.teacher_release_control()
                     st.session_state["ta_teacher_control_v13e"] = False
                     st.session_state[state_key] = AvatarState.LISTENING.value
@@ -345,15 +346,15 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
         current = teaching_session.current_activity
         if current is not None:
             st.caption(
-                f"Hoạt động hiện tại: **{current.activity_title}** · phase={current.phase.value} · "
-                f"slide={current.selected_slide_id or '—'}"
+                f"Hoáº¡t Ä‘á»™ng hiá»‡n táº¡i: **{current.activity_title}** Â· phase={current.phase.value} Â· "
+                f"slide={current.selected_slide_id or 'â€”'}"
             )
             if current.question:
-                st.caption("Câu hỏi đã được giáo viên duyệt: " + current.question)
+                st.caption("CÃ¢u há»i Ä‘Ã£ Ä‘Æ°á»£c giÃ¡o viÃªn duyá»‡t: " + current.question)
 
     # V13I: MC + activity facilitation planner.
     # The planner creates a reviewable teaching plan; it does not execute classroom tools.
-    with st.expander("🎬 MC & điều phối hoạt động", expanded=True):
+    with st.expander("ðŸŽ¬ MC & Ä‘iá»u phá»‘i hoáº¡t Ä‘á»™ng", expanded=True):
         try:
             from ai_kernel.teaching_assistant import TeachingAssistantMode
             from ai_kernel.teaching_classroom import ClassroomPhase, LessonActivityContext, TeachingClassroomOrchestrator
@@ -362,10 +363,10 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
             mode_label = st.selectbox(
                 "Vai trò của Trợ giảng",
                 options=[
-                    ("MC – dẫn chương trình", TeachingAssistantMode.MC),
-                    ("Điều phối hoạt động", TeachingAssistantMode.ACTIVITY_FACILITATOR),
+                    ("MC â€“ dáº«n chÆ°Æ¡ng trÃ¬nh", TeachingAssistantMode.MC),
+                    ("Äiá»u phá»‘i hoáº¡t Ä‘á»™ng", TeachingAssistantMode.ACTIVITY_FACILITATOR),
                     ("Điều hành kỹ thuật", TeachingAssistantMode.TECHNICAL_OPERATOR),
-                    ("Đồng giảng", TeachingAssistantMode.CO_TEACHER),
+                    ("Äá»“ng giáº£ng", TeachingAssistantMode.CO_TEACHER),
                 ],
                 format_func=lambda item: item[0],
                 key="ta_v13i_mode",
@@ -373,40 +374,40 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
             c1, c2 = st.columns(2)
             with c1:
                 lesson_id = st.text_input("Mã bài học", value=st.session_state.get("ta_v13i_lesson_id", "lesson-demo"), key="ta_v13i_lesson_id")
-                activity_id = st.text_input("Mã hoạt động", value=st.session_state.get("ta_v13i_activity_id", "opening-1"), key="ta_v13i_activity_id")
-                activity_title = st.text_input("Tên hoạt động", value=st.session_state.get("ta_v13i_activity_title", "Khởi động"), key="ta_v13i_activity_title")
+                activity_id = st.text_input("MÃ£ hoáº¡t Ä‘á»™ng", value=st.session_state.get("ta_v13i_activity_id", "opening-1"), key="ta_v13i_activity_id")
+                activity_title = st.text_input("TÃªn hoáº¡t Ä‘á»™ng", value=st.session_state.get("ta_v13i_activity_title", "Khá»Ÿi Ä‘á»™ng"), key="ta_v13i_activity_title")
             with c2:
                 phase_label = st.selectbox(
-                    "Giai đoạn",
+                    "Giai Ä‘oáº¡n",
                     options=list(ClassroomPhase),
                     format_func=lambda item: {
-                        ClassroomPhase.OPENING: "Mở đầu",
+                        ClassroomPhase.OPENING: "Má»Ÿ Ä‘áº§u",
                         ClassroomPhase.NEW_KNOWLEDGE: "Hình thành kiến thức",
-                        ClassroomPhase.PRACTICE: "Luyện tập",
+                        ClassroomPhase.PRACTICE: "Luyá»‡n táº­p",
                         ClassroomPhase.APPLICATION: "Vận dụng",
-                        ClassroomPhase.TRANSITION: "Chuyển hoạt động",
+                        ClassroomPhase.TRANSITION: "Chuyá»ƒn hoáº¡t Ä‘á»™ng",
                         ClassroomPhase.CLOSING: "Kết thúc",
                     }[item],
                     key="ta_v13i_phase",
                 )
                 duration_seconds = st.number_input("Thời lượng (giây)", min_value=0, max_value=3600, value=60, step=10, key="ta_v13i_duration")
-                question = st.text_area("Câu hỏi/Prompt hoạt động", value="", key="ta_v13i_question")
+                question = st.text_area("CÃ¢u há»i/Prompt hoáº¡t Ä‘á»™ng", value="", key="ta_v13i_question")
 
-            objective = st.text_input("Mục tiêu hoạt động", value="", key="ta_v13i_objective")
+            objective = st.text_input("Má»¥c tiÃªu hoáº¡t Ä‘á»™ng", value="", key="ta_v13i_objective")
             a1, a2, a3, a4, a5 = st.columns(5)
             with a1:
-                include_slide = st.checkbox("Mở slide", value=False, key="ta_v13i_slide")
+                include_slide = st.checkbox("Má»Ÿ slide", value=False, key="ta_v13i_slide")
             with a2:
                 include_timer = st.checkbox("Bấm giờ", value=True, key="ta_v13i_timer")
             with a3:
-                include_quiz = st.checkbox("Hiển thị câu hỏi", value=False, key="ta_v13i_quiz")
+                include_quiz = st.checkbox("Hiá»ƒn thá»‹ cÃ¢u há»i", value=False, key="ta_v13i_quiz")
             with a4:
                 stage_ids = tuple(str(k) for k in (st.session_state.get("lesson_integrated_stages", {}) or {}).keys())
-                include_stage = st.checkbox("Mở sân khấu", value=False, disabled=not stage_ids, key="ta_v13k_stage")
+                include_stage = st.checkbox("Má»Ÿ sÃ¢n kháº¥u", value=False, disabled=not stage_ids, key="ta_v13k_stage")
             with a5:
-                include_whiteboard = st.checkbox("Mở bảng", value=False, key="ta_v13k_whiteboard")
+                include_whiteboard = st.checkbox("Má»Ÿ báº£ng", value=False, key="ta_v13k_whiteboard")
             selected_slide_id = st.text_input(
-                "Mã slide cần mở (nếu có)",
+                "MÃ£ slide cáº§n má»Ÿ (náº¿u cÃ³)",
                 value=str(st.session_state.get("lesson_slide_selected", "")),
                 key="ta_v13j_selected_slide_id",
             )
@@ -420,7 +421,7 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                     disabled=not include_stage,
                 )
 
-            if st.button("🧩 Lập kịch bản & kế hoạch", type="primary", use_container_width=True, key="ta_v13i_build_plan"):
+            if st.button("ðŸ§© Láº­p ká»‹ch báº£n & káº¿ hoáº¡ch", type="primary", use_container_width=True, key="ta_v13i_build_plan"):
                 allowed_tools = (
                     "classroom.status.read",
                     "classroom.slide.open",
@@ -456,7 +457,7 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                                 clear_overlays=True,
                             )
                         else:
-                            raise ValueError("Hoạt động trong form không trùng activity hiện tại của phiên dạy.")
+                            raise ValueError("Hoáº¡t Ä‘á»™ng trong form khÃ´ng trÃ¹ng activity hiá»‡n táº¡i cá»§a phiÃªn dáº¡y.")
                     else:
                         plan = TeachingClassroomOrchestrator().build_plan(
                             context=context,
@@ -469,11 +470,11 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                         )
                     st.session_state["ta_v13i_plan"] = plan
                 except Exception as exc:
-                    st.error(f"Không thể lập kế hoạch cho phiên dạy: {exc}")
+                    st.error(f"KhÃ´ng thá»ƒ láº­p káº¿ hoáº¡ch cho phiÃªn dáº¡y: {exc}")
 
             plan = st.session_state.get("ta_v13i_plan")
             if plan is not None:
-                st.success("Đã lập kế hoạch. Classroom Action chỉ thực thi khi giáo viên xác nhận từng thao tác.")
+                st.success("ÄÃ£ láº­p káº¿ hoáº¡ch. Classroom Action chá»‰ thá»±c thi khi giÃ¡o viÃªn xÃ¡c nháº­n tá»«ng thao tÃ¡c.")
                 for idx, line in enumerate(plan.script, start=1):
                     st.write(f"**{idx}. {line.speaker}:** {line.text}")
                 if plan.actions:
@@ -486,7 +487,7 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                     for action in plan.actions:
                         result = st.session_state["ta_v13j_action_results"].get(action.action_id)
                         if result:
-                            icon = "✅" if result.status is ClassroomExecutionStatus.EXECUTED else "⏸️"
+                            icon = "âœ…" if result.status is ClassroomExecutionStatus.EXECUTED else "â¸ï¸"
                             st.write(f"{icon} **{action.label}** · {result.message}")
                             continue
                         a_left, a_right = st.columns([3, 1])
@@ -494,33 +495,33 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                             approval = "Xác nhận của giáo viên" if action.requires_teacher_confirmation else "Theo policy"
                             st.write(f"- {action.label} · {approval}")
                         with a_right:
-                            if st.button("▶ Thực hiện", key="ta_v13j_exec_" + action.action_id, use_container_width=True):
+                            if st.button("â–¶ Thá»±c hiá»‡n", key="ta_v13j_exec_" + action.action_id, use_container_width=True):
                                 if teaching_session.status not in {TeachingSessionStatus.PREPARING, TeachingSessionStatus.COMPLETED, TeachingSessionStatus.STOPPED}:
                                     try:
                                         session_plan = plan_for_single_action(plan, action.action_id)
                                         session_results = teaching_session.execute_plan(session_plan, teacher_confirmed=True)
                                         exec_result = session_results[0] if session_results else executor.execute(action, teacher_confirmed=True)
                                     except Exception as exc:
-                                        st.error(f"Không thể thực thi theo Teaching Session: {exc}")
+                                        st.error(f"KhÃ´ng thá»ƒ thá»±c thi theo Teaching Session: {exc}")
                                         exec_result = executor.execute(action, teacher_confirmed=True)
                                 else:
                                     exec_result = executor.execute(action, teacher_confirmed=True)
                                 st.session_state["ta_v13j_action_results"][action.action_id] = exec_result
                                 st.rerun()
                 else:
-                    st.caption("Kịch bản này chỉ gồm lời dẫn, chưa đề xuất thao tác kỹ thuật.")
+                    st.caption("Ká»‹ch báº£n nÃ y chá»‰ gá»“m lá»i dáº«n, chÆ°a Ä‘á» xuáº¥t thao tÃ¡c ká»¹ thuáº­t.")
                 status = StreamlitClassroomRuntime(st.session_state).read_status()
                 if status:
-                    with st.expander("Trạng thái lớp học do Trợ giảng vừa cập nhật", expanded=False):
+                    with st.expander("Tráº¡ng thÃ¡i lá»›p há»c do Trá»£ giáº£ng vá»«a cáº­p nháº­t", expanded=False):
                         st.json(status)
-                st.caption("V13K: Action được đẩy vào Bài giảng/Sân khấu/Timer/Quiz/Whiteboard sau xác nhận; Teacher Override luôn chặn executor.")
+                st.caption("V13K: Action Ä‘Æ°á»£c Ä‘áº©y vÃ o BÃ i giáº£ng/SÃ¢n kháº¥u/Timer/Quiz/Whiteboard sau xÃ¡c nháº­n; Teacher Override luÃ´n cháº·n executor.")
         except Exception as exc:
-            st.warning(f"Chưa thể mở bộ lập kế hoạch MC/hoạt động: {exc}")
+            st.warning(f"ChÆ°a thá»ƒ má»Ÿ bá»™ láº­p káº¿ hoáº¡ch MC/hoáº¡t Ä‘á»™ng: {exc}")
 
     teacher_control = bool(st.session_state.get("ta_teacher_control_v13e", False))
     if teacher_control:
-        st.warning("Giáo viên đang giữ quyền điều khiển. Avatar không xử lý hội thoại mới cho tới khi được bật lại.")
-        if st.button("▶️ Cho phép Trợ giảng tiếp tục", use_container_width=True):
+        st.warning("GiÃ¡o viÃªn Ä‘ang giá»¯ quyá»n Ä‘iá»u khiá»ƒn. Avatar khÃ´ng xá»­ lÃ½ há»™i thoáº¡i má»›i cho tá»›i khi Ä‘Æ°á»£c báº­t láº¡i.")
+        if st.button("â–¶ï¸ Cho phÃ©p Trá»£ giáº£ng tiáº¿p tá»¥c", use_container_width=True):
             if teaching_session.status.name == "TEACHER_CONTROL":
                 teaching_session.teacher_release_control()
             else:
@@ -533,16 +534,16 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
     uploaded = None
     audio_input = getattr(st, "audio_input", None)
     if callable(audio_input):
-        uploaded = audio_input("Nói với Trợ giảng", key="ta_browser_audio_v13e")
+        uploaded = audio_input("NÃ³i vá»›i Trá»£ giáº£ng", key="ta_browser_audio_v13e")
     else:
-        st.info("Phiên bản Streamlit hiện tại chưa có audio_input; có thể dùng Voice Bridge/CLI local.")
+        st.info("PhiÃªn báº£n Streamlit hiá»‡n táº¡i chÆ°a cÃ³ audio_input; cÃ³ thá»ƒ dÃ¹ng Voice Bridge/CLI local.")
         return
 
     if uploaded is None:
-        st.caption("Cho phép microphone trong trình duyệt rồi nói một câu. Audio chỉ được chuyển vào local voice bridge khi bạn bấm xử lý.")
+        st.caption("Cho phÃ©p microphone trong trÃ¬nh duyá»‡t rá»“i nÃ³i má»™t cÃ¢u. Audio chá»‰ Ä‘Æ°á»£c chuyá»ƒn vÃ o local voice bridge khi báº¡n báº¥m xá»­ lÃ½.")
         return
 
-    if st.button("🧠 Xử lý bằng AI local", type="primary", use_container_width=True):
+    if st.button("ðŸ§  Xá»­ lÃ½ báº±ng AI local", type="primary", use_container_width=True):
         st.session_state[state_key] = AvatarState.THINKING.value
         st.rerun()
 
@@ -580,10 +581,10 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                 audio_bytes = turn.synthesized_audio.read_bytes()
                 st.session_state[audio_key] = "data:audio/mpeg;base64," + base64.b64encode(audio_bytes).decode("ascii")
                 st.audio(audio_bytes, format="audio/mp3")
-            st.caption("Voice surface chỉ trả lời; không tự thực thi Classroom Action.")
+            st.caption("Voice surface chá»‰ tráº£ lá»i; khÃ´ng tá»± thá»±c thi Classroom Action.")
         except Exception as exc:
             st.session_state[state_key] = AvatarState.IDLE.value
-            st.error(f"Chưa thể chạy local voice: {exc}")
+            st.error(f"ChÆ°a thá»ƒ cháº¡y local voice: {exc}")
 
 
 def render_livekit_realtime_panel(st: Any, *, identity: str = "teacher") -> None:
@@ -597,7 +598,7 @@ def render_livekit_realtime_panel(st: Any, *, identity: str = "teacher") -> None
 
     config = LiveKitTransportConfig.from_env()
     if not os.environ.get("LIVEKIT_API_KEY") or not os.environ.get("LIVEKIT_API_SECRET"):
-        st.info("Chưa cấu hình LIVEKIT_API_KEY/LIVEKIT_API_SECRET ở backend.")
+        st.info("ChÆ°a cáº¥u hÃ¬nh LIVEKIT_API_KEY/LIVEKIT_API_SECRET á»Ÿ backend.")
         return
     try:
         participant = generate_livekit_access_token(
@@ -614,14 +615,14 @@ def render_livekit_realtime_panel(st: Any, *, identity: str = "teacher") -> None
         html_fragment = build_livekit_client_html(
             server_url=config.url,
             token=participant.token,
-            display_name="AI Trợ giảng – Realtime",
+            display_name="AI Trá»£ giáº£ng â€“ Realtime",
             client_js_url=client_js,
         )
         import streamlit.components.v1 as components
         components.html(html_fragment, height=130, scrolling=False)
-        st.caption(f"Room: {participant.room_name} · token hiệu lực {participant.ttl_seconds}s")
+        st.caption(f"Room: {participant.room_name} Â· token hiá»‡u lá»±c {participant.ttl_seconds}s")
     except Exception as exc:
-        st.error(f"Không tạo được phiên LiveKit: {exc}")
+        st.error(f"KhÃ´ng táº¡o Ä‘Æ°á»£c phiÃªn LiveKit: {exc}")
 
 
 __all__ = ["build_avatar_surface_html", "render_teaching_assistant_avatar_surface", "render_livekit_realtime_panel"]

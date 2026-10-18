@@ -38,7 +38,7 @@ def test_static_avatar_state_and_speak_without_lipsync():
         avatar.write_bytes(b"fake-png")
         audio = make_wav(root / "reply.wav")
         session = TeachingAvatarSession(
-            profile=AvatarProfile("a1", "Trợ giảng", avatar),
+            profile=AvatarProfile("a1", "Trá»£ giáº£ng", avatar),
             renderer=StaticAvatarRenderer(),
         )
         idle = session.set_state(AvatarState.IDLE)
@@ -50,7 +50,7 @@ def test_static_avatar_state_and_speak_without_lipsync():
 
 
 def test_command_lipsync_placeholder_contract():
-    provider = CommandLipSyncProvider(["python", "-c", "from pathlib import Path; Path('{output}').write_bytes(Path('{audio}').read_bytes())", "{avatar}", "{audio}", "{output}"], provider_id="fake-lipsync")
+    provider = CommandLipSyncProvider(["python", "-c", "from pathlib import Path; Path(r'{output}').write_bytes(Path(r'{audio}').read_bytes())", "{avatar}", "{audio}", "{output}"], provider_id="fake-lipsync")
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         avatar = root / "avatar.png"
@@ -66,7 +66,7 @@ def test_command_lipsync_placeholder_contract():
 def test_missing_avatar_is_rejected_before_render():
     missing = Path(tempfile.gettempdir()) / "mathteacher_missing_avatar_v13d.png"
     session = TeachingAvatarSession(
-        profile=AvatarProfile("a1", "Trợ giảng", missing),
+        profile=AvatarProfile("a1", "Trá»£ giáº£ng", missing),
         renderer=StaticAvatarRenderer(),
     )
     try:

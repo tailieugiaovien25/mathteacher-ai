@@ -16,12 +16,12 @@ class FakeMic:
 
 class FakeSTT:
     def transcribe(self, audio_path, *, language="vi"):
-        return STTResult(text="Xin chào trợ giảng.", provider="fake", language=language)
+        return STTResult(text="Xin chÃ o trá»£ giáº£ng.", provider="fake", language=language)
 
 
 class FakeBrain:
-    def respond(self, *, transcript, system_prompt, history=()):
-        return "Xin chào thầy/cô. Em sẵn sàng hỗ trợ."
+    def respond(self, *, transcript, system_prompt, history=(), mode="teacher"):
+        return "Xin chÃ o tháº§y/cÃ´. Em sáºµn sÃ ng há»— trá»£."
 
 
 def test_vad_detects_start_and_end():
@@ -48,7 +48,7 @@ def test_realtime_session_runs_one_turn(tmp_path):
     events = list(session.run(max_turns=1))
     states = [event.state for event in events]
     assert states == ["session_started", "listening", "processing", "turn_completed", "session_stopped"]
-    assert events[3].turn.response_text.startswith("Xin chào")
+    assert events[3].turn.response_text.startswith("Xin chÃ o")
 
 
 def test_realtime_session_does_not_execute_classroom_tools(tmp_path):

@@ -1,4 +1,4 @@
-﻿"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
+"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
 
 from __future__ import annotations
 
@@ -46,6 +46,7 @@ PORTAL_PAGES = (
     'Ma tr\u1eadn & b\u1ea3n \u0111\u1eb7c t\u1ea3',
     'AI xây dựng ngân hàng câu hỏi',
     'Lớp học ôn tập',
+    'AI Trợ giảng',
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra',
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra To\xe1n 6',
     'Xu\u1ea5t \u0111\u1ec1 ki\u1ec3m tra',
@@ -2140,6 +2141,16 @@ def main() -> None:
     elif selected == "Lớp học ôn tập":
         from portal_v2.ui.teacher_classroom_streamlit import render_teacher_classroom
         render_teacher_classroom(st=st, client=client, user_id=str(user_id))
+
+    elif selected == "AI Trợ giảng":
+        from portal_v2.ui.teaching_assistant_avatar_surface_streamlit import (
+            render_teaching_assistant_avatar_surface,
+        )
+        render_teaching_assistant_avatar_surface(
+            st=st,
+            client=client,
+            user_id=str(user_id),
+        )
 
     elif selected == "Xưởng câu hỏi":
         from portal_v2.ui.question_studio_streamlit import (
