@@ -17,8 +17,9 @@ class FakeSTT:
 
 
 class FakeBrain:
-    def respond(self, *, transcript, system_prompt, history=()):
-        assert "tiếng Việt" in system_prompt
+    def respond(self, *, transcript, system_prompt, history=(), mode="teacher"):
+        assert "Bạn là Trợ giảng Toán THCS" in system_prompt
+        assert mode == "teacher"
         return f"Mình sẽ giới thiệu hoạt động dựa trên yêu cầu: {transcript}"
 
 
@@ -39,7 +40,7 @@ def test_voice_bridge_requires_output_path_when_tts_is_configured(tmp_path):
     audio = tmp_path / "input.wav"
     audio.write_bytes(b"fake")
     bridge = TeachingAssistantVoiceBridge(stt=FakeSTT(), brain=FakeBrain(), tts=FakeTTS())
-    with pytest.raises(ValueError):
+    with pytest.raises(RuntimeError):
         bridge.process_audio(audio)
 
 
@@ -75,6 +76,6 @@ def test_ollama_payload_contract(monkeypatch):
     result = brain.respond(transcript="Bắt đầu tiết học.", system_prompt="Trả lời tiếng Việt.")
     assert result == "Được, chúng ta bắt đầu."
     assert captured["url"].endswith("/api/chat")
-    assert captured["body"]["model"] == "qwen3:8b"
+    assert captured["body"]["model"] == "qwen3:0.6b"
     assert captured["body"]["stream"] is False
     assert captured["body"]["messages"][-1]["content"] == "Bắt đầu tiết học."
