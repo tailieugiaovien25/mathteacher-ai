@@ -86,6 +86,7 @@ def default_ai_skills() -> tuple[AISkillSpec, ...]:
             frozenset({
                 AIActionClass.READ_ONLY,
                 AIActionClass.ADVISORY,
+                AIActionClass.MUTATING,
             }),
             description=(
                 "Láº­p ká»‹ch báº£n MC vÃ  káº¿ hoáº¡ch Ä‘iá»u phá»‘i hoáº¡t Ä‘á»™ng; thao tÃ¡c lá»›p há»c "
