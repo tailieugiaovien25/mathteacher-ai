@@ -1720,29 +1720,26 @@ def _v14b6n_build_standardization_document_analyzer():
         )
     )
 
-    credentials = None
-    if runtime_config.ai_enabled:
-        provider_id = str(runtime_config.provider or "").strip().lower()
-        secret_name = {
-            "gemini": "GEMINI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-        }.get(provider_id)
+    _PROVIDER_SECRET_NAMES = {
+        "gemini": "GEMINI_API_KEY",
+        "openai": "OPENAI_API_KEY",
+    }
 
-        if secret_name:
-            secret_value = _v14b6n_standardization_secret(
-                secret_name
-            )
-            if secret_value:
-                credentials = {
-                    provider_id: secret_value
-                }
+    runtime_provider_id = str(runtime_config.provider or "").strip().lower()
+    secret_name = _PROVIDER_SECRET_NAMES.get(runtime_provider_id)
+
+    credentials = {}
+
+    if runtime_config.ai_enabled and secret_name:
+        secret_value = _v14b6n_standardization_secret(secret_name)
+        if secret_value:
+            credentials[runtime_provider_id] = secret_value
 
     # V14B6N_R7B2D9F_SANITIZED_AI_REQUEST_EVIDENCE
-    runtime_provider_id = str(runtime_config.provider or "").strip().lower()
+    # Evidence contains provider/model/status only; never credential values.
+    # Credential fields are intentionally kept absent from evidence.
     credential_configured = bool(
-        credentials
-        and runtime_provider_id
-        and credentials.get(runtime_provider_id)
+        runtime_provider_id and runtime_provider_id in credentials
     )
     st.session_state["_g1b_v2_ai_runtime_request_evidence"] = {
         "document_ai_requested": bool(runtime_config.ai_enabled),

@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +34,8 @@ def test_only_first_selected_period_keeps_planning_field():
 
 def test_a9b_r2_row_split_guard_remains_single_header_only():
     text = STANDARDIZER.read_text(encoding="utf-8-sig")
-    assert text.count('OxmlElement(\n                            "w:cantSplit"') == 1
+    assert text.count('OxmlElement(\n                            "w:cantSplit"') == 2
+    assert "row_index != 0" in text
+    assert "allow_row_split" in text
     assert "row_index == 0" in text
     assert 'OxmlElement(\n                        "w:tblHeader"' in text
