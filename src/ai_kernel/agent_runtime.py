@@ -271,10 +271,19 @@ class SafeAgentRuntime:
                         created_at=datetime.now(timezone.utc).isoformat(),
                     ))
                     break
-                approval = self.approval_queue.authorize_execution(approval_id, approval_token)
-                if (approval.task_id != str(task_id) or approval.skill_id != skill_id or
-                        approval.tool_id != spec.tool_id or dict(approval.arguments) != dict(call.arguments)):
-                    raise AdminPolicyError("Approval không khớp task/skill/tool/arguments hiện tại.")
+                approval = self.approval_queue.authorize_execution(
+                    approval_id, approval_token
+                )
+                if (
+                    approval.task_id != str(task_id)
+                    or approval.skill_id != skill_id
+                    or approval.tool_id != spec.tool_id
+                    or dict(approval.arguments) != dict(call.arguments)
+                ):
+                    raise AdminPolicyError(
+                        "Approval không khớp task/skill/tool/arguments hiện tại."
+                    )
+                self.approval_queue.claim_execution(approval_id, approval_token)
             if mutating and owner is not AIOwnership.ADMIN and not approval_id:
                 status = AgentRunStatus.BLOCKED
                 steps.append(AgentStep(
@@ -289,18 +298,12 @@ class SafeAgentRuntime:
 
             try:
                 output = self.tools.handler(spec.tool_id)(dict(call.arguments))
+            except Exception as exc:
                 if approval_id and (spec.requires_admin_approval or mutating):
-                    self.approval_queue.mark_executed(approval_id)
-                steps.append(AgentStep(
-                    step_id="step_" + uuid4().hex,
-                    index=index,
-                    tool_id=spec.tool_id,
-                    status=ToolCallStatus.EXECUTED,
-                    approval_id=approval_id,
-                    message="Tool thực thi thành công.",
-                    created_at=datetime.now(timezone.utc).isoformat(),
-                ))
-            except Exception as exc:  # bounded tool failure; does not mutate governance
+                    try:
+                        self.approval_queue.mark_failed(approval_id)
+                    except Exception:
+                        pass  # Preserve the original handler failure.
                 status = AgentRunStatus.FAILED
                 steps.append(AgentStep(
                     step_id="step_" + uuid4().hex,
@@ -311,6 +314,38 @@ class SafeAgentRuntime:
                     created_at=datetime.now(timezone.utc).isoformat(),
                 ))
                 break
+
+            if approval_id and (spec.requires_admin_approval or mutating):
+                try:
+                    self.approval_queue.mark_executed(approval_id)
+                except Exception as exc:
+                    # The handler already ran; do not mark the approval FAILED.
+                    # Keep EXECUTING for manual reconciliation if persistence failed.
+                    status = AgentRunStatus.FAILED
+                    steps.append(AgentStep(
+                        step_id="step_" + uuid4().hex,
+                        index=index,
+                        tool_id=spec.tool_id,
+                        status=ToolCallStatus.EXECUTED,
+                        approval_id=approval_id,
+                        message=(
+                            "Tool đã thực thi nhưng không "
+                            "cập nhật được trạng thái "
+                            f"approval: {exc}"
+                        ),
+                        created_at=datetime.now(timezone.utc).isoformat(),
+                    ))
+                    break
+
+            steps.append(AgentStep(
+                step_id="step_" + uuid4().hex,
+                index=index,
+                tool_id=spec.tool_id,
+                status=ToolCallStatus.EXECUTED,
+                approval_id=approval_id,
+                message="Tool thực thi thành công.",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            ))
 
         if len(calls) > bound_limit and status is AgentRunStatus.COMPLETED:
             status = AgentRunStatus.MAX_STEPS
