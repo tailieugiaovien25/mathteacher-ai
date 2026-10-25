@@ -7,3 +7,5 @@ backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F3F6FA"
 textColor = "#172033"
 
+maxUploadSize = 2048
+maxMessageSize = 4096

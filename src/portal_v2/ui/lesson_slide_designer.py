@@ -36,8 +36,6 @@ ACTIVITIES = (
     ("VAN_DUNG", "4 · Vận dụng"),
 )
 BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt", "Hộp văn bản", "Công thức Toán", "Hình học", "Hình ảnh")
-MAX_SLIDE_IMAGE_BASE64 = 1_200_000
-MAX_IMPORTED_IMAGE_BASE64 = 180_000
 TEXT_FONTS = ("Arial", "Times New Roman", "Calibri", "Segoe UI", "Verdana")
 TEXT_STYLE_DEFAULT = {"width": 100, "min_height": 80, "font_size": 32, "font_family": "Arial", "color": "#123453", "background": "#EEF4FC", "bold": False, "italic": False, "underline": False, "align": "left", "depth": 0, "auto_size": False, "positioned": False, "x": 5, "y": 25}
 DESIGN_TOOL_TABS = ("Bản nháp", "Thông tin", "SGK · AI", "Trợ giảng", "Sân khấu", "Ghi nhận", "Chèn", "Định dạng", "Slide")
@@ -173,8 +171,8 @@ def new_draft() -> dict:
 def save_teacher_draft(client, user_id: str, draft_id: str, draft: dict) -> None:
     """Save a validated draft with the signed-in user's RLS-scoped client."""
     validate_draft(draft)
-    if len(json.dumps(draft, ensure_ascii=False).encode("utf-8")) > 2_000_000:
-        raise ValueError("Bản nháp vượt quá 2 MB.")
+    # Do not impose a code-level JSON size ceiling: imported PPTX images can make drafts large.
+    # Actual database/request limits remain deployment-dependent.
     client.table("teacher_lesson_drafts").upsert({
         "draft_id": draft_id, "owner_user_id": user_id,
         "title": draft["lesson_title"], "draft_json": draft,
@@ -384,7 +382,7 @@ def validate_draft(draft: object) -> dict:
                     raise ValueError("Dữ liệu ảnh trên slide không hợp lệ.")
                 if image["mime"] not in ("image/jpeg", "image/png", "image/webp"):
                     raise ValueError("Định dạng ảnh trên slide không được hỗ trợ.")
-                if not isinstance(image["data_b64"], str) or not image["data_b64"] or len(image["data_b64"]) > MAX_IMPORTED_IMAGE_BASE64 or not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", image["data_b64"]):
+                if not isinstance(image["data_b64"], str) or not image["data_b64"] or not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", image["data_b64"]):
                     raise ValueError("Dữ liệu ảnh trên slide không hợp lệ.")
                 for coordinate in ("x", "y"):
                     if type(image[coordinate]) not in (int, float) or not 0 <= image[coordinate] <= 100:
@@ -393,9 +391,6 @@ def validate_draft(draft: object) -> dict:
                     raise ValueError("Kích thước ảnh trên slide không hợp lệ.")
             if "style" in block:
                 validate_text_style(block["style"])
-    if sum(len(block["image"]["data_b64"]) for slide in slides for block in slide["blocks"]
-           if block.get("kind") == "Hình ảnh" and isinstance(block.get("image"), dict)) > MAX_SLIDE_IMAGE_BASE64:
-        raise ValueError("Tổng dung lượng ảnh trong slide vượt giới hạn bản nháp; hãy giảm số ảnh hoặc kích thước ảnh.")
     cards = draft.get("activity_cards", [])  # Previously exported drafts have no cards.
     if not isinstance(cards, list) or len(cards) > 80:
         raise ValueError("Bài giảng vượt quá 80 thẻ hoạt động.")
@@ -1479,8 +1474,6 @@ def render_design_tool_dialog(st, draft, *, group, client=None, user_id=None):
                                            help="Mở bản nháp JSON đã tải lên", use_container_width=True)
         if uploaded is not None and import_clicked:
             try:
-                if uploaded.size > 2_000_000:
-                    raise ValueError("File bản nháp vượt quá 2 MB.")
                 imported = validate_draft(json.load(uploaded))
                 if user_id:
                     from portal_v2.ui.lesson_phone_inbox import stop_owner_inbox
@@ -1627,47 +1620,42 @@ def render_design_tool_dialog(st, draft, *, group, client=None, user_id=None):
 
 
 def _prepare_pptx_image(image_bytes: bytes) -> tuple[str, str] | None:
-    """Normalize a PowerPoint image to a browser-safe, size-limited raster image."""
+    """Convert an embedded PowerPoint raster image for browser display without a code-imposed size cap."""
     try:
         from PIL import Image
         with Image.open(io.BytesIO(image_bytes)) as source:
             source.load()
-            source.thumbnail((1400, 1000))
             has_alpha = ("A" in source.getbands()) or (source.mode == "P" and "transparency" in source.info)
             output = io.BytesIO()
+            # Keep the original pixel dimensions. Re-encode in a browser-friendly format,
+            # but do not reject an image just because its encoded payload is large.
             if has_alpha:
-                source.convert("RGBA").save(output, format="WEBP", quality=78, method=4)
+                source.convert("RGBA").save(output, format="WEBP", quality=90, method=4)
                 mime = "image/webp"
             else:
-                source.convert("RGB").save(output, format="JPEG", quality=80, optimize=True, progressive=True)
+                source.convert("RGB").save(output, format="JPEG", quality=90, optimize=True, progressive=True)
                 mime = "image/jpeg"
-            data = output.getvalue()
-            if len(base64.b64encode(data)) > MAX_IMPORTED_IMAGE_BASE64:
-                output = io.BytesIO()
-                if has_alpha:
-                    source.thumbnail((900, 700))
-                    source.convert("RGBA").save(output, format="WEBP", quality=65, method=4)
-                    mime = "image/webp"
-                else:
-                    source.thumbnail((900, 700))
-                    source.convert("RGB").save(output, format="JPEG", quality=66, optimize=True, progressive=True)
-                    mime = "image/jpeg"
-                data = output.getvalue()
-            encoded = base64.b64encode(data).decode("ascii")
-            if len(encoded) > MAX_IMPORTED_IMAGE_BASE64:
-                return None
+            encoded = base64.b64encode(output.getvalue()).decode("ascii")
             return mime, encoded
     except Exception:
         # Unsupported vector images (for example EMF/WMF) are skipped safely.
         return None
 
 
-def extract_pptx_slides(file_bytes: bytes) -> list[dict]:
-    """Extract text and embedded raster pictures, including grouped and picture-filled shapes."""
-    if not isinstance(file_bytes, bytes) or not file_bytes:
-        raise ValueError("Tệp PowerPoint đang trống.")
+def extract_pptx_slides(file_bytes) -> list[dict]:
+    """Extract PPTX text and raster pictures from bytes or a seekable upload stream."""
+    if hasattr(file_bytes, "read") and hasattr(file_bytes, "seek"):
+        try:
+            file_bytes.seek(0)
+            archive_source = file_bytes
+        except (OSError, ValueError) as exc:
+            raise ValueError("Không thể đọc luồng tệp PowerPoint đã tải lên.") from exc
+    elif isinstance(file_bytes, (bytes, bytearray)) and file_bytes:
+        archive_source = io.BytesIO(file_bytes)
+    else:
+        raise ValueError("Tệp PowerPoint đang trống hoặc không hợp lệ.")
     try:
-        archive = zipfile.ZipFile(io.BytesIO(file_bytes))
+        archive = zipfile.ZipFile(archive_source)
     except (zipfile.BadZipFile, OSError) as exc:
         raise ValueError("Tệp không phải PowerPoint .pptx hợp lệ. Định dạng .ppt cũ cần chuyển sang .pptx.") from exc
 
@@ -1698,7 +1686,6 @@ def extract_pptx_slides(file_bytes: bytes) -> list[dict]:
                 pass
 
         result = []
-        total_image_base64 = 0
         picture_tag = "{%s}pic" % ns["p"]
         shape_tag = "{%s}sp" % ns["p"]
         group_tag = "{%s}grpSp" % ns["p"]
@@ -1736,7 +1723,7 @@ def extract_pptx_slides(file_bytes: bytes) -> list[dict]:
 
             def append_image(shape) -> None:
                 """Append one embedded picture or image-filled shape to the ordered content."""
-                nonlocal skipped_images, total_image_base64
+                nonlocal skipped_images
                 blip = shape.find(".//a:blip", ns)
                 rel_id = None
                 if blip is not None:
@@ -1753,10 +1740,6 @@ def extract_pptx_slides(file_bytes: bytes) -> list[dict]:
                     skipped_images += 1
                     return
                 mime, encoded = image_result
-                if total_image_base64 + len(encoded) > MAX_SLIDE_IMAGE_BASE64:
-                    skipped_images += 1
-                    return
-
                 x, y, width_pct = 5.0, 25.0, 35
                 transform = shape.find("p:spPr/a:xfrm", ns)
                 if transform is not None:
@@ -1774,7 +1757,6 @@ def extract_pptx_slides(file_bytes: bytes) -> list[dict]:
                     "mime": mime, "data_b64": encoded,
                     "x": round(x, 2), "y": round(y, 2), "width": int(width_pct),
                 }})
-                total_image_base64 += len(encoded)
 
             def walk_shapes(container) -> None:
                 """Walk shapes recursively so pictures inside PowerPoint groups are not lost."""
@@ -1888,7 +1870,7 @@ def _apply_pptx_to_current_slide(st, draft: dict, imported: list[dict]) -> tuple
         f"đã lấy {image_count} ảnh."
     )
     if skipped_count:
-        feedback += f" Bỏ qua {skipped_count} ảnh không được hỗ trợ hoặc vượt giới hạn dung lượng."
+        feedback += f" Bỏ qua {skipped_count} ảnh không được hỗ trợ bởi bộ đọc ảnh hiện tại."
     return candidate, feedback
 
 
@@ -1902,12 +1884,16 @@ def _render_pptx_import_dialog(st) -> None:
     @st.dialog("Import PPT/PPTX", width="large")
     def import_dialog():
         st.caption(
-            "Chọn tệp .pptx. Slide PowerPoint đầu tiên sẽ thay nội dung của slide đang chọn; "
+            "Chọn tệp .pptx. Mã import không đặt giới hạn dung lượng riêng cho tệp hoặc ảnh; "
+            "ngưỡng tải lên và kích thước thông điệp do cấu hình Streamlit/hạ tầng triển khai quyết định. "
+            "Cấu hình dự án đề xuất tối đa 2 GiB cho tệp tải lên và 4 GiB cho thông điệp giao diện. "
+            "Slide PowerPoint đầu tiên sẽ thay nội dung của slide đang chọn; "
             "các slide tiếp theo được chèn ngay sau đó trong cùng hoạt động. "
             "Nội dung được chuyển thành chữ/ảnh; hiệu ứng PowerPoint không được giữ nguyên."
         )
         uploaded = st.file_uploader(
-            "Chọn tệp PowerPoint", type=["pptx"], key=f"lesson_pptx_toolbar_file_{nonce}"
+            "Chọn tệp PowerPoint", type=["pptx"], key=f"lesson_pptx_toolbar_file_{nonce}",
+            help="Ngưỡng dung lượng được đặt trong .streamlit/config.toml; tài nguyên máy chủ vẫn có giới hạn thực tế.",
         )
         col_import, col_cancel = st.columns(2)
         with col_import:
@@ -1926,7 +1912,8 @@ def _render_pptx_import_dialog(st) -> None:
             st.rerun(scope="app")
         if do_import and uploaded is not None:
             try:
-                imported = extract_pptx_slides(uploaded.getvalue())
+                uploaded.seek(0)
+                imported = extract_pptx_slides(uploaded)
                 _, feedback = _apply_pptx_to_current_slide(
                     st, st.session_state["lesson_slide_draft"], imported
                 )
