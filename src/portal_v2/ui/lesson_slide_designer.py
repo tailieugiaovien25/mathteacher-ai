@@ -35,7 +35,7 @@ ACTIVITIES = (
     ("LUYEN_TAP", "3 · Luyện tập"),
     ("VAN_DUNG", "4 · Vận dụng"),
 )
-BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt", "Hộp văn bản", "Công thức Toán", "Hình học", "Hình ảnh")
+BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt", "Hộp văn bản", "Công thức Toán", "Hình học", "Hình ảnh", "Video")
 TEXT_FONTS = ("Arial", "Times New Roman", "Calibri", "Segoe UI", "Verdana")
 TEXT_STYLE_DEFAULT = {"width": 100, "min_height": 80, "font_size": 32, "font_family": "Arial", "color": "#123453", "background": "#EEF4FC", "bold": False, "italic": False, "underline": False, "align": "left", "depth": 0, "auto_size": False, "positioned": False, "x": 5, "y": 25}
 DESIGN_TOOL_TABS = ("Bản nháp", "Thông tin", "SGK · AI", "Trợ giảng", "Sân khấu", "Ghi nhận", "Chèn", "Định dạng", "Slide")
@@ -376,19 +376,28 @@ def validate_draft(draft: object) -> dict:
                 raise ValueError("Khối nội dung không hợp lệ.")
             if block["kind"] == "Hình học":
                 validate_geometry(block.get("geometry"))
-            if block["kind"] == "Hình ảnh":
-                image = block.get("image")
-                if not isinstance(image, dict) or set(image) != {"mime", "data_b64", "x", "y", "width"}:
-                    raise ValueError("Dữ liệu ảnh trên slide không hợp lệ.")
-                if image["mime"] not in ("image/jpeg", "image/png", "image/webp"):
-                    raise ValueError("Định dạng ảnh trên slide không được hỗ trợ.")
-                if not isinstance(image["data_b64"], str) or not image["data_b64"] or not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", image["data_b64"]):
-                    raise ValueError("Dữ liệu ảnh trên slide không hợp lệ.")
+            if block["kind"] in ("Hình ảnh", "Video"):
+                media_key = "image" if block["kind"] == "Hình ảnh" else "video"
+                media = block.get(media_key)
+                allowed_keys = {"mime", "data_b64", "x", "y", "width"}
+                if isinstance(media, dict) and "height" in media:
+                    allowed_keys.add("height")
+                if not isinstance(media, dict) or set(media) != allowed_keys:
+                    raise ValueError("Dữ liệu ảnh/video trên slide không hợp lệ.")
+                allowed_mimes = ({"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"}
+                                 if media_key == "image" else
+                                 {"video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-m4v"})
+                if media["mime"] not in allowed_mimes:
+                    raise ValueError("Định dạng ảnh/video trên slide không được hỗ trợ.")
+                if not isinstance(media["data_b64"], str) or not media["data_b64"] or not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", media["data_b64"]):
+                    raise ValueError("Dữ liệu ảnh/video trên slide không hợp lệ.")
                 for coordinate in ("x", "y"):
-                    if type(image[coordinate]) not in (int, float) or not 0 <= image[coordinate] <= 100:
-                        raise ValueError("Vị trí ảnh trên slide không hợp lệ.")
-                if type(image["width"]) is not int or not 1 <= image["width"] <= 100:
-                    raise ValueError("Kích thước ảnh trên slide không hợp lệ.")
+                    if type(media[coordinate]) not in (int, float) or not 0 <= media[coordinate] <= 100:
+                        raise ValueError("Vị trí ảnh/video trên slide không hợp lệ.")
+                if type(media["width"]) is not int or not 1 <= media["width"] <= 100:
+                    raise ValueError("Kích thước ảnh/video trên slide không hợp lệ.")
+                if "height" in media and (type(media["height"]) is not int or not 1 <= media["height"] <= 100):
+                    raise ValueError("Chiều cao ảnh/video trên slide không hợp lệ.")
             if "style" in block:
                 validate_text_style(block["style"])
     cards = draft.get("activity_cards", [])  # Previously exported drafts have no cards.
@@ -462,24 +471,40 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
             blocks = []
             for block_index, block in enumerate(slide["blocks"]):
                 classes = "content fragment" if block["reveal_later"] else "content"
-                if block["kind"] == "Hình ảnh":
-                    image = block["image"]
-                    image_x = float(image["x"])
-                    image_y = float(image["y"])
-                    image_width = min(float(image["width"]), max(1.0, 100.0 - image_x))
-                    # Reset the generic .content styling for imported pictures. The default
-                    # content padding/background otherwise shifts and can visually obscure small images.
-                    image_css = (f"position:absolute;left:{image_x:.2f}%;top:{image_y:.2f}%;"
-                                 f"width:{image_width:.2f}%;height:auto;max-height:90%;"
-                                 "object-fit:contain;z-index:5;display:block;box-sizing:border-box;"
-                                 "padding:0;margin:0;background:transparent;border-radius:0;")
-                    inner_image_css = ("display:block;width:100%;height:auto;max-height:90%;"
-                                       "object-fit:contain;padding:0;margin:0;background:transparent;")
-                    blocks.append(f'<div class="{classes}" style="{image_css}" '
-                                  f'data-delete-kind="block" data-delete-index="{block_index}">'
-                                  f'<img alt="Ảnh nhập từ PowerPoint" '
-                                  f'src="data:{image["mime"]};base64,{image["data_b64"]}" '
-                                  f'style="{inner_image_css}"></div>')
+                if block["kind"] in ("Hình ảnh", "Video"):
+                    media_kind = "image" if block["kind"] == "Hình ảnh" else "video"
+                    media = block[media_kind]
+                    media_x = float(media["x"])
+                    media_y = float(media["y"])
+                    media_width = min(float(media["width"]), max(1.0, 100.0 - media_x))
+                    media_height = media.get("height")
+                    height_css = f"height:{min(float(media_height), max(1.0, 100.0 - media_y)):.2f}%;" if media_height is not None else "height:auto;max-height:90%;"
+                    # In the interactive editor, the base64 payload already exists in the draft JSON.
+                    # Hydrate the media src from that copy instead of duplicating a giant data URI
+                    # in the HTML; exported standalone HTML still gets a self-contained data URI.
+                    source = "about:blank" if shared_editor else f"data:{media['mime']};base64,{media['data_b64']}"
+                    media_css = (f"position:absolute;left:{media_x:.2f}%;top:{media_y:.2f}%;"
+                                 f"width:{media_width:.2f}%;{height_css}"
+                                 "z-index:6;display:block;box-sizing:border-box;overflow:visible;"
+                                 "padding:0;margin:0;background:transparent;border:1px dashed #7ab9df;")
+                    inner_css = ("display:block;width:100%;height:100%;max-width:none;max-height:none;"
+                                 "object-fit:contain;padding:0;margin:0;background:transparent;border:0;")
+                    media_attr = (f'data-media-object data-media-kind="{media_kind}" '
+                                  f'data-media-slide-id="{escape(slide["id"], quote=True)}" '
+                                  f'data-media-index="{block_index}"')
+                    if media_kind == "image":
+                        media_element = (f'<img alt="Ảnh trên slide" src="{source}" '
+                                         f'style="{inner_css}">')
+                    else:
+                        media_element = (f'<video controls playsinline preload="metadata" '
+                                         f'src="{source}" style="{inner_css}"></video>')
+                    controls = ('<button type="button" class="media-object-drag" title="Kéo để di chuyển" '
+                                'aria-label="Kéo để di chuyển">✥</button>' if shared_editor else "")
+                    resize = ('<button type="button" class="media-object-resize" title="Kéo để đổi kích thước" '
+                              'aria-label="Kéo để đổi kích thước">↘</button>' if shared_editor else "")
+                    blocks.append(f'<div class="{classes} lesson-media-object" style="{media_css}" '
+                                  f'data-delete-kind="block" data-delete-index="{block_index}" {media_attr}>'
+                                  + controls + media_element + resize + '</div>')
                     continue
                 if block["kind"] in ("Hộp văn bản", "Công thức Toán", "Hình học"):
                     classes += " lesson-text-box"
@@ -739,6 +764,12 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     html:fullscreen .lesson-slide-viewport .reveal{min-width:0!important;width:100vw!important}
     .lesson-delete-object{position:absolute;right:2px;top:2px;z-index:30;width:28px;height:28px;border:1px solid #d8a9a9;border-radius:6px;background:#fff;color:#a32626;cursor:pointer;font:18px Segoe UI}
     [data-delete-kind]{position:relative}
+    .lesson-media-object{user-select:none;touch-action:none}
+    .lesson-media-object img,.lesson-media-object video{pointer-events:auto}
+    .media-object-drag,.media-object-resize{position:absolute;z-index:29;width:28px;height:28px;border:1px solid #5ca9d8;border-radius:6px;background:#e5f5ff;color:#075078;font:18px Segoe UI;font-weight:700;padding:0;cursor:grab;touch-action:none}
+    .media-object-drag{left:2px;top:2px}
+    .media-object-resize{right:2px;bottom:2px;cursor:nwse-resize}
+    html:fullscreen .media-object-drag,html:fullscreen .media-object-resize{display:none!important}
     html:fullscreen .lesson-delete-object{display:none!important}
     .lesson-publish-button{position:fixed;top:14px;right:72px;z-index:102;width:48px;height:48px;box-sizing:border-box;border:1px solid #a9daf9;border-radius:10px;background:#0b3550;color:white;font:25px Segoe UI;cursor:pointer;box-shadow:0 4px 14px #071b34aa}
     html:fullscreen .lesson-publish-button{display:none}
@@ -777,8 +808,9 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
         background:linear-gradient(150deg,#eaf8ff 0%,#c8eaff 100%);
         color:#06466c;font-size:23px;font-weight:800;line-height:1;
         box-shadow:0 2px 5px #08263e26;cursor:pointer}
-    .lesson-edit-toolbar #lesson-import-pptx:hover{background:linear-gradient(150deg,#d5f0ff,#a8dcff);border-color:#378fbe}
-</style><header class="lesson-surface-heading">THI?T K? B?I GI?NG<small>So?n ho?t ??ng ? chu?n b? c?ng c? ? tr?nh chi?u tr?n l?p</small></header><div class="lesson-edit-toolbar"><nav class="lesson-tool-tabs" aria-label="Nhóm công cụ bài giảng"></nav><button id="lesson-import-pptx" type="button" title="Import PPT/PPTX" aria-label="Import PPT/PPTX">⇧</button><button id="lesson-insert-text">＋ Hộp text</button><button id="lesson-edit-toggle">Sửa slide</button><button id="lesson-edit-apply" hidden>Áp dụng vào bản nháp</button><button class="format-icon" data-format="bold" title="Đậm" aria-label="Đậm"><b>B</b></button><button class="format-icon" data-format="italic" title="Nghiêng" aria-label="Nghiêng"><i>I</i></button><button class="format-icon" data-format="underline" title="Gạch chân" aria-label="Gạch chân"><u>U</u></button>
+    .lesson-edit-toolbar #lesson-import-pptx:hover,.lesson-edit-toolbar #lesson-insert-media:hover{background:linear-gradient(150deg,#d5f0ff,#a8dcff);border-color:#378fbe}
+    .lesson-edit-toolbar #lesson-insert-media{width:40px;height:40px;min-width:40px;min-height:40px;border:1px solid #70b8e3;border-radius:8px;background:linear-gradient(150deg,#eaf8ff 0%,#c8eaff 100%);color:#06466c;font-size:23px;font-weight:800;line-height:1;box-shadow:0 2px 5px #08263e26;cursor:pointer}
+</style><header class="lesson-surface-heading">THI?T K? B?I GI?NG<small>So?n ho?t ??ng ? chu?n b? c?ng c? ? tr?nh chi?u tr?n l?p</small></header><div class="lesson-edit-toolbar"><nav class="lesson-tool-tabs" aria-label="Nhóm công cụ bài giảng"></nav><button id="lesson-import-pptx" type="button" title="Import PPT/PPTX" aria-label="Import PPT/PPTX">⇧</button><button id="lesson-insert-media" type="button" title="Chèn ảnh/video" aria-label="Chèn ảnh/video">▧</button><button id="lesson-insert-text">＋ Hộp text</button><button id="lesson-edit-toggle">Sửa slide</button><button id="lesson-edit-apply" hidden>Áp dụng vào bản nháp</button><button class="format-icon" data-format="bold" title="Đậm" aria-label="Đậm"><b>B</b></button><button class="format-icon" data-format="italic" title="Nghiêng" aria-label="Nghiêng"><i>I</i></button><button class="format-icon" data-format="underline" title="Gạch chân" aria-label="Gạch chân"><u>U</u></button>
     <select id="format-font" title="Font chữ" aria-label="Font chữ"><option>Arial</option><option>Times New Roman</option><option>Calibri</option><option>Segoe UI</option><option>Verdana</option></select>
     <label title="Cỡ chữ">A↕ <input id="format-size" aria-label="Cỡ chữ" type="number" min="12" max="96" value="32"></label>
     <label title="Màu chữ">A <input id="format-color" aria-label="Màu chữ" type="color" value="#123453"></label>
@@ -794,6 +826,7 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     toolTabs.setAttribute('role','tablist');
     const toolbar=document.querySelector('.lesson-edit-toolbar');
     const importPptxButton=document.getElementById('lesson-import-pptx');
+    const insertMediaButton=document.getElementById('lesson-insert-media');
     // Keep the toolbar before the slide canvas.
     const slideCanvas=document.querySelector('.reveal');
     slideCanvas.before(document.querySelector('.lesson-surface-heading'),toolbar);
@@ -811,7 +844,7 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     layoutLessonSurface();
 
     const children=Array.from(toolbar.children).filter(
-        e=>e!==toolTabs&&e!==status&&e!==importPptxButton
+        e=>e!==toolTabs&&e!==status&&e!==importPptxButton&&e!==insertMediaButton
     );
     const panels=new Map();
 
@@ -955,6 +988,12 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
         if(editing){status.textContent='Áp dụng hoặc hủy sửa slide trước khi nhập PowerPoint.';return;}
         postAction('open_pptx_import');
     });}
+    if(insertMediaButton){insertMediaButton.addEventListener('click',()=>{
+        if(editing){status.textContent='Áp dụng hoặc hủy sửa slide trước khi chèn ảnh/video.';return;}
+        const current=Reveal.getCurrentSlide();
+        if(!current||!current.dataset.slideId){status.textContent='Chọn slide nội dung trước.';return;}
+        postAction('open_media_insert');
+    });}
     function armObject(value){if(!Reveal.getCurrentSlide()?.dataset.slideId){status.textContent='Thêm hoặc chọn slide nội dung trước.';return;}objectPlacement=value;status.textContent='Bấm vị trí trên slide để chèn; Esc để hủy.';document.querySelector('.slides').style.cursor='crosshair';}
     const formula=document.createElement('textarea');formula.rows=2;formula.placeholder='Nhập LaTeX, ví dụ: \\frac{a}{b}';formula.title='Công thức LaTeX';formula.setAttribute('aria-label','Công thức LaTeX');formula.style.cssText='width:320px;max-width:100%;font:16px Segoe UI';mathPanel.append(formula);
     [['a/b','\\frac{a}{b}'],['√','\\sqrt{x}'],['x²','x^{2}'],['x₁','x_{1}'],['≤','\\leq'],['π','\\pi'],['∑','\\sum_{i=1}^{n} i']].forEach(([icon,value])=>button(mathPanel,icon,'Mẫu '+value,()=>{formula.value+=value;formula.focus();}));
@@ -1011,6 +1050,56 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
         });
         if(object.dataset.deleteKind==='title'){object.after(b);}else{object.append(b);}
     });
+    // Restore the media URL from the single draft payload copy.
+    document.querySelectorAll('[data-media-object]').forEach(object=>{
+        const slide=(window.lessonInsertConfig.draft.slides||[]).find(row=>row.id===object.dataset.mediaSlideId);
+        const block=slide&&slide.blocks[Number(object.dataset.mediaIndex)];
+        const media=block&&(object.dataset.mediaKind==='video'?block.video:block.image);
+        const element=object.querySelector('img,video');
+        if(media&&element){element.src='data:'+media.mime+';base64,'+media.data_b64;if(element.tagName==='VIDEO')element.load();}
+    });
+    let mediaGesture=null;
+    document.addEventListener('pointerdown',event=>{
+        const handle=event.target.closest('.media-object-drag,.media-object-resize');
+        if(!handle||document.fullscreenElement||editing)return;
+        const object=handle.closest('[data-media-object]');
+        if(!object||object.closest('section')!==Reveal.getCurrentSlide())return;
+        event.preventDefault();event.stopImmediatePropagation();
+        const section=object.closest('section'),sr=section.getBoundingClientRect(),br=object.getBoundingClientRect();
+        mediaGesture={handle,object,section,pointer:event.pointerId,mode:handle.classList.contains('media-object-resize')?'resize':'move',
+            dx:event.clientX-br.left,dy:event.clientY-br.top,x:Number(object.style.left.replace('%',''))||0,
+            y:Number(object.style.top.replace('%',''))||0,w:Number(object.style.width.replace('%',''))||35,
+            h:Number(object.style.height.replace('%',''))||35,sr,canvasHeight:640*(sr.width/section.offsetWidth)};
+        Reveal.configure({touch:false});try{handle.setPointerCapture(event.pointerId);}catch(error){}
+        status.textContent=mediaGesture.mode==='resize'?'Kéo góc ↘ để đổi kích thước ảnh/video':'Kéo ✥ để di chuyển ảnh/video';
+    },true);
+    document.addEventListener('pointermove',event=>{
+        const d=mediaGesture;if(!d||event.pointerId!==d.pointer)return;
+        event.preventDefault();
+        if(d.mode==='move'){
+            const br=d.object.getBoundingClientRect();
+            d.x=Math.max(0,Math.min(100-d.w,(event.clientX-d.sr.left-d.dx)/d.sr.width*100));
+            d.y=Math.max(0,Math.min(100-d.h,(event.clientY-d.sr.top-d.dy)/d.canvasHeight*100));
+            d.object.style.left=d.x+'%';d.object.style.top=d.y+'%';
+        }else{
+            const br=d.object.getBoundingClientRect();
+            d.w=Math.max(3,Math.min(100-(Number(d.object.style.left.replace('%',''))||0),(event.clientX-br.left+d.w*d.sr.width/100)/d.sr.width*100));
+            d.h=Math.max(3,Math.min(100-(Number(d.object.style.top.replace('%',''))||0),(event.clientY-br.top+d.h*d.canvasHeight/100)/d.canvasHeight*100));
+            d.object.style.width=d.w+'%';d.object.style.height=d.h+'%';
+        }
+    },true);
+    document.addEventListener('pointerup',event=>{
+        const d=mediaGesture;if(!d||event.pointerId!==d.pointer)return;mediaGesture=null;
+        try{d.handle.releasePointerCapture(event.pointerId);}catch(error){}
+        Reveal.configure({touch:!editing});
+        const x=Math.round(Math.max(0,Math.min(99,d.x))*100)/100;
+        const y=Math.round(Math.max(0,Math.min(99,d.y))*100)/100;
+        const width=Math.max(1,Math.min(100-Math.round(x),Math.round(d.w)));
+        const height=Math.max(1,Math.min(100-Math.round(y),Math.round(d.h)));
+        postAction(d.mode==='resize'?'resize_media':'move_media',{block_index:Number(d.object.dataset.mediaIndex),x,y,width,height});
+        status.textContent=d.mode==='resize'?'Đã cập nhật kích thước ảnh/video':'Đã cập nhật vị trí ảnh/video';
+    },true);
+    document.addEventListener('pointercancel',()=>{if(mediaGesture){mediaGesture=null;Reveal.configure({touch:!editing});}},true);
     const slidePanel=panels.get(toolGroups[8][0]);
     button(slidePanel,'＋','Thêm slide sau slide hiện tại',()=>postAction('add_slide'));
     button(slidePanel,'◀','Slide trước',()=>{if(editing){status.textContent='Áp dụng hoặc hủy sửa trước khi chuyển slide.';return;}Reveal.prev();});
@@ -1181,7 +1270,7 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
 
 def apply_surface_event(draft: dict, event: object) -> dict:
     """Validate all edits atomically before touching the teacher draft."""
-    if isinstance(event, dict) and event.get("action") in ("insert_text", "insert_formula", "insert_geometry", "delete_component") and event.get("updates"):
+    if isinstance(event, dict) and event.get("action") in ("insert_text", "insert_formula", "insert_geometry", "delete_component", "move_media", "resize_media") and event.get("updates"):
         draft = apply_surface_event(draft, {"action": "edit", "updates": event["updates"]})
         event = {**event, "updates": []}
     if not isinstance(event, dict) or not isinstance(event.get("updates", []), list):
@@ -1248,6 +1337,52 @@ def apply_surface_event(draft: dict, event: object) -> dict:
                 block = {'kind': 'Hình học', 'text': '', 'geometry': validate_geometry(event.get('geometry')),
                          'style': style, 'reveal_later': False}
             current['blocks'].append(block)
+    if action == "insert_media":
+        slide = by_id.get(event.get("slide_id"))
+        if slide is None:
+            raise ValueError("Không tìm thấy slide đang chọn để chèn ảnh/video.")
+        if len(slide["blocks"]) >= 30:
+            raise ValueError("Slide đã có 30 khối nội dung. Hãy xóa bớt khối trước khi chèn media.")
+        media_kind = event.get("media_kind")
+        mime = event.get("mime")
+        data_b64 = event.get("data_b64")
+        if media_kind == "image":
+            kind, field = "Hình ảnh", "image"
+            allowed = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"}
+        elif media_kind == "video":
+            kind, field = "Video", "video"
+            allowed = {"video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-m4v"}
+        else:
+            raise ValueError("Chọn ảnh hoặc video hợp lệ.")
+        if mime not in allowed or not isinstance(data_b64, str) or not data_b64 or not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", data_b64):
+            raise ValueError("Tệp ảnh/video không đúng định dạng được hỗ trợ.")
+        media = {"mime": mime, "data_b64": data_b64, "x": 8, "y": 12, "width": 42, "height": 42}
+        slide["blocks"].append({"kind": kind, "text": "", "reveal_later": False, field: media})
+    elif action in ("move_media", "resize_media"):
+        slide = by_id.get(event.get("slide_id"))
+        index = event.get("block_index")
+        if slide is None or type(index) is not int or not 0 <= index < len(slide["blocks"]):
+            raise ValueError("Không tìm thấy ảnh/video cần chỉnh sửa.")
+        block = slide["blocks"][index]
+        media_field = "image" if block.get("kind") == "Hình ảnh" else "video" if block.get("kind") == "Video" else None
+        if media_field is None or not isinstance(block.get(media_field), dict):
+            raise ValueError("Khối đang chọn không phải ảnh/video.")
+        media = block[media_field]
+        for field in ("x", "y"):
+            value = event.get(field, media[field])
+            if type(value) not in (int, float) or not 0 <= value <= 100:
+                raise ValueError("Vị trí ảnh/video ngoài phạm vi slide.")
+            media[field] = round(float(value), 2)
+        if action == "resize_media":
+            for field in ("width", "height"):
+                value = event.get(field, media.get(field, 42))
+                if type(value) not in (int, float) or not 1 <= value <= 100:
+                    raise ValueError("Kích thước ảnh/video ngoài phạm vi slide.")
+                media[field] = int(round(value))
+        else:
+            media.setdefault("height", 42)
+            media["width"] = int(round(media["width"]))
+            media["height"] = int(round(media["height"]))
     if event.get("action") == "insert_text":
         slide = by_id.get(event.get("slide_id"))
         if slide is None or len(slide["blocks"]) >= 30:
@@ -1561,15 +1696,22 @@ def render_design_tool_dialog(st, draft, *, group, client=None, user_id=None):
                                            key="slide_title_" + revision + slide_id)
             for index, block in enumerate(slide["blocks"]):
                 with st.expander(f"{index+1}. {block['kind']}", expanded=True):
-                    kinds_for_block = BLOCK_KINDS if block["kind"] == "Hình ảnh" else BLOCK_KINDS[:-1]
+                    media_kinds = ("Hình ảnh", "Video")
+                    kinds_for_block = BLOCK_KINDS if block["kind"] in media_kinds else BLOCK_KINDS[:-2]
                     block["kind"] = st.selectbox("Loại khối", kinds_for_block, index=kinds_for_block.index(block["kind"]),
                                                   key=f"slide_kind_{revision}_{slide_id}_{index}")
                     if block["kind"] != "Hình ảnh":
                         block.pop("image", None)
+                    if block["kind"] != "Video":
+                        block.pop("video", None)
                     if block["kind"] == "Hình ảnh":
-                        st.caption("Ảnh được nhập từ PowerPoint; vị trí và kích thước ban đầu được giữ gần đúng.")
+                        st.caption("Ảnh hiển thị trực tiếp trên slide. Kéo tay nắm ✥ để di chuyển và ↘ để đổi kích thước.")
                         if isinstance(block.get("image"), dict):
-                            st.image(base64.b64decode(block["image"]["data_b64"]), use_container_width=True)
+                            st.caption(f"Ảnh đính kèm · {len(block['image']['data_b64']) * 3 // 4:,} byte dữ liệu mã hóa")
+                    elif block["kind"] == "Video":
+                        st.caption("Video hiển thị với bộ điều khiển phát trên slide. Kéo tay nắm để di chuyển/đổi kích thước.")
+                        if isinstance(block.get("video"), dict):
+                            st.caption(f"Video đính kèm · {len(block['video']['data_b64']) * 3 // 4:,} byte dữ liệu mã hóa")
                     else:
                         block["text"] = st.text_area("Nội dung", value=block["text"], max_chars=5000,
                                                       key=f"slide_text_{revision}_{slide_id}_{index}")
@@ -1874,6 +2016,87 @@ def _apply_pptx_to_current_slide(st, draft: dict, imported: list[dict]) -> tuple
     return candidate, feedback
 
 
+def _render_media_insert_dialog(st) -> None:
+    """Upload image/video into the currently selected slide, without a code-level file-size cap."""
+    if not st.session_state.get("lesson_media_insert_open"):
+        return
+    nonce = st.session_state.get("lesson_media_insert_nonce") or str(uuid4())
+    st.session_state["lesson_media_insert_nonce"] = nonce
+    slide_id = st.session_state.get("lesson_media_insert_slide_id")
+
+    @st.dialog("Chèn ảnh / video vào slide hiện tại", width="large")
+    def media_dialog():
+        st.caption(
+            "Chọn ảnh hoặc video. Tệp sẽ được đặt trên slide đang chọn; dùng tay nắm ✥ để di chuyển, "
+            "tay nắm ↘ để đổi kích thước và nút × trên đối tượng để xóa. Code không đặt giới hạn byte riêng; "
+            "giới hạn thực tế do cấu hình Streamlit, trình duyệt, bộ nhớ và nơi lưu bản nháp quyết định."
+        )
+        uploaded = st.file_uploader(
+            "Tải ảnh hoặc video", type=["png", "jpg", "jpeg", "webp", "gif", "bmp", "mp4", "webm", "ogg", "mov", "m4v"],
+            key=f"lesson_media_file_{nonce}",
+            help="Ảnh: PNG/JPG/WebP/GIF/BMP. Video: MP4/WebM/OGG/MOV/M4V. Một tệp mỗi lần.",
+        )
+        col_add, col_cancel = st.columns(2)
+        with col_add:
+            add_clicked = st.button("Chèn vào slide hiện tại", type="primary", icon=":material/add_photo_alternate:",
+                                    key=f"lesson_media_add_{nonce}", disabled=uploaded is None, use_container_width=True)
+        with col_cancel:
+            cancel = st.button("Hủy", key=f"lesson_media_cancel_{nonce}", use_container_width=True)
+        if cancel:
+            st.session_state["lesson_media_insert_open"] = False
+            st.rerun(scope="app")
+        if add_clicked and uploaded is not None:
+            import mimetypes
+            name_mime = mimetypes.guess_type(uploaded.name)[0]
+            mime = (uploaded.type or name_mime or "").lower()
+            suffix = Path(uploaded.name).suffix.lower()
+            image_ext = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+            video_ext = {".mp4", ".webm", ".ogg", ".mov", ".m4v"}
+            image_mimes = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"}
+            video_mimes = {"video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-m4v"}
+            if suffix in image_ext:
+                media_kind = "image"
+                if mime not in image_mimes:
+                    mime = {".png":"image/png", ".jpg":"image/jpeg", ".jpeg":"image/jpeg",
+                            ".webp":"image/webp", ".gif":"image/gif", ".bmp":"image/bmp"}[suffix]
+            elif suffix in video_ext:
+                media_kind = "video"
+                if mime not in video_mimes:
+                    mime = {".mp4":"video/mp4", ".webm":"video/webm", ".ogg":"video/ogg",
+                            ".mov":"video/quicktime", ".m4v":"video/x-m4v"}[suffix]
+            else:
+                st.error("Định dạng tệp chưa được hỗ trợ. Hãy chọn ảnh PNG/JPG/WebP/GIF/BMP hoặc video MP4/WebM/OGG/MOV/M4V.")
+                return
+            draft = st.session_state.get("lesson_slide_draft") or new_draft()
+            target_id = slide_id or st.session_state.get("lesson_slide_selected")
+            if not any(row.get("id") == target_id for row in draft.get("slides", [])):
+                st.error("Slide đích không còn tồn tại. Đóng hộp thoại, chọn slide rồi thử lại.")
+                return
+            try:
+                # No artificial byte-count check: preserve original media bytes and MIME type.
+                encoded = base64.b64encode(uploaded.getvalue()).decode("ascii")
+                candidate = apply_surface_event(draft, {
+                    "action": "insert_media", "slide_id": target_id,
+                    "media_kind": media_kind, "mime": mime, "data_b64": encoded, "updates": [],
+                })
+                st.session_state["lesson_slide_draft"] = candidate
+                st.session_state["lesson_slide_selected"] = target_id
+                target = next(row for row in candidate["slides"] if row["id"] == target_id)
+                st.session_state["lesson_tool_activity"] = target["activity"]
+                st.session_state["lesson_slide_revision"] = str(uuid4())
+                st.session_state["lesson_slide_saved_digest"] = ""
+                st.session_state.pop("lesson_surface_index", None)
+                st.session_state.pop("lesson_surface_pending", None)
+                st.session_state["lesson_media_insert_open"] = False
+                st.session_state["lesson_media_insert_feedback"] = (
+                    f"Đã chèn {'ảnh' if media_kind == 'image' else 'video'} {uploaded.name} vào slide hiện tại."
+                )
+                st.rerun(scope="app")
+            except (ValueError, OSError) as exc:
+                st.error(f"Chưa chèn được tệp media: {exc}")
+    media_dialog()
+
+
 def _render_pptx_import_dialog(st) -> None:
     """Render the native file picker opened by the pale-blue toolbar icon."""
     if not st.session_state.get("lesson_pptx_import_open"):
@@ -1954,6 +2177,10 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 if action == "open_pptx_import":
                     st.session_state["lesson_pptx_import_open"] = True
                     st.session_state["lesson_pptx_import_nonce"] = str(uuid4())
+                if action == "open_media_insert":
+                    st.session_state["lesson_media_insert_open"] = True
+                    st.session_state["lesson_media_insert_nonce"] = str(uuid4())
+                    st.session_state["lesson_media_insert_slide_id"] = pending.get("slide_id")
                 if action == "save_draft":
                     if client is not None and user_id:
                         draft_id = st.session_state.get("lesson_slide_saved_id") or str(uuid4())
@@ -1991,7 +2218,7 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                     st.session_state["lesson_slide_selected"] = selected["id"]
                     st.session_state["lesson_tool_activity"] = selected["activity"]
                 # Clear stale widget values before those widgets are instantiated.
-                if pending.get("updates") or pending.get("action") == "move_text":
+                if pending.get("updates") or pending.get("action") in ("move_text", "move_media", "resize_media", "insert_media", "delete_component"):
                     for widget_key in list(st.session_state):
                         if widget_key.startswith(("slide_title_", "slide_text_", "text_format_")):
                             del st.session_state[widget_key]
@@ -2022,6 +2249,10 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                                    icon=":material/publish:")
             publish_dialog()
         _render_pptx_import_dialog(st)
+        _render_media_insert_dialog(st)
+        media_feedback = st.session_state.pop("lesson_media_insert_feedback", None)
+        if media_feedback:
+            st.success(media_feedback)
         feedback = st.session_state.pop("lesson_pptx_import_feedback", None)
         if feedback:
             st.success(feedback)
