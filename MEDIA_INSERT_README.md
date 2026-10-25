@@ -1,8 +1,8 @@
 # Công cụ chèn ảnh/video vào slide hiện tại
 
 ## Tệp trong gói
-- `src/portal_v2/ui/lesson_slide_designer.py`: thêm nút xanh nhạt trên thanh công cụ, hộp chọn ảnh/video, hiển thị media trên slide, kéo để di chuyển, kéo góc dưới-phải để đổi kích thước và nút `×` để xóa.
-- `src/tests/test_lesson_slide_designer_media.py`: ba kiểm thử mới cho thêm, di chuyển, đổi kích thước, xóa và xuất HTML.
+- `src/portal_v2/ui/lesson_slide_designer.py`: thêm nút xanh nhạt trên thanh công cụ, hộp chọn ảnh/video, hiển thị media trên slide, kéo để di chuyển, kéo tay nắm góc dưới-phải màu xanh để đổi kích thước; phép tính dựa trên độ dịch chuyển con trỏ ban đầu nên không bị nhảy/kẹt kích thước và nút `×` để xóa.
+- `src/tests/test_lesson_slide_designer_media.py`: bốn kiểm thử mới cho thêm, di chuyển, đổi kích thước, xóa, xuất HTML và công thức kéo-thả resize.
 
 ## Cài đặt
 Giải nén gói tại thư mục gốc dự án, giữ nguyên cấu trúc thư mục. Chạy:

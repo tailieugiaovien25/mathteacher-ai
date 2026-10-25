@@ -1,4 +1,5 @@
 import base64
+from pathlib import Path
 
 from portal_v2.ui.lesson_slide_designer import (
     apply_surface_event,
@@ -80,3 +81,17 @@ def test_media_toolbar_and_resizer_render_in_editor_and_export():
 
     exported_html = build_presentation_html(draft, selected_slide_id="slide-media-1", shared_editor=False)
     assert 'src="data:video/mp4;base64,' in exported_html
+
+
+def test_media_resize_uses_stable_pointer_delta_and_visible_handle():
+    source_path = Path(__file__).resolve().parents[1] / "portal_v2" / "ui" / "lesson_slide_designer.py"
+    source = source_path.read_text(encoding="utf-8")
+
+    # The handle must remain interactive even while slide text editing is active.
+    assert "if(!handle||document.fullscreenElement)return;" in source
+    # Resize should be computed from the starting dimensions plus pointer delta,
+    # not from a changing bounding box (which made the size jump/stick).
+    assert "d.startWidth+deltaX/d.sr.width*100" in source
+    assert "d.startHeight+deltaY/d.canvasHeight*100" in source
+    assert "event.clientX-br.left+d.w*d.sr.width/100" not in source
+    assert ".lesson-media-object .media-object-resize{z-index:60}" in source

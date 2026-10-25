@@ -766,9 +766,12 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     [data-delete-kind]{position:relative}
     .lesson-media-object{user-select:none;touch-action:none}
     .lesson-media-object img,.lesson-media-object video{pointer-events:auto}
-    .media-object-drag,.media-object-resize{position:absolute;z-index:29;width:28px;height:28px;border:1px solid #5ca9d8;border-radius:6px;background:#e5f5ff;color:#075078;font:18px Segoe UI;font-weight:700;padding:0;cursor:grab;touch-action:none}
+    .media-object-drag,.media-object-resize{position:absolute;z-index:60;display:flex;align-items:center;justify-content:center;width:34px;height:34px;box-sizing:border-box;border:2px solid #5ca9d8;border-radius:7px;background:#e5f5ff;color:#075078;font:20px Segoe UI;font-weight:800;padding:0;cursor:grab;touch-action:none!important;user-select:none;pointer-events:auto;box-shadow:0 2px 6px #102e4660}
     .media-object-drag{left:2px;top:2px}
-    .media-object-resize{right:2px;bottom:2px;cursor:nwse-resize}
+    .media-object-resize{right:2px;bottom:2px;cursor:nwse-resize;background:#cdeaff;border-color:#2585bd}
+    .lesson-media-object{isolation:isolate}
+    .lesson-media-object img,.lesson-media-object video{position:relative;z-index:1}
+    .lesson-media-object .media-object-drag,.lesson-media-object .media-object-resize{z-index:60}
     html:fullscreen .media-object-drag,html:fullscreen .media-object-resize{display:none!important}
     html:fullscreen .lesson-delete-object{display:none!important}
     .lesson-publish-button{position:fixed;top:14px;right:72px;z-index:102;width:48px;height:48px;box-sizing:border-box;border:1px solid #a9daf9;border-radius:10px;background:#0b3550;color:white;font:25px Segoe UI;cursor:pointer;box-shadow:0 4px 14px #071b34aa}
@@ -1061,30 +1064,40 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     let mediaGesture=null;
     document.addEventListener('pointerdown',event=>{
         const handle=event.target.closest('.media-object-drag,.media-object-resize');
-        if(!handle||document.fullscreenElement||editing)return;
+        if(!handle||document.fullscreenElement)return;
         const object=handle.closest('[data-media-object]');
         if(!object||object.closest('section')!==Reveal.getCurrentSlide())return;
+        // Capture the starting pointer and geometry once. Resizing from the live
+        // bounding box causes exponential jumps because the box changes on each move.
         event.preventDefault();event.stopImmediatePropagation();
-        const section=object.closest('section'),sr=section.getBoundingClientRect(),br=object.getBoundingClientRect();
-        mediaGesture={handle,object,section,pointer:event.pointerId,mode:handle.classList.contains('media-object-resize')?'resize':'move',
-            dx:event.clientX-br.left,dy:event.clientY-br.top,x:Number(object.style.left.replace('%',''))||0,
-            y:Number(object.style.top.replace('%',''))||0,w:Number(object.style.width.replace('%',''))||35,
-            h:Number(object.style.height.replace('%',''))||35,sr,canvasHeight:640*(sr.width/section.offsetWidth)};
-        Reveal.configure({touch:false});try{handle.setPointerCapture(event.pointerId);}catch(error){}
+        const section=object.closest('section'),sr=section.getBoundingClientRect();
+        const startX=Number.parseFloat(object.style.left)||0;
+        const startY=Number.parseFloat(object.style.top)||0;
+        const startWidth=Number.parseFloat(object.style.width)||35;
+        const startHeight=Number.parseFloat(object.style.height)||35;
+        mediaGesture={handle,object,section,pointer:event.pointerId,
+            mode:handle.classList.contains('media-object-resize')?'resize':'move',
+            startClientX:event.clientX,startClientY:event.clientY,
+            startX,startY,startWidth,startHeight,x:startX,y:startY,w:startWidth,h:startHeight,
+            sr,canvasHeight:640*(sr.width/section.offsetWidth)};
+        Reveal.configure({touch:false});
+        try{handle.setPointerCapture(event.pointerId);}catch(error){}
         status.textContent=mediaGesture.mode==='resize'?'Kéo góc ↘ để đổi kích thước ảnh/video':'Kéo ✥ để di chuyển ảnh/video';
     },true);
     document.addEventListener('pointermove',event=>{
         const d=mediaGesture;if(!d||event.pointerId!==d.pointer)return;
         event.preventDefault();
+        const deltaX=event.clientX-d.startClientX;
+        const deltaY=event.clientY-d.startClientY;
         if(d.mode==='move'){
-            const br=d.object.getBoundingClientRect();
-            d.x=Math.max(0,Math.min(100-d.w,(event.clientX-d.sr.left-d.dx)/d.sr.width*100));
-            d.y=Math.max(0,Math.min(100-d.h,(event.clientY-d.sr.top-d.dy)/d.canvasHeight*100));
+            d.x=Math.max(0,Math.min(100-d.w,d.startX+deltaX/d.sr.width*100));
+            d.y=Math.max(0,Math.min(100-d.h,d.startY+deltaY/d.canvasHeight*100));
             d.object.style.left=d.x+'%';d.object.style.top=d.y+'%';
         }else{
-            const br=d.object.getBoundingClientRect();
-            d.w=Math.max(3,Math.min(100-(Number(d.object.style.left.replace('%',''))||0),(event.clientX-br.left+d.w*d.sr.width/100)/d.sr.width*100));
-            d.h=Math.max(3,Math.min(100-(Number(d.object.style.top.replace('%',''))||0),(event.clientY-br.top+d.h*d.canvasHeight/100)/d.canvasHeight*100));
+            const maxWidth=Math.max(1,100-d.startX);
+            const maxHeight=Math.max(1,100-d.startY);
+            d.w=Math.min(maxWidth,Math.max(Math.min(3,maxWidth),d.startWidth+deltaX/d.sr.width*100));
+            d.h=Math.min(maxHeight,Math.max(Math.min(3,maxHeight),d.startHeight+deltaY/d.canvasHeight*100));
             d.object.style.width=d.w+'%';d.object.style.height=d.h+'%';
         }
     },true);
@@ -1096,7 +1109,10 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
         const y=Math.round(Math.max(0,Math.min(99,d.y))*100)/100;
         const width=Math.max(1,Math.min(100-Math.round(x),Math.round(d.w)));
         const height=Math.max(1,Math.min(100-Math.round(y),Math.round(d.h)));
-        postAction(d.mode==='resize'?'resize_media':'move_media',{block_index:Number(d.object.dataset.mediaIndex),x,y,width,height});
+        postAction(d.mode==='resize'?'resize_media':'move_media',{
+            slide_id:d.object.dataset.mediaSlideId,
+            block_index:Number(d.object.dataset.mediaIndex),x,y,width,height
+        });
         status.textContent=d.mode==='resize'?'Đã cập nhật kích thước ảnh/video':'Đã cập nhật vị trí ảnh/video';
     },true);
     document.addEventListener('pointercancel',()=>{if(mediaGesture){mediaGesture=null;Reveal.configure({touch:!editing});}},true);
