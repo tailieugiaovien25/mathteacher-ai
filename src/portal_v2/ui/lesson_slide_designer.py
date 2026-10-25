@@ -6,6 +6,9 @@ from html import escape
 from hashlib import sha256
 from datetime import datetime, timezone
 import json
+import base64
+import io
+import posixpath
 from uuid import uuid4
 from pathlib import Path
 import tempfile
@@ -32,7 +35,9 @@ ACTIVITIES = (
     ("LUYEN_TAP", "3 · Luyện tập"),
     ("VAN_DUNG", "4 · Vận dụng"),
 )
-BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt", "Hộp văn bản", "Công thức Toán", "Hình học")
+BLOCK_KINDS = ("Nội dung", "Câu hỏi", "Gợi ý", "Kiến thức chốt", "Hộp văn bản", "Công thức Toán", "Hình học", "Hình ảnh")
+MAX_SLIDE_IMAGE_BASE64 = 1_200_000
+MAX_IMPORTED_IMAGE_BASE64 = 180_000
 TEXT_FONTS = ("Arial", "Times New Roman", "Calibri", "Segoe UI", "Verdana")
 TEXT_STYLE_DEFAULT = {"width": 100, "min_height": 80, "font_size": 32, "font_family": "Arial", "color": "#123453", "background": "#EEF4FC", "bold": False, "italic": False, "underline": False, "align": "left", "depth": 0, "auto_size": False, "positioned": False, "x": 5, "y": 25}
 DESIGN_TOOL_TABS = ("Bản nháp", "Thông tin", "SGK · AI", "Trợ giảng", "Sân khấu", "Ghi nhận", "Chèn", "Định dạng", "Slide")
@@ -373,8 +378,24 @@ def validate_draft(draft: object) -> dict:
                 raise ValueError("Khối nội dung không hợp lệ.")
             if block["kind"] == "Hình học":
                 validate_geometry(block.get("geometry"))
+            if block["kind"] == "Hình ảnh":
+                image = block.get("image")
+                if not isinstance(image, dict) or set(image) != {"mime", "data_b64", "x", "y", "width"}:
+                    raise ValueError("Dữ liệu ảnh trên slide không hợp lệ.")
+                if image["mime"] not in ("image/jpeg", "image/png", "image/webp"):
+                    raise ValueError("Định dạng ảnh trên slide không được hỗ trợ.")
+                if not isinstance(image["data_b64"], str) or not image["data_b64"] or len(image["data_b64"]) > MAX_IMPORTED_IMAGE_BASE64 or not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", image["data_b64"]):
+                    raise ValueError("Dữ liệu ảnh trên slide không hợp lệ.")
+                for coordinate in ("x", "y"):
+                    if type(image[coordinate]) not in (int, float) or not 0 <= image[coordinate] <= 100:
+                        raise ValueError("Vị trí ảnh trên slide không hợp lệ.")
+                if type(image["width"]) is not int or not 1 <= image["width"] <= 100:
+                    raise ValueError("Kích thước ảnh trên slide không hợp lệ.")
             if "style" in block:
                 validate_text_style(block["style"])
+    if sum(len(block["image"]["data_b64"]) for slide in slides for block in slide["blocks"]
+           if block.get("kind") == "Hình ảnh" and isinstance(block.get("image"), dict)) > MAX_SLIDE_IMAGE_BASE64:
+        raise ValueError("Tổng dung lượng ảnh trong slide vượt giới hạn bản nháp; hãy giảm số ảnh hoặc kích thước ảnh.")
     cards = draft.get("activity_cards", [])  # Previously exported drafts have no cards.
     if not isinstance(cards, list) or len(cards) > 80:
         raise ValueError("Bài giảng vượt quá 80 thẻ hoạt động.")
@@ -446,6 +467,25 @@ def build_presentation_html(draft: dict, *, classroom_stages: dict[str, bytes] |
             blocks = []
             for block_index, block in enumerate(slide["blocks"]):
                 classes = "content fragment" if block["reveal_later"] else "content"
+                if block["kind"] == "Hình ảnh":
+                    image = block["image"]
+                    image_x = float(image["x"])
+                    image_y = float(image["y"])
+                    image_width = min(float(image["width"]), max(1.0, 100.0 - image_x))
+                    # Reset the generic .content styling for imported pictures. The default
+                    # content padding/background otherwise shifts and can visually obscure small images.
+                    image_css = (f"position:absolute;left:{image_x:.2f}%;top:{image_y:.2f}%;"
+                                 f"width:{image_width:.2f}%;height:auto;max-height:90%;"
+                                 "object-fit:contain;z-index:5;display:block;box-sizing:border-box;"
+                                 "padding:0;margin:0;background:transparent;border-radius:0;")
+                    inner_image_css = ("display:block;width:100%;height:auto;max-height:90%;"
+                                       "object-fit:contain;padding:0;margin:0;background:transparent;")
+                    blocks.append(f'<div class="{classes}" style="{image_css}" '
+                                  f'data-delete-kind="block" data-delete-index="{block_index}">'
+                                  f'<img alt="Ảnh nhập từ PowerPoint" '
+                                  f'src="data:{image["mime"]};base64,{image["data_b64"]}" '
+                                  f'style="{inner_image_css}"></div>')
+                    continue
                 if block["kind"] in ("Hộp văn bản", "Công thức Toán", "Hình học"):
                     classes += " lesson-text-box"
                     effective_style = {"auto_size": True, **block.get("style", {})}
@@ -737,7 +777,13 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     html:fullscreen .reveal{
         margin-top:0!important;border:0;height:100vh!important
     }
-</style><header class="lesson-surface-heading">THI?T K? B?I GI?NG<small>So?n ho?t ??ng ? chu?n b? c?ng c? ? tr?nh chi?u tr?n l?p</small></header><div class="lesson-edit-toolbar"><nav class="lesson-tool-tabs" aria-label="Nhóm công cụ bài giảng"></nav><button id="lesson-insert-text">＋ Hộp text</button><button id="lesson-edit-toggle">Sửa slide</button><button id="lesson-edit-apply" hidden>Áp dụng vào bản nháp</button><button class="format-icon" data-format="bold" title="Đậm" aria-label="Đậm"><b>B</b></button><button class="format-icon" data-format="italic" title="Nghiêng" aria-label="Nghiêng"><i>I</i></button><button class="format-icon" data-format="underline" title="Gạch chân" aria-label="Gạch chân"><u>U</u></button>
+    .lesson-edit-toolbar #lesson-import-pptx{width:40px;height:40px;min-width:40px;min-height:40px;
+        border:1px solid #70b8e3;border-radius:8px;
+        background:linear-gradient(150deg,#eaf8ff 0%,#c8eaff 100%);
+        color:#06466c;font-size:23px;font-weight:800;line-height:1;
+        box-shadow:0 2px 5px #08263e26;cursor:pointer}
+    .lesson-edit-toolbar #lesson-import-pptx:hover{background:linear-gradient(150deg,#d5f0ff,#a8dcff);border-color:#378fbe}
+</style><header class="lesson-surface-heading">THI?T K? B?I GI?NG<small>So?n ho?t ??ng ? chu?n b? c?ng c? ? tr?nh chi?u tr?n l?p</small></header><div class="lesson-edit-toolbar"><nav class="lesson-tool-tabs" aria-label="Nhóm công cụ bài giảng"></nav><button id="lesson-import-pptx" type="button" title="Import PPT/PPTX" aria-label="Import PPT/PPTX">⇧</button><button id="lesson-insert-text">＋ Hộp text</button><button id="lesson-edit-toggle">Sửa slide</button><button id="lesson-edit-apply" hidden>Áp dụng vào bản nháp</button><button class="format-icon" data-format="bold" title="Đậm" aria-label="Đậm"><b>B</b></button><button class="format-icon" data-format="italic" title="Nghiêng" aria-label="Nghiêng"><i>I</i></button><button class="format-icon" data-format="underline" title="Gạch chân" aria-label="Gạch chân"><u>U</u></button>
     <select id="format-font" title="Font chữ" aria-label="Font chữ"><option>Arial</option><option>Times New Roman</option><option>Calibri</option><option>Segoe UI</option><option>Verdana</option></select>
     <label title="Cỡ chữ">A↕ <input id="format-size" aria-label="Cỡ chữ" type="number" min="12" max="96" value="32"></label>
     <label title="Màu chữ">A <input id="format-color" aria-label="Màu chữ" type="color" value="#123453"></label>
@@ -752,6 +798,7 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
 
     toolTabs.setAttribute('role','tablist');
     const toolbar=document.querySelector('.lesson-edit-toolbar');
+    const importPptxButton=document.getElementById('lesson-import-pptx');
     // Keep the toolbar before the slide canvas.
     const slideCanvas=document.querySelector('.reveal');
     slideCanvas.before(document.querySelector('.lesson-surface-heading'),toolbar);
@@ -769,7 +816,7 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     layoutLessonSurface();
 
     const children=Array.from(toolbar.children).filter(
-        e=>e!==toolTabs&&e!==status
+        e=>e!==toolTabs&&e!==status&&e!==importPptxButton
     );
     const panels=new Map();
 
@@ -909,6 +956,10 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     addTab('Công thức Toán','∑',mathPanel);addTab('Hình học','△',geometryPanel);
     function button(panel,icon,title,callback){const b=document.createElement('button');b.type='button';b.textContent=icon;b.title=title;b.setAttribute('aria-label',title);b.onclick=callback;panel.append(b);return b;}
     function postAction(action,extra){const slide=Reveal.getCurrentSlide();const updates=editing?currentUpdates():[];if(editing){fields().forEach(e=>e.dataset.rawText=e.innerText);setEditing(false);}parent.postMessage(Object.assign({lessonSurface:true,action,slide_id:slide?.dataset.slideId,index:Reveal.getIndices().h,updates,event_id:Date.now().toString()+'-'+Math.random()},extra||{}),'*');}
+    if(importPptxButton){importPptxButton.addEventListener('click',()=>{
+        if(editing){status.textContent='Áp dụng hoặc hủy sửa slide trước khi nhập PowerPoint.';return;}
+        postAction('open_pptx_import');
+    });}
     function armObject(value){if(!Reveal.getCurrentSlide()?.dataset.slideId){status.textContent='Thêm hoặc chọn slide nội dung trước.';return;}objectPlacement=value;status.textContent='Bấm vị trí trên slide để chèn; Esc để hủy.';document.querySelector('.slides').style.cursor='crosshair';}
     const formula=document.createElement('textarea');formula.rows=2;formula.placeholder='Nhập LaTeX, ví dụ: \\frac{a}{b}';formula.title='Công thức LaTeX';formula.setAttribute('aria-label','Công thức LaTeX');formula.style.cssText='width:320px;max-width:100%;font:16px Segoe UI';mathPanel.append(formula);
     [['a/b','\\frac{a}{b}'],['√','\\sqrt{x}'],['x²','x^{2}'],['x₁','x_{1}'],['≤','\\leq'],['π','\\pi'],['∑','\\sum_{i=1}^{n} i']].forEach(([icon,value])=>button(mathPanel,icon,'Mẫu '+value,()=>{formula.value+=value;formula.focus();}));
@@ -1034,7 +1085,7 @@ def _shared_editor_script(*, insert_armed: bool = False, edit_block_index: int |
     function fields(){return Reveal.getCurrentSlide().querySelectorAll('[data-edit-title],[data-edit-block]');}
     function setEditing(value){editing=value;fields().forEach(e=>e.contentEditable=value?'true':'false');apply.hidden=!value;edit.textContent=value?'Hủy sửa':'Sửa slide';if(window.Reveal){Reveal.configure({keyboard:!value,touch:!value});Reveal.sync();}}
     function send(updates){const indices=window.Reveal?Reveal.getIndices():{h:0};const current=window.Reveal?Reveal.getCurrentSlide():null;parent.postMessage({lessonSurface:true,slide_id:current?current.dataset.slideId:null,index:indices.h,updates:updates||[],event_id:Date.now().toString()+'-'+Math.random()},'*');}
-    function currentUpdates(){return Array.from(document.querySelectorAll('section[data-slide-id]')).filter(section=>section===Reveal.getCurrentSlide()).map(section=>({id:section.dataset.slideId,title:section.querySelector('[data-edit-title]').innerText,blocks:Array.from(section.querySelectorAll('[data-edit-block]')).map(e=>e.innerText),styles:Array.from(section.querySelectorAll('[data-text-format]')).map(e=>JSON.parse(e.dataset.textFormat))}));}
+    function currentUpdates(){return Array.from(document.querySelectorAll('section[data-slide-id]')).filter(section=>section===Reveal.getCurrentSlide()).map(section=>{const items=Array.from(section.querySelectorAll('[data-delete-kind="block"]')).sort((a,b)=>Number(a.dataset.deleteIndex)-Number(b.dataset.deleteIndex));return {id:section.dataset.slideId,title:section.querySelector('[data-edit-title]').innerText,blocks:items.map(e=>{const field=e.querySelector('[data-edit-block]');return field?field.innerText:'';}),styles:items.map(e=>e.dataset.textFormat?JSON.parse(e.dataset.textFormat):({width:100,min_height:80,font_size:32,font_family:'Arial',color:'#123453',background:'#EEF4FC',bold:false,italic:false,underline:false,align:'left',depth:0,auto_size:false,positioned:false,x:5,y:25}))};});}
     let dragging=null;
     document.addEventListener('pointerdown',function(event){const handle=event.target.closest('.text-box-drag');if(!handle||document.fullscreenElement||placing)return;event.preventDefault();event.stopPropagation();const box=handle.parentElement,section=box.closest('section'),rect=section.getBoundingClientRect(),boxRect=box.getBoundingClientRect();dragging={handle:handle,box:box,section:section,index:Number(handle.dataset.blockIndex),pointer:event.pointerId,dx:event.clientX-boxRect.left,dy:event.clientY-boxRect.top,original:box.style.cssText};Reveal.configure({touch:false});try{handle.setPointerCapture(event.pointerId);}catch(error){}status.textContent='Đang di chuyển hộp text';},true);
     document.addEventListener('pointermove',function(event){if(!dragging||event.pointerId!==dragging.pointer)return;event.preventDefault();const d=dragging,rect=d.section.getBoundingClientRect(),br=d.box.getBoundingClientRect(),canvasHeight=640*(rect.width/d.section.offsetWidth);d.x=Math.round(Math.max(0,Math.min(Math.max(0,rect.width-br.width),event.clientX-rect.left-d.dx))/rect.width*100);d.y=Math.round(Math.max(0,Math.min(Math.max(0,canvasHeight-br.height),event.clientY-rect.top-d.dy))/canvasHeight*100);Object.assign(d.box.style,{position:'absolute',left:d.x+'%',top:d.y+'%',margin:'0'});},true);
@@ -1517,13 +1568,21 @@ def render_design_tool_dialog(st, draft, *, group, client=None, user_id=None):
                                            key="slide_title_" + revision + slide_id)
             for index, block in enumerate(slide["blocks"]):
                 with st.expander(f"{index+1}. {block['kind']}", expanded=True):
-                    block["kind"] = st.selectbox("Loại khối", BLOCK_KINDS, index=BLOCK_KINDS.index(block["kind"]),
+                    kinds_for_block = BLOCK_KINDS if block["kind"] == "Hình ảnh" else BLOCK_KINDS[:-1]
+                    block["kind"] = st.selectbox("Loại khối", kinds_for_block, index=kinds_for_block.index(block["kind"]),
                                                   key=f"slide_kind_{revision}_{slide_id}_{index}")
-                    block["text"] = st.text_area("Nội dung", value=block["text"], max_chars=5000,
-                                                  key=f"slide_text_{revision}_{slide_id}_{index}")
+                    if block["kind"] != "Hình ảnh":
+                        block.pop("image", None)
+                    if block["kind"] == "Hình ảnh":
+                        st.caption("Ảnh được nhập từ PowerPoint; vị trí và kích thước ban đầu được giữ gần đúng.")
+                        if isinstance(block.get("image"), dict):
+                            st.image(base64.b64decode(block["image"]["data_b64"]), use_container_width=True)
+                    else:
+                        block["text"] = st.text_area("Nội dung", value=block["text"], max_chars=5000,
+                                                      key=f"slide_text_{revision}_{slide_id}_{index}")
+                        render_text_box_format(st, block, f"text_format_{revision}_{slide_id}_{index}_")
                     block["reveal_later"] = st.checkbox("Giáo viên bấm mới hiện", value=block["reveal_later"],
                                                         key=f"slide_reveal_{revision}_{slide_id}_{index}")
-                    render_text_box_format(st, block, f"text_format_{revision}_{slide_id}_{index}_")
                     if tool_button(st, "Xóa khối", key=f"slide_remove_block_{slide_id}_{index}"):
                         slide["blocks"].pop(index)
                         for widget_key in list(st.session_state):
@@ -1567,89 +1626,318 @@ def render_design_tool_dialog(st, draft, *, group, client=None, user_id=None):
             save_status.error(f"Chưa lưu được bản nháp: {exc}")
 
 
+def _prepare_pptx_image(image_bytes: bytes) -> tuple[str, str] | None:
+    """Normalize a PowerPoint image to a browser-safe, size-limited raster image."""
+    try:
+        from PIL import Image
+        with Image.open(io.BytesIO(image_bytes)) as source:
+            source.load()
+            source.thumbnail((1400, 1000))
+            has_alpha = ("A" in source.getbands()) or (source.mode == "P" and "transparency" in source.info)
+            output = io.BytesIO()
+            if has_alpha:
+                source.convert("RGBA").save(output, format="WEBP", quality=78, method=4)
+                mime = "image/webp"
+            else:
+                source.convert("RGB").save(output, format="JPEG", quality=80, optimize=True, progressive=True)
+                mime = "image/jpeg"
+            data = output.getvalue()
+            if len(base64.b64encode(data)) > MAX_IMPORTED_IMAGE_BASE64:
+                output = io.BytesIO()
+                if has_alpha:
+                    source.thumbnail((900, 700))
+                    source.convert("RGBA").save(output, format="WEBP", quality=65, method=4)
+                    mime = "image/webp"
+                else:
+                    source.thumbnail((900, 700))
+                    source.convert("RGB").save(output, format="JPEG", quality=66, optimize=True, progressive=True)
+                    mime = "image/jpeg"
+                data = output.getvalue()
+            encoded = base64.b64encode(data).decode("ascii")
+            if len(encoded) > MAX_IMPORTED_IMAGE_BASE64:
+                return None
+            return mime, encoded
+    except Exception:
+        # Unsupported vector images (for example EMF/WMF) are skipped safely.
+        return None
+
+
 def extract_pptx_slides(file_bytes: bytes) -> list[dict]:
-    """Extract slide titles and text from a PPTX without trusting embedded content."""
+    """Extract text and embedded raster pictures, including grouped and picture-filled shapes."""
     if not isinstance(file_bytes, bytes) or not file_bytes:
         raise ValueError("Tệp PowerPoint đang trống.")
     try:
-        archive = zipfile.ZipFile(__import__("io").BytesIO(file_bytes))
+        archive = zipfile.ZipFile(io.BytesIO(file_bytes))
     except (zipfile.BadZipFile, OSError) as exc:
         raise ValueError("Tệp không phải PowerPoint .pptx hợp lệ. Định dạng .ppt cũ cần chuyển sang .pptx.") from exc
+
     with archive:
-        names = archive.namelist()
+        names = set(archive.namelist())
         slide_names = [name for name in names if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)]
         slide_names.sort(key=lambda name: int(re.search(r"slide(\d+)\.xml$", name).group(1)))
         if not slide_names:
             raise ValueError("Không tìm thấy slide trong tệp PowerPoint.")
         if len(slide_names) > 80:
             raise ValueError("Bài giảng hiện hỗ trợ tối đa 80 slide.")
-        ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
-        result = []
-        for name in slide_names:
+
+        ns = {
+            "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "rel": "http://schemas.openxmlformats.org/package/2006/relationships",
+        }
+        slide_width, slide_height = 12192000.0, 6858000.0
+        if "ppt/presentation.xml" in names:
             try:
-                root = ET.fromstring(archive.read(name))
+                presentation = ET.fromstring(archive.read("ppt/presentation.xml"))
+                size = presentation.find(".//p:sldSz", ns)
+                if size is not None:
+                    slide_width = float(size.attrib.get("cx", slide_width))
+                    slide_height = float(size.attrib.get("cy", slide_height))
+            except (ET.ParseError, ValueError):
+                pass
+
+        result = []
+        total_image_base64 = 0
+        picture_tag = "{%s}pic" % ns["p"]
+        shape_tag = "{%s}sp" % ns["p"]
+        group_tag = "{%s}grpSp" % ns["p"]
+
+        for slide_name in slide_names:
+            try:
+                root = ET.fromstring(archive.read(slide_name))
             except ET.ParseError as exc:
                 raise ValueError("Một slide trong tệp PowerPoint bị lỗi cấu trúc.") from exc
-            paragraphs = []
-            for paragraph in root.findall(".//a:p", ns):
-                text = "".join(node.text or "" for node in paragraph.findall(".//a:t", ns)).strip()
-                if text:
-                    paragraphs.append(text)
-            title = paragraphs[0][:200] if paragraphs else f"Slide {len(result) + 1}"
-            blocks = [{"kind": "Nội dung", "text": text[:5000], "reveal_later": False}
-                      for text in paragraphs[1:31]]
-            result.append({"title": title, "blocks": blocks})
+
+            # Relationships are local to each slide. Resolve normal and absolute OPC targets,
+            # but never follow external relationships or paths outside the PPTX package.
+            rels_name = posixpath.join(posixpath.dirname(slide_name), "_rels", posixpath.basename(slide_name) + ".rels")
+            relationships = {}
+            if rels_name in names:
+                try:
+                    rel_root = ET.fromstring(archive.read(rels_name))
+                    for relation in rel_root.findall("rel:Relationship", ns):
+                        if relation.attrib.get("TargetMode") == "External":
+                            continue
+                        rel_id = relation.attrib.get("Id")
+                        target = relation.attrib.get("Target", "")
+                        if not rel_id or not target:
+                            continue
+                        target_path = (posixpath.normpath(target.lstrip("/")) if target.startswith("/")
+                                       else posixpath.normpath(posixpath.join(posixpath.dirname(slide_name), target)))
+                        if target_path in names and target_path.startswith("ppt/media/"):
+                            relationships[rel_id] = target_path
+                except ET.ParseError:
+                    relationships = {}
+
+            shape_tree = root.find(".//p:spTree", ns)
+            content_items = []
+            skipped_images = 0
+
+            def append_image(shape) -> None:
+                """Append one embedded picture or image-filled shape to the ordered content."""
+                nonlocal skipped_images, total_image_base64
+                blip = shape.find(".//a:blip", ns)
+                rel_id = None
+                if blip is not None:
+                    rel_id = blip.attrib.get("{%s}embed" % ns["r"])
+                media_path = relationships.get(rel_id)
+                if not media_path:
+                    skipped_images += 1
+                    return
+                try:
+                    image_result = _prepare_pptx_image(archive.read(media_path))
+                except (KeyError, OSError, RuntimeError):
+                    image_result = None
+                if image_result is None:
+                    skipped_images += 1
+                    return
+                mime, encoded = image_result
+                if total_image_base64 + len(encoded) > MAX_SLIDE_IMAGE_BASE64:
+                    skipped_images += 1
+                    return
+
+                x, y, width_pct = 5.0, 25.0, 35
+                transform = shape.find("p:spPr/a:xfrm", ns)
+                if transform is not None:
+                    offset = transform.find("a:off", ns)
+                    extent = transform.find("a:ext", ns)
+                    try:
+                        if offset is not None:
+                            x = min(99.0, max(0.0, float(offset.attrib.get("x", 0)) / slide_width * 100.0))
+                            y = min(99.0, max(0.0, float(offset.attrib.get("y", 0)) / slide_height * 100.0))
+                        if extent is not None:
+                            width_pct = min(100, max(1, round(float(extent.attrib.get("cx", slide_width * .35)) / slide_width * 100.0)))
+                    except (TypeError, ValueError, ZeroDivisionError):
+                        pass
+                content_items.append({"type": "image", "image": {
+                    "mime": mime, "data_b64": encoded,
+                    "x": round(x, 2), "y": round(y, 2), "width": int(width_pct),
+                }})
+                total_image_base64 += len(encoded)
+
+            def walk_shapes(container) -> None:
+                """Walk shapes recursively so pictures inside PowerPoint groups are not lost."""
+                nonlocal skipped_images
+                for shape in list(container):
+                    if shape.tag == group_tag:
+                        walk_shapes(shape)
+                    elif shape.tag == picture_tag:
+                        append_image(shape)
+                    elif shape.tag == shape_tag:
+                        # Some PowerPoint objects store a picture as the shape's fill,
+                        # rather than as a standalone p:pic.
+                        blip_fill = shape.find("p:spPr/a:blipFill/a:blip", ns)
+                        paragraphs = []
+                        for paragraph in shape.findall(".//a:p", ns):
+                            text = "".join(node.text or "" for node in paragraph.findall(".//a:t", ns)).strip()
+                            if text:
+                                paragraphs.append(text)
+                        if blip_fill is not None:
+                            append_image(shape)
+                        for text in paragraphs:
+                            content_items.append({"type": "text", "text": text})
+                    # Other top-level entries are metadata, connectors, or non-picture
+                    # drawing objects; they do not contain importable text or raster images.
+
+            if shape_tree is not None:
+                walk_shapes(shape_tree)
+
+            title_item_index = next((idx for idx, item in enumerate(content_items)
+                                     if item["type"] == "text" and item["text"]), None)
+            title = (content_items[title_item_index]["text"][:200]
+                     if title_item_index is not None else f"Slide {len(result) + 1}")
+            blocks = []
+            for idx, item in enumerate(content_items):
+                if idx == title_item_index:
+                    continue
+                if len(blocks) >= 30:
+                    if item["type"] == "image":
+                        skipped_images += 1
+                    continue
+                if item["type"] == "text":
+                    blocks.append({"kind": "Nội dung", "text": item["text"][:5000], "reveal_later": False})
+                else:
+                    blocks.append({"kind": "Hình ảnh", "text": "", "reveal_later": False, "image": item["image"]})
+            result.append({"title": title, "blocks": blocks, "images_skipped": skipped_images})
         return result
 
+def _apply_pptx_to_current_slide(st, draft: dict, imported: list[dict]) -> tuple[dict, str]:
+    """Replace the selected slide with PPTX slide 1 and insert the remaining slides after it."""
+    if not imported:
+        raise ValueError("Không tìm thấy slide nào để nhập.")
 
-def render_pptx_import(st, draft: dict) -> dict:
-    """Offer a safe text-first PPTX preview and append imported slides on confirmation."""
-    with st.expander("📥 Import PPT/PPTX", expanded=False):
-        st.caption("Chọn tệp .pptx để xem trước nội dung slide. Bản nhập hiện chuyển tiêu đề và văn bản; bố cục, ảnh, hiệu ứng và âm thanh chưa được giữ nguyên.")
-        uploaded = st.file_uploader("Chọn tệp PowerPoint", type=["pptx"], key="lesson_pptx_import_file")
-        imported = None
-        if uploaded is not None:
+    candidate = deepcopy(draft)
+    slides = candidate.setdefault("slides", [])
+    selected_id = st.session_state.get("lesson_slide_selected")
+    target_index = next((i for i, slide in enumerate(slides) if slide.get("id") == selected_id), None)
+    if target_index is None:
+        if slides:
+            target_index = 0
+            selected_id = slides[0]["id"]
+        else:
+            activity = st.session_state.get("lesson_tool_activity", ACTIVITIES[0][0])
+            target = {"id": str(uuid4()), "activity": activity, "title": "Slide mới", "blocks": []}
+            slides.append(target)
+            target_index = len(slides) - 1
+            selected_id = target["id"]
+
+    target = slides[target_index]
+    activity = target.get("activity", st.session_state.get("lesson_tool_activity", ACTIVITIES[0][0]))
+    # The target slide, whether pre-existing or just created, is reused as slide 1.
+    available = 80 - len(slides) + 1
+    if len(imported) > available:
+        raise ValueError(
+            f"Bản nháp chỉ còn chỗ cho {available} slide khi thay slide đang chọn; "
+            f"tệp PowerPoint có {len(imported)} slide. Hãy xóa bớt slide trước khi nhập."
+        )
+
+    # Keep the current slide ID/activity so the editor stays on the same canvas location.
+    first = imported[0]
+    target["title"] = first["title"]
+    target["blocks"] = deepcopy(first["blocks"])
+    new_rows = []
+    for item in imported[1:]:
+        row = {
+            "id": str(uuid4()),
+            "activity": activity,
+            "title": item["title"],
+            "blocks": deepcopy(item["blocks"]),
+        }
+        new_rows.append(row)
+    slides[target_index + 1:target_index + 1] = new_rows
+
+    validate_draft(candidate)
+    st.session_state["lesson_slide_draft"] = candidate
+    st.session_state["lesson_slide_selected"] = selected_id
+    st.session_state["lesson_tool_activity"] = activity
+    st.session_state["lesson_slide_revision"] = str(uuid4())
+    st.session_state["lesson_slide_saved_digest"] = ""
+    st.session_state.pop("lesson_surface_index", None)
+    st.session_state.pop("lesson_surface_pending", None)
+    st.session_state.pop("lesson_insert_armed", None)
+    st.session_state.pop("lesson_insert_edit_index", None)
+
+    image_count = sum(
+        1 for slide in imported for block in slide.get("blocks", [])
+        if block.get("kind") == "Hình ảnh" and isinstance(block.get("image"), dict)
+    )
+    skipped_count = sum(int(slide.get("images_skipped", 0) or 0) for slide in imported)
+    feedback = (
+        f"Đã nhập {len(imported)} slide trực tiếp tại vị trí slide đang chọn; "
+        f"đã lấy {image_count} ảnh."
+    )
+    if skipped_count:
+        feedback += f" Bỏ qua {skipped_count} ảnh không được hỗ trợ hoặc vượt giới hạn dung lượng."
+    return candidate, feedback
+
+
+def _render_pptx_import_dialog(st) -> None:
+    """Render the native file picker opened by the pale-blue toolbar icon."""
+    if not st.session_state.get("lesson_pptx_import_open"):
+        return
+    nonce = st.session_state.get("lesson_pptx_import_nonce") or str(uuid4())
+    st.session_state["lesson_pptx_import_nonce"] = nonce
+
+    @st.dialog("Import PPT/PPTX", width="large")
+    def import_dialog():
+        st.caption(
+            "Chọn tệp .pptx. Slide PowerPoint đầu tiên sẽ thay nội dung của slide đang chọn; "
+            "các slide tiếp theo được chèn ngay sau đó trong cùng hoạt động. "
+            "Nội dung được chuyển thành chữ/ảnh; hiệu ứng PowerPoint không được giữ nguyên."
+        )
+        uploaded = st.file_uploader(
+            "Chọn tệp PowerPoint", type=["pptx"], key=f"lesson_pptx_toolbar_file_{nonce}"
+        )
+        col_import, col_cancel = st.columns(2)
+        with col_import:
+            do_import = st.button(
+                "Nhập vào slide hiện tại", type="primary", icon=":material/upload_file:",
+                key=f"lesson_pptx_toolbar_confirm_{nonce}", disabled=uploaded is None,
+                use_container_width=True,
+            )
+        with col_cancel:
+            cancel = st.button(
+                "Hủy", key=f"lesson_pptx_toolbar_cancel_{nonce}", use_container_width=True
+            )
+
+        if cancel:
+            st.session_state["lesson_pptx_import_open"] = False
+            st.rerun(scope="app")
+        if do_import and uploaded is not None:
             try:
                 imported = extract_pptx_slides(uploaded.getvalue())
-            except ValueError as exc:
-                st.error(str(exc))
-            else:
-                st.success(f"Đã đọc {len(imported)} slide · {uploaded.name}")
-                with st.container(border=True):
-                    st.markdown("**Xem trước slide**")
-                    for index, slide in enumerate(imported[:8], start=1):
-                        with st.expander(f"Slide {index}: {slide['title']}", expanded=index == 1):
-                            if slide["blocks"]:
-                                for block in slide["blocks"]:
-                                    st.write(block["text"])
-                            else:
-                                st.caption("Không tìm thấy văn bản bổ sung trên slide này.")
-                    if len(imported) > 8:
-                        st.caption(f"Còn {len(imported) - 8} slide khác; nội dung sẽ được nhập đầy đủ.")
-                available = 80 - len(draft.get("slides", []))
-                if len(imported) > available:
-                    st.warning(f"Bản nháp còn chỗ cho {max(0, available)} slide; tệp có {len(imported)} slide.")
-                disabled = not imported or available <= 0
-                if st.button("Nhập bài giảng", type="primary", key="lesson_pptx_import_confirm", disabled=disabled):
-                    to_add = imported[:available]
-                    activities = [key for key, _ in ACTIVITIES]
-                    for index, item in enumerate(to_add):
-                        draft["slides"].append({
-                            "id": str(uuid4()),
-                            "activity": activities[min(3, index * 4 // max(1, len(to_add)))],
-                            "title": item["title"],
-                            "blocks": item["blocks"],
-                        })
-                    validate_draft(draft)
-                    st.session_state["lesson_slide_draft"] = draft
-                    st.session_state["lesson_slide_revision"] = str(uuid4())
-                    st.session_state["lesson_slide_saved_digest"] = ""
-                    st.session_state.pop("lesson_surface_index", None)
-                    st.session_state.pop("lesson_surface_pending", None)
-                    st.success(f"Đã nhập {len(to_add)} slide vào bản nháp.")
-                    st.rerun()
-    return draft
+                _, feedback = _apply_pptx_to_current_slide(
+                    st, st.session_state["lesson_slide_draft"], imported
+                )
+            except (ValueError, OSError, zipfile.BadZipFile) as exc:
+                st.error(f"Chưa nhập được PowerPoint: {exc}")
+                return
+            st.session_state["lesson_pptx_import_open"] = False
+            st.session_state["lesson_pptx_import_feedback"] = feedback
+            st.rerun(scope="app")
 
+    import_dialog()
 
 def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None) -> None:
     _designer_style(st)
@@ -1659,8 +1947,6 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
         if "lesson_slide_revision" not in st.session_state:
             st.session_state["lesson_slide_revision"] = str(uuid4())
         draft = st.session_state["lesson_slide_draft"]
-        draft = render_pptx_import(st, draft)
-        st.session_state["lesson_slide_draft"] = draft
         # lesson-current-slide-r164
         if not draft["slides"]:
             draft = apply_surface_event(draft, {"action": "add_slide"})
@@ -1678,6 +1964,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
             try:
                 draft = apply_surface_event(draft, pending)
                 action = pending.get("action")
+                if action == "open_pptx_import":
+                    st.session_state["lesson_pptx_import_open"] = True
+                    st.session_state["lesson_pptx_import_nonce"] = str(uuid4())
                 if action == "save_draft":
                     if client is not None and user_id:
                         draft_id = st.session_state.get("lesson_slide_saved_id") or str(uuid4())
@@ -1745,5 +2034,9 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
                 st.download_button("Xuất bản · Tải HTML", html, file_name="bai_giang.html", mime="text/html",
                                    icon=":material/publish:")
             publish_dialog()
+        _render_pptx_import_dialog(st)
+        feedback = st.session_state.pop("lesson_pptx_import_feedback", None)
+        if feedback:
+            st.success(feedback)
         render_shared_surface(st, draft, staged, revision, cloud_save=client is not None and bool(user_id))
         _designer_band(st, "MATH TEACHER AI · THIẾT KẾ BÀI GIẢNG")
