@@ -1,4 +1,4 @@
-﻿"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
+"""Unified Streamlit portal for MathTeacher-AI teacher tools."""
 
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ PORTAL_PAGES = (
     'T\u1ed5ng quan',
     'Soạn bài cùng chuẩn giáo án',
     'Qu\u1ea3n l\xfd gi\xe1o \xe1n',
+    'Thiết kế bài giảng',
     'Thư viện Prompt & AI',
     'Trợ lý OpenClaw',
     'Soạn bài theo tuần',
@@ -45,6 +46,7 @@ PORTAL_PAGES = (
     'Ma tr\u1eadn & b\u1ea3n \u0111\u1eb7c t\u1ea3',
     'AI xây dựng ngân hàng câu hỏi',
     'Lớp học ôn tập',
+    'AI Trợ giảng',
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra',
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra To\xe1n 6',
     'Xu\u1ea5t \u0111\u1ec1 ki\u1ec3m tra',
@@ -1123,13 +1125,17 @@ def main() -> None:
     )
     if current_page not in PORTAL_PAGES and not hidden_route:
         current_page = "Tổng quan"
+    slide_designer_enabled = os.environ.get("MATHTEACHER_SLIDE_DESIGNER") == "1"
+    if not slide_designer_enabled and current_page == "Thiết kế bài giảng":
+        current_page = "Tổng quan"
     if hidden_route:
         selected = current_page
     else:
         if st.session_state.get("portal_navigation") != current_page:
             st.session_state["portal_navigation"] = current_page
         selected = st.sidebar.radio(
-            "Công cụ", PORTAL_PAGES,
+            "Công cụ", (PORTAL_PAGES if slide_designer_enabled else
+                        tuple(page for page in PORTAL_PAGES if page != "Thiết kế bài giảng")),
             key="portal_navigation",
             label_visibility="collapsed",
             on_change=_autosave_before_portal_navigation,
@@ -1148,6 +1154,10 @@ def main() -> None:
 
     if selected == "Tổng quan":
         render_dashboard(st)
+
+    elif selected == "Thiết kế bài giảng":
+        from portal_v2.ui.lesson_slide_designer import render_lesson_slide_designer
+        render_lesson_slide_designer(st, client=client, user_id=str(user_id))
 
     elif selected == 'Công cụ soạn bài':
         from portal_v2.ui.weekly_schedule_streamlit import (
@@ -2131,6 +2141,16 @@ def main() -> None:
     elif selected == "Lớp học ôn tập":
         from portal_v2.ui.teacher_classroom_streamlit import render_teacher_classroom
         render_teacher_classroom(st=st, client=client, user_id=str(user_id))
+
+    elif selected == "AI Trợ giảng":
+        from portal_v2.ui.teaching_assistant_avatar_surface_streamlit import (
+            render_teaching_assistant_avatar_surface,
+        )
+        render_teaching_assistant_avatar_surface(
+            st=st,
+            client=client,
+            user_id=str(user_id),
+        )
 
     elif selected == "Xưởng câu hỏi":
         from portal_v2.ui.question_studio_streamlit import (

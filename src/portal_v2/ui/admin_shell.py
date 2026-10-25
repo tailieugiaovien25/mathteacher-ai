@@ -46,12 +46,22 @@ from portal_v2.ui.admin_math_question_review_streamlit import (
 from portal_v2.ui.admin_lesson_plan_coordination_center_streamlit import (
     render_admin_lesson_plan_coordination_center,
 )
+from portal_v2.ui.admin_system_admin_ai_streamlit import render_admin_system_admin_ai
+from portal_v2.ui.admin_marketing_ai_streamlit import render_admin_marketing_ai
+from portal_v2.ui.admin_ai_approval_center_streamlit import render_admin_ai_approval_center
+from portal_v2.ui.admin_ai_runtime_center_streamlit import render_admin_ai_runtime_center
+from portal_v2.ui.admin_ai_autonomous_center_streamlit import render_admin_ai_autonomous_center
 
 from portal_v2.ui.admin_navigation import (
     ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION,
     ADMIN_PAGE_CANONICAL_CODE_CATALOG,
     ADMIN_PAGE_CONTEXT_CONTROL_CENTER,
     ADMIN_PAGE_LESSON_PLAN_COORDINATION_CENTER,
+    ADMIN_PAGE_SYSTEM_ADMIN_AI,
+    ADMIN_PAGE_MARKETING_AI,
+    ADMIN_PAGE_AI_APPROVAL_CENTER,
+    ADMIN_PAGE_AI_RUNTIME_CENTER,
+    ADMIN_PAGE_AI_AUTONOMOUS_CENTER,
     ADMIN_PAGE_ASSESSMENT_TEMPLATES,
     ADMIN_PAGE_ASSESSMENT_REVIEWS,
     ADMIN_PAGE_MATH6_ASSESSMENT,
@@ -547,6 +557,26 @@ def render_admin_page(
             authorization=authorization,
             client=client,
         )
+        return
+
+    if page.page_id == ADMIN_PAGE_SYSTEM_ADMIN_AI:
+        render_admin_system_admin_ai(st, client=client)
+        return
+
+    if page.page_id == ADMIN_PAGE_MARKETING_AI:
+        render_admin_marketing_ai(st, client=client)
+        return
+
+    if page.page_id == ADMIN_PAGE_AI_APPROVAL_CENTER:
+        render_admin_ai_approval_center(st, admin_actor=authorization.user_id)
+        return
+
+    if page.page_id == ADMIN_PAGE_AI_RUNTIME_CENTER:
+        render_admin_ai_runtime_center(st, admin_actor=authorization.user_id)
+        return
+
+    if page.page_id == ADMIN_PAGE_AI_AUTONOMOUS_CENTER:
+        render_admin_ai_autonomous_center(st, admin_actor=authorization.user_id)
         return
 
     renderers = {

@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,7 +24,9 @@ def test_table_border_and_image_fit_are_wired():
 
 def test_a9b_r2_row_split_guard_is_preserved():
     text = STANDARDIZER.read_text(encoding="utf-8-sig")
-    assert text.count('OxmlElement(\n                            "w:cantSplit"') == 1
+    assert text.count('OxmlElement(\n                            "w:cantSplit"') == 2
+    assert "row_index != 0" in text
+    assert "allow_row_split" in text
     assert "row_index == 0" in text
     assert 'OxmlElement(\n                        "w:tblHeader"' in text
 
