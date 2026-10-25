@@ -10,6 +10,8 @@ from uuid import uuid4
 from pathlib import Path
 import tempfile
 import re
+import zipfile
+import xml.etree.ElementTree as ET
 from copy import deepcopy
 
 from portal_v2.ui.lesson_tool_buttons import tool_button, tool_download_button
@@ -1565,6 +1567,90 @@ def render_design_tool_dialog(st, draft, *, group, client=None, user_id=None):
             save_status.error(f"Chưa lưu được bản nháp: {exc}")
 
 
+def extract_pptx_slides(file_bytes: bytes) -> list[dict]:
+    """Extract slide titles and text from a PPTX without trusting embedded content."""
+    if not isinstance(file_bytes, bytes) or not file_bytes:
+        raise ValueError("Tệp PowerPoint đang trống.")
+    try:
+        archive = zipfile.ZipFile(__import__("io").BytesIO(file_bytes))
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise ValueError("Tệp không phải PowerPoint .pptx hợp lệ. Định dạng .ppt cũ cần chuyển sang .pptx.") from exc
+    with archive:
+        names = archive.namelist()
+        slide_names = [name for name in names if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)]
+        slide_names.sort(key=lambda name: int(re.search(r"slide(\d+)\.xml$", name).group(1)))
+        if not slide_names:
+            raise ValueError("Không tìm thấy slide trong tệp PowerPoint.")
+        if len(slide_names) > 80:
+            raise ValueError("Bài giảng hiện hỗ trợ tối đa 80 slide.")
+        ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+        result = []
+        for name in slide_names:
+            try:
+                root = ET.fromstring(archive.read(name))
+            except ET.ParseError as exc:
+                raise ValueError("Một slide trong tệp PowerPoint bị lỗi cấu trúc.") from exc
+            paragraphs = []
+            for paragraph in root.findall(".//a:p", ns):
+                text = "".join(node.text or "" for node in paragraph.findall(".//a:t", ns)).strip()
+                if text:
+                    paragraphs.append(text)
+            title = paragraphs[0][:200] if paragraphs else f"Slide {len(result) + 1}"
+            blocks = [{"kind": "Nội dung", "text": text[:5000], "reveal_later": False}
+                      for text in paragraphs[1:31]]
+            result.append({"title": title, "blocks": blocks})
+        return result
+
+
+def render_pptx_import(st, draft: dict) -> dict:
+    """Offer a safe text-first PPTX preview and append imported slides on confirmation."""
+    with st.expander("📥 Import PPT/PPTX", expanded=False):
+        st.caption("Chọn tệp .pptx để xem trước nội dung slide. Bản nhập hiện chuyển tiêu đề và văn bản; bố cục, ảnh, hiệu ứng và âm thanh chưa được giữ nguyên.")
+        uploaded = st.file_uploader("Chọn tệp PowerPoint", type=["pptx"], key="lesson_pptx_import_file")
+        imported = None
+        if uploaded is not None:
+            try:
+                imported = extract_pptx_slides(uploaded.getvalue())
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                st.success(f"Đã đọc {len(imported)} slide · {uploaded.name}")
+                with st.container(border=True):
+                    st.markdown("**Xem trước slide**")
+                    for index, slide in enumerate(imported[:8], start=1):
+                        with st.expander(f"Slide {index}: {slide['title']}", expanded=index == 1):
+                            if slide["blocks"]:
+                                for block in slide["blocks"]:
+                                    st.write(block["text"])
+                            else:
+                                st.caption("Không tìm thấy văn bản bổ sung trên slide này.")
+                    if len(imported) > 8:
+                        st.caption(f"Còn {len(imported) - 8} slide khác; nội dung sẽ được nhập đầy đủ.")
+                available = 80 - len(draft.get("slides", []))
+                if len(imported) > available:
+                    st.warning(f"Bản nháp còn chỗ cho {max(0, available)} slide; tệp có {len(imported)} slide.")
+                disabled = not imported or available <= 0
+                if st.button("Nhập bài giảng", type="primary", key="lesson_pptx_import_confirm", disabled=disabled):
+                    to_add = imported[:available]
+                    activities = [key for key, _ in ACTIVITIES]
+                    for index, item in enumerate(to_add):
+                        draft["slides"].append({
+                            "id": str(uuid4()),
+                            "activity": activities[min(3, index * 4 // max(1, len(to_add)))],
+                            "title": item["title"],
+                            "blocks": item["blocks"],
+                        })
+                    validate_draft(draft)
+                    st.session_state["lesson_slide_draft"] = draft
+                    st.session_state["lesson_slide_revision"] = str(uuid4())
+                    st.session_state["lesson_slide_saved_digest"] = ""
+                    st.session_state.pop("lesson_surface_index", None)
+                    st.session_state.pop("lesson_surface_pending", None)
+                    st.success(f"Đã nhập {len(to_add)} slide vào bản nháp.")
+                    st.rerun()
+    return draft
+
+
 def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None) -> None:
     _designer_style(st)
     with st.container(border=True):
@@ -1573,6 +1659,8 @@ def render_lesson_slide_designer(st, *, client=None, user_id: str | None = None)
         if "lesson_slide_revision" not in st.session_state:
             st.session_state["lesson_slide_revision"] = str(uuid4())
         draft = st.session_state["lesson_slide_draft"]
+        draft = render_pptx_import(st, draft)
+        st.session_state["lesson_slide_draft"] = draft
         # lesson-current-slide-r164
         if not draft["slides"]:
             draft = apply_surface_event(draft, {"action": "add_slide"})
