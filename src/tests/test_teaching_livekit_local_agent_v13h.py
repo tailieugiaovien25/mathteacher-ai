@@ -124,6 +124,34 @@ def test_zero_pre_roll_keeps_the_first_voiced_frame(tmp_path):
     asyncio.run(run())
 
 
+
+def test_max_utterance_budget_counts_first_voiced_block(tmp_path):
+    agent = _FakeAgent()
+    config = LocalLiveKitAgentConfig(
+        output_dir=tmp_path,
+        pre_roll_ms=0,
+        max_utterance_ms=60,
+        silence_timeout_ms=600,
+        min_utterance_ms=1,
+    )
+    sess = LocalLiveKitAgentSession(agent=agent, config=config)
+    stt = _FakeSTT()
+    sess._stt = stt
+
+    async def run():
+        speech = b"\x00\x40" * 480
+        await sess.consume_frame(speech, block_ms=30)
+        assert sess._elapsed_ms == 30
+        await sess.consume_frame(speech, block_ms=30)
+        assert sess._started is False
+        assert sess._elapsed_ms == 0
+        await asyncio.sleep(0.01)
+        assert agent.transcripts == ["mở hoạt động khởi động"]
+        assert stt.duration_ms == 60
+
+    asyncio.run(run())
+
+
 def test_barge_in_interrupts_active_agent():
     agent = _FakeAgent()
     agent.speaking = True
