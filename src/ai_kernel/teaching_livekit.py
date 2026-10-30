@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import datetime as dt
 import html
+import json
 import os
 from typing import Any
 
@@ -25,6 +26,8 @@ def generate_livekit_access_token(
     can_publish_video: bool = False,
     can_subscribe_audio: bool = True,
     can_subscribe_video: bool = True,
+    api_key_env: str = "LIVEKIT_API_KEY",
+    api_secret_env: str = "LIVEKIT_API_SECRET",
 ) -> LiveKitParticipantToken:
     """Generate a short-lived token; API secret remains server-side.
 
@@ -34,8 +37,8 @@ def generate_livekit_access_token(
     if not room_name.strip() or not identity.strip():
         raise ValueError("room_name và identity không được để trống")
     ttl = max(60, min(int(ttl_seconds), 3600))
-    api_key = os.environ.get("LIVEKIT_API_KEY", "").strip()
-    api_secret = os.environ.get("LIVEKIT_API_SECRET", "").strip()
+    api_key = os.environ.get(str(api_key_env), "").strip()
+    api_secret = os.environ.get(str(api_secret_env), "").strip()
     if not api_key or not api_secret:
         raise RuntimeError("Thiếu LIVEKIT_API_KEY/LIVEKIT_API_SECRET ở backend.")
 
@@ -44,10 +47,17 @@ def generate_livekit_access_token(
     except ImportError as exc:
         raise RuntimeError("Chưa cài livekit-api; hãy cài trong môi trường server.") from exc
 
+    publish_sources = []
+    if can_publish_audio:
+        publish_sources.append("microphone")
+    if can_publish_video:
+        publish_sources.append("camera")
+
     grants = api.VideoGrants(
         room_join=True,
         room=room_name,
-        can_publish=bool(can_publish_audio or can_publish_video),
+        can_publish=bool(publish_sources),
+        can_publish_sources=publish_sources,
         can_subscribe=bool(can_subscribe_audio or can_subscribe_video),
     )
 
@@ -60,6 +70,18 @@ def generate_livekit_access_token(
         .to_jwt()
     )
     return LiveKitParticipantToken(token, room_name, identity, ttl)
+
+
+def _script_json(value: str) -> str:
+    """Serialize data as a JavaScript string without permitting script-tag breakout."""
+    return (
+        json.dumps(str(value), ensure_ascii=False)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
 
 def build_livekit_client_html(
@@ -75,12 +97,12 @@ def build_livekit_client_html(
     bundled ESM build. A CDN URL is only a development fallback.
     """
     js_url = (client_js_url or os.environ.get("MATHTEACHER_LIVEKIT_CLIENT_JS_URL", "")).strip()
-    safe_url = html.escape(server_url, quote=True)
-    safe_token = html.escape(token, quote=True)
     safe_name = html.escape(display_name, quote=True)
     if not js_url:
         js_url = "https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.esm.mjs"
-    safe_js = html.escape(js_url, quote=True)
+    script_server_url = _script_json(server_url)
+    script_token = _script_json(token)
+    script_js_url = _script_json(js_url)
     return f"""
 <div class='lk-ta' style='font-family:Arial,sans-serif;padding:10px;border:1px solid #d7dee8;border-radius:12px'>
   <div style='font-weight:700'>{safe_name}</div>
@@ -89,9 +111,9 @@ def build_livekit_client_html(
   <button id='lk-stop' type='button' style='margin-left:6px'>⏹ Ngắt</button>
 </div>
 <script type='module'>
-import * as LivekitClient from '{safe_js}';
-const url = {server_url!r};
-const token = {token!r};
+import * as LivekitClient from {script_js_url};
+const url = {script_server_url};
+const token = {script_token};
 const status = document.getElementById('lk-status');
 let room = null;
 function setStatus(t) {{ if (status) status.textContent = t; }}
