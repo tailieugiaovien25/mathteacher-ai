@@ -517,10 +517,7 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                                 if active_session:
                                     try:
                                         session_plan = plan_for_single_action(plan, action.action_id)
-                                        session_results = teaching_session.execute_plan(
-                                            session_plan,
-                                            teacher_confirmed=True,
-                                        )
+                                        session_results = teaching_session.execute_plan(session_plan, teacher_confirmed=True)
                                         if session_results:
                                             exec_result = session_results[0]
                                         else:
