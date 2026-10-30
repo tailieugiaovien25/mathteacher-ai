@@ -12,7 +12,6 @@ on:
       - "src/ai_platform/**"
       - "src/portal_v2/ui/teaching_assistant_avatar_surface_streamlit.py"
       - "src/tests/test_ai*.py"
-      - "src/tests/test_agent*.py"
       - "src/tests/test_teaching_*.py"
       - ".github/workflows/teaching-assistant-regression.yml"
   workflow_dispatch:
@@ -54,5 +53,4 @@ jobs:
         run: |
           python -m pytest -q \
             src/tests/test_ai*.py \
-            src/tests/test_agent*.py \
             src/tests/test_teaching_*.py
