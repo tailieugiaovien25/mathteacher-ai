@@ -27,6 +27,17 @@ def test_avatar_surface_is_presentation_only():
     assert "classroom.slide.open" not in html
 
 
+def test_avatar_surface_escapes_script_closing_sequences_in_ai_text():
+    html = build_avatar_surface_html(
+        avatar_svg="<svg></svg>",
+        display_name="Trợ giảng Toán",
+        state="speaking",
+        speech_text="Nội dung </script><script>alert(1)</script>",
+    )
+    assert "Nội dung </script>" not in html
+    assert "\\u003c/script\\u003e" in html
+
+
 def test_teacher_navigation_exposes_teaching_assistant():
     from portal_v2.ui.workspace_navigation import route_from_label
     route = route_from_label("AI Trợ giảng")

@@ -22,6 +22,7 @@ class TeachingAssistantTurn(str, Enum):
     SPEAKING = "speaking"
     INTERRUPTED = "interrupted"
     TEACHER_CONTROL = "teacher_control"
+    PAUSED = "paused"
     STOPPED = "stopped"
 
 
@@ -105,6 +106,7 @@ class TeachingAssistantController:
             raise ValueError("persona_id và policy.persona_id phải khớp")
         self.persona = persona
         self.policy = policy
+        self._turn_before_teacher_control: TeachingAssistantTurn | None = None
         self.session = TeachingAssistantSession(
             session_id="ta_" + uuid4().hex,
             persona_id=persona.persona_id,
@@ -112,7 +114,10 @@ class TeachingAssistantController:
         )
 
     def propose_actions(self, actions: Sequence[TeachingAssistantAction]) -> tuple[TeachingAssistantAction, ...]:
-        if self.session.teacher_control:
+        if self.session.teacher_control or self.session.turn in {
+            TeachingAssistantTurn.PAUSED,
+            TeachingAssistantTurn.STOPPED,
+        }:
             return ()
         limited = tuple(actions)[: self.policy.max_actions_per_turn]
         for action in limited:
@@ -127,8 +132,11 @@ class TeachingAssistantController:
         """
         if not isinstance(action_id, str) or not action_id.strip():
             raise ValueError("action_id không được rỗng")
-        if self.session.teacher_control:
-            raise AdminPolicyError("Giáo viên đang giữ quyền điều khiển; không phê duyệt action cho AI.")
+        if self.session.teacher_control or self.session.turn in {
+            TeachingAssistantTurn.PAUSED,
+            TeachingAssistantTurn.STOPPED,
+        }:
+            raise AdminPolicyError("Trợ giảng đang tạm dừng/dừng hoặc giáo viên đang giữ quyền; không thể phê duyệt action.")
         approved = tuple(dict.fromkeys((*self.session.approved_action_ids, action_id)))
         self.session = TeachingAssistantSession(
             session_id=self.session.session_id,
@@ -140,7 +148,38 @@ class TeachingAssistantController:
         )
         return self.session
 
+    def pause(self) -> TeachingAssistantSession:
+        if self.session.teacher_control or self.session.turn is TeachingAssistantTurn.STOPPED:
+            raise AdminPolicyError("Không thể tạm dừng trợ giảng ở trạng thái hiện tại.")
+        if self.session.turn is TeachingAssistantTurn.PAUSED:
+            raise AdminPolicyError("Trợ giảng đã tạm dừng.")
+        self.session = TeachingAssistantSession(
+            session_id=self.session.session_id,
+            persona_id=self.session.persona_id,
+            mode=self.session.mode,
+            turn=TeachingAssistantTurn.PAUSED,
+            teacher_control=False,
+            approved_action_ids=self.session.approved_action_ids,
+        )
+        return self.session
+
+    def resume(self) -> TeachingAssistantSession:
+        if self.session.turn is not TeachingAssistantTurn.PAUSED:
+            raise AdminPolicyError("Trợ giảng không ở trạng thái tạm dừng.")
+        self.session = TeachingAssistantSession(
+            session_id=self.session.session_id,
+            persona_id=self.session.persona_id,
+            mode=self.session.mode,
+            turn=TeachingAssistantTurn.LISTENING,
+            teacher_control=False,
+            approved_action_ids=self.session.approved_action_ids,
+        )
+        return self.session
+
     def teacher_take_control(self) -> TeachingAssistantSession:
+        if self.session.teacher_control or self.session.turn is TeachingAssistantTurn.STOPPED:
+            raise AdminPolicyError("Không thể giành quyền điều khiển ở trạng thái hiện tại.")
+        self._turn_before_teacher_control = self.session.turn
         self.session = TeachingAssistantSession(
             session_id=self.session.session_id,
             persona_id=self.session.persona_id,
@@ -152,17 +191,22 @@ class TeachingAssistantController:
         return self.session
 
     def teacher_release_control(self) -> TeachingAssistantSession:
+        if not self.session.teacher_control:
+            raise AdminPolicyError("Giáo viên không giữ quyền điều khiển.")
+        restore_turn = self._turn_before_teacher_control or TeachingAssistantTurn.LISTENING
+        self._turn_before_teacher_control = None
         self.session = TeachingAssistantSession(
             session_id=self.session.session_id,
             persona_id=self.session.persona_id,
             mode=self.session.mode,
-            turn=TeachingAssistantTurn.LISTENING,
+            turn=restore_turn,
             teacher_control=False,
             approved_action_ids=self.session.approved_action_ids,
         )
         return self.session
 
     def stop(self) -> TeachingAssistantSession:
+        self._turn_before_teacher_control = None
         self.session = TeachingAssistantSession(
             session_id=self.session.session_id,
             persona_id=self.session.persona_id,

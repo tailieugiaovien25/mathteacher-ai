@@ -49,6 +49,37 @@ def test_command_tts_validates_placeholders():
         CommandTTSAdapter("echo {text}")
 
 
+def test_voice_bridge_with_ollama_brain_accepts_mode_contract(tmp_path):
+    import ai_kernel.teaching_voice as voice
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"message": {"content": "Chúng ta bắt đầu nhé."}}).encode("utf-8")
+
+    def fake_open(request, timeout=None):
+        return FakeResponse()
+
+    audio = tmp_path / "input.wav"
+    audio.write_bytes(b"fake")
+    bridge = TeachingAssistantVoiceBridge(
+        stt=FakeSTT(),
+        brain=voice.OllamaTeachingBrain(opener=fake_open),
+        config=TeachingVoiceConfig(mode="teacher"),
+    )
+
+    turn = bridge.process_audio(audio)
+
+    assert turn.response_text == "Chúng ta bắt đầu nhé."
+
+
 def test_ollama_payload_contract(monkeypatch):
     import ai_kernel.teaching_voice as voice
 

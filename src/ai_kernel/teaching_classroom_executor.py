@@ -7,7 +7,7 @@ from typing import Any, Mapping, MutableMapping, Protocol
 
 from .contracts import AIActionClass
 from .governance import AdminPolicyError
-from .teaching_assistant import TeachingAssistantAction, TeachingAssistantController
+from .teaching_assistant import TeachingAssistantAction, TeachingAssistantController, TeachingAssistantTurn
 
 
 class ClassroomExecutionStatus(str, Enum):
@@ -189,6 +189,14 @@ class TeachingClassroomActionExecutor:
                     tool_id=action.tool_id,
                     status=ClassroomExecutionStatus.BLOCKED,
                     message="Giáo viên đang giữ quyền điều khiển; Trợ giảng không được thực thi action.",
+                )
+
+            if self.controller.session.turn is TeachingAssistantTurn.PAUSED:
+                return ClassroomExecutionResult(
+                    action_id=action.action_id,
+                    tool_id=action.tool_id,
+                    status=ClassroomExecutionStatus.BLOCKED,
+                    message="Teaching Assistant đang tạm dừng; không thể thực thi action.",
                 )
 
             self.controller.policy.check_action(action)

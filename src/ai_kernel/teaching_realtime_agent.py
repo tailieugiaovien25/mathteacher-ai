@@ -89,27 +89,32 @@ class AIKernelStreamingBrain:
             skill_id="classroom.assistant",
         )
 
-        queue: asyncio.Queue[str | None] = asyncio.Queue()
+        queue: asyncio.Queue[str | Exception | None] = asyncio.Queue()
         loop = asyncio.get_running_loop()
+
+        def enqueue(item: str | Exception | None) -> None:
+            asyncio.run_coroutine_threadsafe(queue.put(item), loop).result()
 
         def producer() -> None:
             try:
                 for chunk in stream:
                     if chunk:
-                        asyncio.run_coroutine_threadsafe(
-                            queue.put(str(chunk)),
-                            loop,
-                        ).result()
+                        enqueue(str(chunk))
+            except Exception as exc:
+                # Do not hide provider/router errors inside the worker thread.
+                enqueue(exc)
             finally:
-                asyncio.run_coroutine_threadsafe(queue.put(None), loop).result()
+                enqueue(None)
 
         task = asyncio.create_task(asyncio.to_thread(producer))
         try:
             while True:
-                chunk = await queue.get()
-                if chunk is None:
+                item = await queue.get()
+                if item is None:
                     break
-                yield chunk
+                if isinstance(item, Exception):
+                    raise RuntimeError(f"AI Kernel streaming failed: {item}") from item
+                yield item
         finally:
             if not task.done():
                 task.cancel()

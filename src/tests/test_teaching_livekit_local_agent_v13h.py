@@ -1,6 +1,7 @@
 import asyncio
 from pathlib import Path
 import sys
+import wave
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -13,8 +14,13 @@ class _FakeSTTResult:
 
 
 class _FakeSTT:
+    def __init__(self):
+        self.duration_ms = 0
+
     def transcribe(self, path, *, language="vi"):
-        del path, language
+        del language
+        with wave.open(str(path), "rb") as audio:
+            self.duration_ms = int(audio.getnframes() * 1000 / audio.getframerate())
         return _FakeSTTResult()
 
 
@@ -59,6 +65,119 @@ def test_local_session_collects_turn_and_starts_response(monkeypatch, tmp_path):
         await sess.consume_frame(silence, block_ms=60)
         await asyncio.sleep(0.01)
         assert agent.transcripts == ["mở hoạt động khởi động"]
+
+    asyncio.run(run())
+
+
+def test_silence_before_speech_does_not_consume_utterance_budget(tmp_path):
+    agent = _FakeAgent()
+    config = LocalLiveKitAgentConfig(
+        output_dir=tmp_path,
+        block_duration_ms=30,
+        silence_timeout_ms=60,
+        max_utterance_ms=90,
+        min_utterance_ms=30,
+    )
+    sess = LocalLiveKitAgentSession(agent=agent, config=config)
+    stt = _FakeSTT()
+    sess._stt = stt
+
+    async def run():
+        silence = b"\x00\x00" * 480
+        speech = b"\x00\x40" * 480
+        for _ in range(8):
+            await sess.consume_frame(silence, block_ms=30)
+        assert sess._elapsed_ms == 0
+        await sess.consume_frame(speech, block_ms=30)
+        await sess.consume_frame(silence, block_ms=30)
+        await sess.consume_frame(silence, block_ms=30)
+        await asyncio.sleep(0.01)
+        assert agent.transcripts == ["mở hoạt động khởi động"]
+        # Six pre-roll frames (180 ms), the voiced frame and trailing silence
+        # are retained in the WAV; only voiced/post-onset time counts toward max.
+        assert stt.duration_ms >= 240
+
+    asyncio.run(run())
+
+
+def test_zero_pre_roll_keeps_the_first_voiced_frame(tmp_path):
+    agent = _FakeAgent()
+    config = LocalLiveKitAgentConfig(
+        output_dir=tmp_path,
+        pre_roll_ms=0,
+        silence_timeout_ms=60,
+        min_utterance_ms=1,
+    )
+    sess = LocalLiveKitAgentSession(agent=agent, config=config)
+    stt = _FakeSTT()
+    sess._stt = stt
+
+    async def run():
+        speech = b"\x00\x40" * 480
+        silence = b"\x00\x00" * 960
+        await sess.consume_frame(speech, block_ms=30)
+        await sess.consume_frame(silence, block_ms=60)
+        await asyncio.sleep(0.01)
+        assert agent.transcripts == ["mở hoạt động khởi động"]
+        assert stt.duration_ms >= 90
+
+    asyncio.run(run())
+
+
+
+def test_max_utterance_budget_counts_first_voiced_block(tmp_path):
+    agent = _FakeAgent()
+    config = LocalLiveKitAgentConfig(
+        output_dir=tmp_path,
+        pre_roll_ms=0,
+        max_utterance_ms=60,
+        silence_timeout_ms=600,
+        min_utterance_ms=1,
+    )
+    sess = LocalLiveKitAgentSession(agent=agent, config=config)
+    stt = _FakeSTT()
+    sess._stt = stt
+
+    async def run():
+        speech = b"\x00\x40" * 480
+        await sess.consume_frame(speech, block_ms=30)
+        assert sess._elapsed_ms == 30
+        await sess.consume_frame(speech, block_ms=30)
+        assert sess._started is False
+        assert sess._elapsed_ms == 0
+        await asyncio.sleep(0.01)
+        assert agent.transcripts == ["mở hoạt động khởi động"]
+        assert stt.duration_ms == 60
+
+    asyncio.run(run())
+
+
+
+def test_pre_roll_does_not_satisfy_minimum_speech_duration(tmp_path):
+    agent = _FakeAgent()
+    config = LocalLiveKitAgentConfig(
+        output_dir=tmp_path,
+        pre_roll_ms=180,
+        silence_timeout_ms=60,
+        min_utterance_ms=240,
+    )
+    sess = LocalLiveKitAgentSession(agent=agent, config=config)
+    stt = _FakeSTT()
+    sess._stt = stt
+
+    async def run():
+        silence = b"\x00\x00" * 480
+        speech = b"\x00\x40" * 480
+        for _ in range(8):
+            await sess.consume_frame(silence, block_ms=30)
+        await sess.consume_frame(speech, block_ms=30)
+        await sess.consume_frame(silence, block_ms=30)
+        await sess.consume_frame(silence, block_ms=30)
+        await asyncio.sleep(0.01)
+        # Pre-roll plus trailing silence must not make a single 30 ms sound
+        # pass the 240 ms minimum utterance threshold.
+        assert agent.transcripts == []
+        assert stt.duration_ms == 0
 
     asyncio.run(run())
 

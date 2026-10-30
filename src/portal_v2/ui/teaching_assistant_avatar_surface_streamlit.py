@@ -27,6 +27,18 @@ def _read_avatar_svg(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _safe_script_json(value: str) -> str:
+    """JSON-encode text for inline scripts without allowing a closing script tag."""
+    return (
+        json.dumps(str(value or ""), ensure_ascii=False)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
 def build_avatar_surface_html(
     *,
     avatar_svg: str,
@@ -43,7 +55,7 @@ def build_avatar_surface_html(
     """
     safe_name = html.escape(display_name)
     safe_state = html.escape(state)
-    speech_payload = json.dumps(speech_text or "", ensure_ascii=False)
+    speech_payload = _safe_script_json(speech_text)
     svg = avatar_svg.strip()
     if not svg:
         avatar_markup = "<div class='avatar-fallback'>AI</div>"
@@ -496,18 +508,30 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                             st.write(f"- {action.label} · {approval}")
                         with a_right:
                             if st.button("â–¶ Thá»±c hiá»‡n", key="ta_v13j_exec_" + action.action_id, use_container_width=True):
-                                if teaching_session.status not in {TeachingSessionStatus.PREPARING, TeachingSessionStatus.COMPLETED, TeachingSessionStatus.STOPPED}:
+                                exec_result = None
+                                active_session = teaching_session.status not in {
+                                    TeachingSessionStatus.PREPARING,
+                                    TeachingSessionStatus.COMPLETED,
+                                    TeachingSessionStatus.STOPPED,
+                                }
+                                if active_session:
                                     try:
                                         session_plan = plan_for_single_action(plan, action.action_id)
                                         session_results = teaching_session.execute_plan(session_plan, teacher_confirmed=True)
-                                        exec_result = session_results[0] if session_results else executor.execute(action, teacher_confirmed=True)
+                                        if session_results:
+                                            exec_result = session_results[0]
+                                        else:
+                                            st.warning("Teaching Session không trả về kết quả thực thi; chưa chạy hành động.")
                                     except Exception as exc:
-                                        st.error(f"KhÃ´ng thá»ƒ thá»±c thi theo Teaching Session: {exc}")
-                                        exec_result = executor.execute(action, teacher_confirmed=True)
+                                        # Never bypass the session lifecycle/pause/teacher-override
+                                        # guards by falling back to direct executor execution.
+                                        st.error(f"Không thể thực thi theo Teaching Session: {exc}")
                                 else:
                                     exec_result = executor.execute(action, teacher_confirmed=True)
-                                st.session_state["ta_v13j_action_results"][action.action_id] = exec_result
-                                st.rerun()
+
+                                if exec_result is not None:
+                                    st.session_state["ta_v13j_action_results"][action.action_id] = exec_result
+                                    st.rerun()
                 else:
                     st.caption("Ká»‹ch báº£n nÃ y chá»‰ gá»“m lá»i dáº«n, chÆ°a Ä‘á» xuáº¥t thao tÃ¡c ká»¹ thuáº­t.")
                 status = StreamlitClassroomRuntime(st.session_state).read_status()
@@ -597,7 +621,7 @@ def render_livekit_realtime_panel(st: Any, *, identity: str = "teacher") -> None
         return
 
     config = LiveKitTransportConfig.from_env()
-    if not os.environ.get("LIVEKIT_API_KEY") or not os.environ.get("LIVEKIT_API_SECRET"):
+    if not os.environ.get(config.api_key_env) or not os.environ.get(config.api_secret_env):
         st.info("ChÆ°a cáº¥u hÃ¬nh LIVEKIT_API_KEY/LIVEKIT_API_SECRET á»Ÿ backend.")
         return
     try:
@@ -606,6 +630,8 @@ def render_livekit_realtime_panel(st: Any, *, identity: str = "teacher") -> None
             identity=f"{config.identity_prefix}-{identity}".strip("-"),
             name="Giáo viên",
             ttl_seconds=min(config.token_ttl_seconds, 900),
+            api_key_env=config.api_key_env,
+            api_secret_env=config.api_secret_env,
             can_publish_audio=True,
             can_publish_video=False,
             can_subscribe_audio=True,

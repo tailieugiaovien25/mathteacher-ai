@@ -4,10 +4,13 @@ from pathlib import Path
 import sys
 import tempfile
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from ai_kernel.teaching_realtime_agent import (  # noqa: E402
+    AIKernelStreamingBrain,
     OllamaStreamingBrain,
     RealtimeAgentEvent,
     RealtimeVoiceAgent,
@@ -117,3 +120,27 @@ def test_livekit_descriptor_is_local_first():
     assert descriptor.local_llm.startswith("ollama:")
     assert descriptor.local_stt.startswith("faster-whisper:")
     assert descriptor.local_tts.startswith("zerotts:")
+
+def test_ai_kernel_streaming_brain_surfaces_provider_errors():
+    class BrokenService:
+        def stream(self, **kwargs):
+            del kwargs
+
+            def broken_stream():
+                raise RuntimeError("synthetic provider failure")
+                yield "unreachable"
+
+            return broken_stream()
+
+    brain = AIKernelStreamingBrain(service=BrokenService())
+
+    async def run():
+        with pytest.raises(RuntimeError, match="synthetic provider failure"):
+            async for _ in brain.stream_response(
+                transcript="Kiểm tra",
+                system_prompt="Trợ giảng",
+            ):
+                pass
+
+    asyncio.run(run())
+

@@ -35,6 +35,18 @@ def test_livekit_descriptor_and_browser_bridge():
     assert "/assets/livekit-client.esm.mjs" in html
 
 
+def test_livekit_html_serializes_script_values_safely():
+    html = build_livekit_client_html(
+        server_url="wss://livekit.example.test';alert(1);//",
+        token="token</script><script>alert(1)</script>",
+        client_js_url="https://cdn.example.test/sdk.mjs?value=</script>",
+    )
+    assert "const url = \"wss://livekit.example.test';alert(1);//\";" in html
+    assert "token</script>" not in html
+    assert "\\u003c/script\\u003e" in html
+    assert 'import * as LivekitClient from "https://cdn.example.test/sdk.mjs?value=\\u003c/script\\u003e";' in html
+
+
 def test_livekit_transport_stays_optional():
     cfg = LiveKitTransportConfig(url="ws://127.0.0.1:7880", room_name="ta-v13g")
     assert cfg.publish_audio is True
@@ -54,14 +66,19 @@ def test_token_generation_keeps_secret_server_side(monkeypatch):
     import os
     from ai_kernel.teaching_livekit import generate_livekit_access_token
 
+    grants_seen = []
+    credentials_seen = []
+
     class FakeGrants:
         def __init__(self, **kwargs):
             self.kwargs = kwargs
+            grants_seen.append(kwargs)
 
     class FakeToken:
         def __init__(self, key, secret):
             self.key = key
             self.secret = secret
+            credentials_seen.append((key, secret))
             self.calls = []
         def with_identity(self, value): self.calls.append(("identity", value)); return self
         def with_name(self, value): self.calls.append(("name", value)); return self
@@ -81,6 +98,31 @@ def test_token_generation_keeps_secret_server_side(monkeypatch):
     result = generate_livekit_access_token(room_name="room", identity="teacher", ttl_seconds=120)
     assert result.token == "JWT-TEST"
     assert result.ttl_seconds == 120
+    assert grants_seen[-1]["can_publish"] is True
+    assert grants_seen[-1]["can_publish_sources"] == ["microphone"]
+    assert grants_seen[-1]["can_publish_data"] is False
+
+    generate_livekit_access_token(
+        room_name="room", identity="teacher",
+        can_publish_audio=True, can_publish_video=True,
+    )
+    assert grants_seen[-1]["can_publish_sources"] == ["microphone", "camera"]
+
+    generate_livekit_access_token(
+        room_name="room", identity="observer",
+        can_publish_audio=False, can_publish_video=False,
+    )
+    assert grants_seen[-1]["can_publish"] is False
+    assert grants_seen[-1]["can_publish_sources"] == []
+
+    monkeypatch.setenv("CUSTOM_LIVEKIT_KEY_NAME", "custom-key-value")
+    monkeypatch.setenv("CUSTOM_LIVEKIT_SECRET_NAME", "custom-secret-value")
+    generate_livekit_access_token(
+        room_name="room", identity="teacher",
+        api_key_env="CUSTOM_LIVEKIT_KEY_NAME",
+        api_secret_env="CUSTOM_LIVEKIT_SECRET_NAME",
+    )
+    assert credentials_seen[-1] == ("custom-key-value", "custom-secret-value")
 
 if __name__ == "__main__":
     test_livekit_descriptor_and_browser_bridge()
