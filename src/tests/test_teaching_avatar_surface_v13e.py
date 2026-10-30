@@ -35,7 +35,7 @@ def test_avatar_surface_escapes_script_closing_sequences_in_ai_text():
         speech_text="Nội dung </script><script>alert(1)</script>",
     )
     assert "Nội dung </script>" not in html
-    assert "\\u003c/script>" in html
+    assert "\\u003c/script\\u003e" in html
 
 
 def test_teacher_navigation_exposes_teaching_assistant():
