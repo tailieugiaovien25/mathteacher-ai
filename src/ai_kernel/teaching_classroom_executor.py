@@ -7,7 +7,7 @@ from typing import Any, Mapping, MutableMapping, Protocol
 
 from .contracts import AIActionClass
 from .governance import AdminPolicyError
-from .teaching_assistant import TeachingAssistantAction, TeachingAssistantController
+from .teaching_assistant import TeachingAssistantAction, TeachingAssistantController, TeachingAssistantTurn
 
 
 class ClassroomExecutionStatus(str, Enum):
