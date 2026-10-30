@@ -63,6 +63,33 @@ def test_local_session_collects_turn_and_starts_response(monkeypatch, tmp_path):
     asyncio.run(run())
 
 
+def test_silence_before_speech_does_not_consume_utterance_budget(tmp_path):
+    agent = _FakeAgent()
+    config = LocalLiveKitAgentConfig(
+        output_dir=tmp_path,
+        block_duration_ms=30,
+        silence_timeout_ms=60,
+        max_utterance_ms=90,
+        min_utterance_ms=30,
+    )
+    sess = LocalLiveKitAgentSession(agent=agent, config=config)
+    sess._stt = _FakeSTT()
+
+    async def run():
+        silence = b"\\x00\\x00" * 480
+        speech = b"\\x00\\x40" * 480
+        for _ in range(8):
+            await sess.consume_frame(silence, block_ms=30)
+        assert sess._elapsed_ms == 0
+        await sess.consume_frame(speech, block_ms=30)
+        await sess.consume_frame(silence, block_ms=30)
+        await sess.consume_frame(silence, block_ms=30)
+        await asyncio.sleep(0.01)
+        assert agent.transcripts == ["mở hoạt động khởi động"]
+
+    asyncio.run(run())
+
+
 def test_barge_in_interrupts_active_agent():
     agent = _FakeAgent()
     agent.speaking = True
