@@ -114,7 +114,10 @@ class TeachingAssistantController:
         )
 
     def propose_actions(self, actions: Sequence[TeachingAssistantAction]) -> tuple[TeachingAssistantAction, ...]:
-        if self.session.teacher_control:
+        if self.session.teacher_control or self.session.turn in {
+            TeachingAssistantTurn.PAUSED,
+            TeachingAssistantTurn.STOPPED,
+        }:
             return ()
         limited = tuple(actions)[: self.policy.max_actions_per_turn]
         for action in limited:
