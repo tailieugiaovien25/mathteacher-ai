@@ -22,6 +22,7 @@ class LocalLiveKitAgentConfig:
     silence_timeout_ms: int = 700
     max_utterance_ms: int = 15_000
     min_utterance_ms: int = 240
+    pre_roll_ms: int = 180
     energy_threshold: float = 0.015
     output_dir: str | Path | None = None
     stt_model: str = "small"
@@ -40,6 +41,7 @@ class LocalLiveKitAgentSession:
 
     _vad: EnergyVoiceActivityDetector = field(init=False)
     _frames: list[bytes] = field(default_factory=list, init=False)
+    _pre_roll_frames: list[bytes] = field(default_factory=list, init=False)
     _started: bool = field(default=False, init=False)
     _elapsed_ms: int = field(default=0, init=False)
     _response_task: asyncio.Task[None] | None = field(default=None, init=False)
@@ -84,14 +86,28 @@ class LocalLiveKitAgentSession:
 
         # Silence before the first voiced frame must not consume the utterance
         # time budget; otherwise a quiet room can cause the next word to be cut.
-        if active and not self._started:
-            self._started = True
-            self._elapsed_ms = 0
         if not self._started:
-            return
+            # Keep a small rolling audio pre-roll so the first consonant is not
+            # clipped by VAD onset detection. Bound it to at most one second.
+            pre_roll_ms = max(0, min(1000, int(self.config.pre_roll_ms)))
+            pre_roll_blocks = pre_roll_ms // max(1, int(self.config.block_duration_ms))
+            if pre_roll_blocks:
+                self._pre_roll_frames.append(bytes(pcm16))
+                if len(self._pre_roll_frames) > pre_roll_blocks:
+                    del self._pre_roll_frames[:-pre_roll_blocks]
+            else:
+                self._pre_roll_frames.clear()
 
-        self._frames.append(bytes(pcm16))
-        self._elapsed_ms = min(self.config.max_utterance_ms, self._elapsed_ms + duration_ms)
+            if active:
+                self._started = True
+                self._elapsed_ms = 0
+                self._frames.extend(self._pre_roll_frames)
+                self._pre_roll_frames.clear()
+            else:
+                return
+        else:
+            self._frames.append(bytes(pcm16))
+            self._elapsed_ms = min(self.config.max_utterance_ms, self._elapsed_ms + duration_ms)
 
         if ended or self._elapsed_ms >= self.config.max_utterance_ms:
             frames = tuple(self._frames)
@@ -158,6 +174,7 @@ class LocalLiveKitAgentSession:
             silence_timeout_ms=self.config.silence_timeout_ms,
         )
         self._frames.clear()
+        self._pre_roll_frames.clear()
         self._started = False
         self._elapsed_ms = 0
 
