@@ -1,6 +1,7 @@
 import asyncio
 from pathlib import Path
 import sys
+import wave
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -13,8 +14,13 @@ class _FakeSTTResult:
 
 
 class _FakeSTT:
+    def __init__(self):
+        self.duration_ms = 0
+
     def transcribe(self, path, *, language="vi"):
-        del path, language
+        del language
+        with wave.open(str(path), "rb") as audio:
+            self.duration_ms = int(audio.getnframes() * 1000 / audio.getframerate())
         return _FakeSTTResult()
 
 
@@ -73,7 +79,8 @@ def test_silence_before_speech_does_not_consume_utterance_budget(tmp_path):
         min_utterance_ms=30,
     )
     sess = LocalLiveKitAgentSession(agent=agent, config=config)
-    sess._stt = _FakeSTT()
+    stt = _FakeSTT()
+    sess._stt = stt
 
     async def run():
         silence = b"\x00\x00" * 480
@@ -86,6 +93,9 @@ def test_silence_before_speech_does_not_consume_utterance_budget(tmp_path):
         await sess.consume_frame(silence, block_ms=30)
         await asyncio.sleep(0.01)
         assert agent.transcripts == ["mở hoạt động khởi động"]
+        # Six pre-roll frames (180 ms), the voiced frame and trailing silence
+        # are retained in the WAV; only voiced/post-onset time counts toward max.
+        assert stt.duration_ms >= 240
 
     asyncio.run(run())
 
