@@ -1,0 +1,7 @@
+# Optional runtime dependencies for the MathTeacher AI realtime voice agent.
+# Install after requirements.txt, only when enabling the LiveKit voice worker.
+# Python 3.13 is supported by the current LiveKit Agents release line.
+livekit>=1.2,<2
+livekit-agents>=1.8,<2
+livekit-api>=1,<2
+zerotts>=0.1.5,<0.2
