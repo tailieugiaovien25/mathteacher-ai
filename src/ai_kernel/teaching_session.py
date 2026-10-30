@@ -255,6 +255,7 @@ class TeachingSessionManager:
     def pause(self, *, reason: str = "") -> TeachingSessionSnapshot:
         if self._status is not TeachingSessionStatus.RUNNING:
             raise AdminPolicyError("Chỉ có thể tạm dừng khi session đang RUNNING.")
+        self.controller.pause()
         self._status = TeachingSessionStatus.PAUSED
         self._last_message = reason or "Phiên dạy tạm dừng."
         self._record("session.paused", message=self._last_message)
