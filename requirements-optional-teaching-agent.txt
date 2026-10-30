@@ -1,6 +1,6 @@
 # Optional runtime dependencies for the MathTeacher AI realtime voice agent.
 # Install after requirements.txt, only when enabling the LiveKit voice worker.
-# Pin the Agents SDK; it declares the compatible livekit and livekit-api versions.
-# In particular, livekit-agents 1.8.10 pins livekit==1.1.21.
-livekit-agents==1.8.10
+# Keep LiveKit Agents 1.6.10: it supports Python 3.13 and OpenAI SDK <3,
+# matching MathTeacher AI's core requirement (openai>=1,<3).
+livekit-agents==1.6.10
 zerotts==0.1.5
