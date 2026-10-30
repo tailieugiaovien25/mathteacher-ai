@@ -76,8 +76,8 @@ def test_silence_before_speech_does_not_consume_utterance_budget(tmp_path):
     sess._stt = _FakeSTT()
 
     async def run():
-        silence = b"\\x00\\x00" * 480
-        speech = b"\\x00\\x40" * 480
+        silence = b"\x00\x00" * 480
+        speech = b"\x00\x40" * 480
         for _ in range(8):
             await sess.consume_frame(silence, block_ms=30)
         assert sess._elapsed_ms == 0
