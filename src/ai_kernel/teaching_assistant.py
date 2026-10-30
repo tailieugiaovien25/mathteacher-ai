@@ -148,7 +148,38 @@ class TeachingAssistantController:
         )
         return self.session
 
+    def pause(self) -> TeachingAssistantSession:
+        if self.session.teacher_control or self.session.turn is TeachingAssistantTurn.STOPPED:
+            raise AdminPolicyError("Không thể tạm dừng trợ giảng ở trạng thái hiện tại.")
+        if self.session.turn is TeachingAssistantTurn.PAUSED:
+            raise AdminPolicyError("Trợ giảng đã tạm dừng.")
+        self.session = TeachingAssistantSession(
+            session_id=self.session.session_id,
+            persona_id=self.session.persona_id,
+            mode=self.session.mode,
+            turn=TeachingAssistantTurn.PAUSED,
+            teacher_control=False,
+            approved_action_ids=self.session.approved_action_ids,
+        )
+        return self.session
+
+    def resume(self) -> TeachingAssistantSession:
+        if self.session.turn is not TeachingAssistantTurn.PAUSED:
+            raise AdminPolicyError("Trợ giảng không ở trạng thái tạm dừng.")
+        self.session = TeachingAssistantSession(
+            session_id=self.session.session_id,
+            persona_id=self.session.persona_id,
+            mode=self.session.mode,
+            turn=TeachingAssistantTurn.LISTENING,
+            teacher_control=False,
+            approved_action_ids=self.session.approved_action_ids,
+        )
+        return self.session
+
     def teacher_take_control(self) -> TeachingAssistantSession:
+        if self.session.teacher_control or self.session.turn is TeachingAssistantTurn.STOPPED:
+            raise AdminPolicyError("Không thể giành quyền điều khiển ở trạng thái hiện tại.")
+        self._turn_before_teacher_control = self.session.turn
         self.session = TeachingAssistantSession(
             session_id=self.session.session_id,
             persona_id=self.session.persona_id,
