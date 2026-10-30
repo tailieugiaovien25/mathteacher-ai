@@ -191,11 +191,15 @@ class TeachingAssistantController:
         return self.session
 
     def teacher_release_control(self) -> TeachingAssistantSession:
+        if not self.session.teacher_control:
+            raise AdminPolicyError("Giáo viên không giữ quyền điều khiển.")
+        restore_turn = self._turn_before_teacher_control or TeachingAssistantTurn.LISTENING
+        self._turn_before_teacher_control = None
         self.session = TeachingAssistantSession(
             session_id=self.session.session_id,
             persona_id=self.session.persona_id,
             mode=self.session.mode,
-            turn=TeachingAssistantTurn.LISTENING,
+            turn=restore_turn,
             teacher_control=False,
             approved_action_ids=self.session.approved_action_ids,
         )
