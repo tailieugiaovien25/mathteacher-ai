@@ -85,6 +85,7 @@ class TeachingSessionManager:
         self._activities: tuple[LessonActivityContext, ...] = ()
         self._current_index = -1
         self._status = TeachingSessionStatus.PREPARING
+        self._status_before_teacher_control: TeachingSessionStatus | None = None
         self._started_at = ""
         self._updated_at = self._now()
         self._completed_at = ""
@@ -129,6 +130,7 @@ class TeachingSessionManager:
         self._activities = source
         self._current_index = 0
         self._status = TeachingSessionStatus.RUNNING
+        self._status_before_teacher_control = None
         self._started_at = self._now()
         self._completed_at = ""
         self._last_action_id = self._last_tool_id = self._last_message = ""
@@ -226,6 +228,14 @@ class TeachingSessionManager:
         return self.snapshot()
 
     def teacher_take_control(self, *, reason: str = "") -> TeachingSessionSnapshot:
+        resumable = {
+            TeachingSessionStatus.RUNNING,
+            TeachingSessionStatus.WAITING_TEACHER,
+            TeachingSessionStatus.PAUSED,
+        }
+        if self._status not in resumable:
+            raise AdminPolicyError("Chỉ có thể giành quyền điều khiển trong một phiên dạy đang hoạt động.")
+        self._status_before_teacher_control = self._status
         self.controller.teacher_take_control()
         self._status = TeachingSessionStatus.TEACHER_CONTROL
         self._last_message = reason or "Giáo viên giành quyền điều khiển."
@@ -233,9 +243,11 @@ class TeachingSessionManager:
         return self.snapshot()
 
     def teacher_release_control(self) -> TeachingSessionSnapshot:
+        if self._status is not TeachingSessionStatus.TEACHER_CONTROL:
+            raise AdminPolicyError("Phiên dạy không ở trạng thái giáo viên giữ quyền điều khiển.")
         self.controller.teacher_release_control()
-        if self._status is not TeachingSessionStatus.COMPLETED:
-            self._status = TeachingSessionStatus.RUNNING
+        self._status = self._status_before_teacher_control or TeachingSessionStatus.RUNNING
+        self._status_before_teacher_control = None
         self._last_message = "Giáo viên trả quyền điều khiển cho Trợ giảng."
         self._record("teacher.control_released", message=self._last_message)
         return self.snapshot()
@@ -262,6 +274,7 @@ class TeachingSessionManager:
         if self._status is TeachingSessionStatus.COMPLETED:
             return self.snapshot()
         self._status = TeachingSessionStatus.COMPLETED
+        self._status_before_teacher_control = None
         self._completed_at = self._now()
         self._last_message = "Phiên dạy hoàn thành."
         self._record("session.completed", message=self._last_message)
@@ -269,6 +282,7 @@ class TeachingSessionManager:
 
     def stop(self, *, reason: str = "") -> TeachingSessionSnapshot:
         self._status = TeachingSessionStatus.STOPPED
+        self._status_before_teacher_control = None
         self._completed_at = self._now()
         self._last_message = reason or "Phiên dạy dừng."
         self._record("session.stopped", message=self._last_message)
