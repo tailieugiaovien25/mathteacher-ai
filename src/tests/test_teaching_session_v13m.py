@@ -87,6 +87,43 @@ def test_teacher_override_blocks_plan_then_release_resumes():
     assert manager.snapshot().status is TeachingSessionStatus.RUNNING
 
 
+def test_teacher_override_restores_paused_state_without_resuming_session():
+    manager, _ = make_manager()
+    manager.start(lesson_id="lesson-1", activities=activities())
+    manager.pause(reason="Chờ giáo viên trao đổi với học sinh.")
+    manager.teacher_take_control()
+    assert manager.snapshot().status is TeachingSessionStatus.TEACHER_CONTROL
+    manager.teacher_release_control()
+    assert manager.snapshot().status is TeachingSessionStatus.PAUSED
+    with pytest.raises(AdminPolicyError):
+        manager.build_plan(TeachingClassroomOrchestrator(), mode=TeachingAssistantMode.MC)
+
+
+def test_teacher_override_restores_pending_confirmation_state():
+    manager, _ = make_manager()
+    manager.start(lesson_id="lesson-1", activities=activities())
+    plan = manager.build_plan(
+        TeachingClassroomOrchestrator(),
+        mode=TeachingAssistantMode.TECHNICAL_OPERATOR,
+        include_slide=True,
+    )
+    result = manager.execute_plan(plan, teacher_confirmed=False)
+    assert result[0].status is ClassroomExecutionStatus.TEACHER_CONFIRMATION_REQUIRED
+    manager.teacher_take_control()
+    manager.teacher_release_control()
+    assert manager.snapshot().status is TeachingSessionStatus.WAITING_TEACHER
+
+
+def test_teacher_override_cannot_start_outside_an_active_session():
+    manager, _ = make_manager()
+    with pytest.raises(AdminPolicyError):
+        manager.teacher_take_control()
+    manager.start(lesson_id="lesson-1", activities=activities())
+    manager.complete()
+    with pytest.raises(AdminPolicyError):
+        manager.teacher_take_control()
+
+
 def test_pause_resume_and_complete():
     manager, _ = make_manager()
     manager.start(lesson_id='lesson-1', activities=activities())
