@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 import json
 import os
 import shlex
-import shlex
 from pathlib import Path
 import subprocess
 from typing import Any, Callable, Mapping, Protocol, Sequence
@@ -17,7 +16,7 @@ class SpeechToTextProvider(Protocol):
 
 
 class TeachingBrain(Protocol):
-    def respond(self, *, transcript: str, system_prompt: str, history: Sequence[Mapping[str, str]] = ()) -> str: ...
+    def respond(self, *, transcript: str, system_prompt: str, history: Sequence[Mapping[str, str]] = (), mode: str = "teacher") -> str: ...
 
 
 class TextToSpeechProvider(Protocol):
@@ -70,7 +69,10 @@ class OllamaTeachingBrain:
         except (OSError, HTTPError, URLError):
             return False
 
-    def respond(self, *, transcript: str, system_prompt: str, history: Sequence[Mapping[str, str]] = ()) -> str:
+    def respond(self, *, transcript: str, system_prompt: str, history: Sequence[Mapping[str, str]] = (), mode: str = "teacher") -> str:
+        # Keep compatibility with TeachingAssistantVoiceBridge; persona instructions
+        # are already supplied through system_prompt for this local adapter.
+        del mode
         messages: list[Mapping[str, str]] = [{"role": "system", "content": system_prompt}]
         messages.extend(history)
         messages.append({"role": "user", "content": transcript})
