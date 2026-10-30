@@ -71,8 +71,7 @@ class LocalLiveKitAgentSession:
         self._response_task = None
 
     async def consume_frame(self, pcm16: bytes, *, block_ms: int | None = None) -> None:
-        duration_ms = block_ms or self.config.block_duration_ms
-        self._elapsed_ms = min(self.config.max_utterance_ms, self._elapsed_ms + duration_ms)
+        duration_ms = max(1, int(block_ms or self.config.block_duration_ms))
         active, ended = self._vad.feed(pcm16, block_ms=duration_ms)
 
         # Barge-in: teacher speech takes precedence over assistant speech.
@@ -83,17 +82,22 @@ class LocalLiveKitAgentSession:
             self._reset_capture()
             return
 
+        # Silence before the first voiced frame must not consume the utterance
+        # time budget; otherwise a quiet room can cause the next word to be cut.
         if active and not self._started:
             self._started = True
-        if self._started:
-            self._frames.append(bytes(pcm16))
+            self._elapsed_ms = 0
+        if not self._started:
+            return
+
+        self._frames.append(bytes(pcm16))
+        self._elapsed_ms = min(self.config.max_utterance_ms, self._elapsed_ms + duration_ms)
 
         if ended or self._elapsed_ms >= self.config.max_utterance_ms:
-            if self._started:
-                frames = tuple(self._frames)
-                self._reset_capture()
-                if self._duration_ms(frames) >= self.config.min_utterance_ms:
-                    await self._handle_utterance(frames)
+            frames = tuple(self._frames)
+            self._reset_capture()
+            if self._duration_ms(frames) >= self.config.min_utterance_ms:
+                await self._handle_utterance(frames)
 
     async def flush(self) -> None:
         if self._frames:
