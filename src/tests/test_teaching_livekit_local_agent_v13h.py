@@ -100,6 +100,30 @@ def test_silence_before_speech_does_not_consume_utterance_budget(tmp_path):
     asyncio.run(run())
 
 
+def test_zero_pre_roll_keeps_the_first_voiced_frame(tmp_path):
+    agent = _FakeAgent()
+    config = LocalLiveKitAgentConfig(
+        output_dir=tmp_path,
+        pre_roll_ms=0,
+        silence_timeout_ms=60,
+        min_utterance_ms=1,
+    )
+    sess = LocalLiveKitAgentSession(agent=agent, config=config)
+    stt = _FakeSTT()
+    sess._stt = stt
+
+    async def run():
+        speech = b"\\x00\\x40" * 480
+        silence = b"\\x00\\x00" * 480
+        await sess.consume_frame(speech, block_ms=30)
+        await sess.consume_frame(silence, block_ms=60)
+        await asyncio.sleep(0.01)
+        assert agent.transcripts == ["mở hoạt động khởi động"]
+        assert stt.duration_ms >= 90
+
+    asyncio.run(run())
+
+
 def test_barge_in_interrupts_active_agent():
     agent = _FakeAgent()
     agent.speaking = True
