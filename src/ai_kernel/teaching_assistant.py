@@ -206,6 +206,7 @@ class TeachingAssistantController:
         return self.session
 
     def stop(self) -> TeachingAssistantSession:
+        self._turn_before_teacher_control = None
         self.session = TeachingAssistantSession(
             session_id=self.session.session_id,
             persona_id=self.session.persona_id,
