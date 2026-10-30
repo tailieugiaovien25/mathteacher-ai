@@ -597,7 +597,7 @@ def render_livekit_realtime_panel(st: Any, *, identity: str = "teacher") -> None
         return
 
     config = LiveKitTransportConfig.from_env()
-    if not os.environ.get("LIVEKIT_API_KEY") or not os.environ.get("LIVEKIT_API_SECRET"):
+    if not os.environ.get(config.api_key_env) or not os.environ.get(config.api_secret_env):
         st.info("ChÆ°a cáº¥u hÃ¬nh LIVEKIT_API_KEY/LIVEKIT_API_SECRET á»Ÿ backend.")
         return
     try:
@@ -606,6 +606,8 @@ def render_livekit_realtime_panel(st: Any, *, identity: str = "teacher") -> None
             identity=f"{config.identity_prefix}-{identity}".strip("-"),
             name="Giáo viên",
             ttl_seconds=min(config.token_ttl_seconds, 900),
+            api_key_env=config.api_key_env,
+            api_secret_env=config.api_secret_env,
             can_publish_audio=True,
             can_publish_video=False,
             can_subscribe_audio=True,
