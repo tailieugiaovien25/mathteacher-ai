@@ -41,7 +41,7 @@ def test_livekit_html_serializes_script_values_safely():
         token="token</script><script>alert(1)</script>",
         client_js_url="https://cdn.example.test/sdk.mjs?value=</script>",
     )
-    assert 'const url = "wss://livekit.example.test\\';alert(1);//";' in html
+    assert "const url = \"wss://livekit.example.test';alert(1);//\";" in html
     assert "token</script>" not in html
     assert "\\u003c/script>" in html
     assert 'import * as LivekitClient from "https://cdn.example.test/sdk.mjs?value=\\u003c/script>";' in html
