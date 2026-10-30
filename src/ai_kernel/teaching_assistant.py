@@ -132,8 +132,11 @@ class TeachingAssistantController:
         """
         if not isinstance(action_id, str) or not action_id.strip():
             raise ValueError("action_id không được rỗng")
-        if self.session.teacher_control:
-            raise AdminPolicyError("Giáo viên đang giữ quyền điều khiển; không phê duyệt action cho AI.")
+        if self.session.teacher_control or self.session.turn in {
+            TeachingAssistantTurn.PAUSED,
+            TeachingAssistantTurn.STOPPED,
+        }:
+            raise AdminPolicyError("Trợ giảng đang tạm dừng/dừng hoặc giáo viên đang giữ quyền; không thể phê duyệt action.")
         approved = tuple(dict.fromkeys((*self.session.approved_action_ids, action_id)))
         self.session = TeachingAssistantSession(
             session_id=self.session.session_id,
