@@ -101,7 +101,11 @@ class LocalLiveKitAgentSession:
             if active:
                 self._started = True
                 self._elapsed_ms = 0
-                self._frames.extend(self._pre_roll_frames)
+                if self._pre_roll_frames:
+                    self._frames.extend(self._pre_roll_frames)
+                else:
+                    # A disabled/sub-block pre-roll must still retain the onset frame.
+                    self._frames.append(bytes(pcm16))
                 self._pre_roll_frames.clear()
             else:
                 return
