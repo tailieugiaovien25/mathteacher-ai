@@ -152,6 +152,36 @@ def test_max_utterance_budget_counts_first_voiced_block(tmp_path):
     asyncio.run(run())
 
 
+
+def test_pre_roll_does_not_satisfy_minimum_speech_duration(tmp_path):
+    agent = _FakeAgent()
+    config = LocalLiveKitAgentConfig(
+        output_dir=tmp_path,
+        pre_roll_ms=180,
+        silence_timeout_ms=60,
+        min_utterance_ms=240,
+    )
+    sess = LocalLiveKitAgentSession(agent=agent, config=config)
+    stt = _FakeSTT()
+    sess._stt = stt
+
+    async def run():
+        silence = b"\x00\x00" * 480
+        speech = b"\x00\x40" * 480
+        for _ in range(8):
+            await sess.consume_frame(silence, block_ms=30)
+        await sess.consume_frame(speech, block_ms=30)
+        await sess.consume_frame(silence, block_ms=30)
+        await sess.consume_frame(silence, block_ms=30)
+        await asyncio.sleep(0.01)
+        # Pre-roll plus trailing silence must not make a single 30 ms sound
+        # pass the 240 ms minimum utterance threshold.
+        assert agent.transcripts == []
+        assert stt.duration_ms == 0
+
+    asyncio.run(run())
+
+
 def test_barge_in_interrupts_active_agent():
     agent = _FakeAgent()
     agent.speaking = True
