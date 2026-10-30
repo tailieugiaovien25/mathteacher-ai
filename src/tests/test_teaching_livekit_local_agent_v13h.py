@@ -113,8 +113,8 @@ def test_zero_pre_roll_keeps_the_first_voiced_frame(tmp_path):
     sess._stt = stt
 
     async def run():
-        speech = b"\\x00\\x40" * 480
-        silence = b"\\x00\\x00" * 480
+        speech = b"\x00\x40" * 480
+        silence = b"\x00\x00" * 480
         await sess.consume_frame(speech, block_ms=30)
         await sess.consume_frame(silence, block_ms=60)
         await asyncio.sleep(0.01)
