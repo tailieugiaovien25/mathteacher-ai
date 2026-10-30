@@ -264,6 +264,7 @@ class TeachingSessionManager:
     def resume(self) -> TeachingSessionSnapshot:
         if self._status is not TeachingSessionStatus.PAUSED:
             raise AdminPolicyError("Phiên dạy không ở trạng thái PAUSED.")
+        self.controller.resume()
         self._status = TeachingSessionStatus.RUNNING
         self._last_message = "Phiên dạy tiếp tục."
         self._record("session.resumed", message=self._last_message)
