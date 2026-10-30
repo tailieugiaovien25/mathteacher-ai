@@ -116,15 +116,17 @@ class LocalLiveKitAgentSession:
 
         if ended or self._elapsed_ms >= self.config.max_utterance_ms:
             frames = tuple(self._frames)
+            captured_ms = self._elapsed_ms
             self._reset_capture()
-            if self._duration_ms(frames) >= self.config.min_utterance_ms:
+            if captured_ms >= self.config.min_utterance_ms:
                 await self._handle_utterance(frames)
 
     async def flush(self) -> None:
         if self._frames:
             frames = tuple(self._frames)
+            captured_ms = self._elapsed_ms
             self._reset_capture()
-            if self._duration_ms(frames) >= self.config.min_utterance_ms:
+            if captured_ms >= self.config.min_utterance_ms:
                 await self._handle_utterance(frames)
 
     async def _handle_utterance(self, frames: tuple[bytes, ...]) -> None:
