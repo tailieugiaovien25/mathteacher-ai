@@ -24,6 +24,7 @@ def generate_livekit_access_token(
     ttl_seconds: int = 900,
     can_publish_audio: bool = True,
     can_publish_video: bool = False,
+    can_publish_data: bool = False,
     can_subscribe_audio: bool = True,
     can_subscribe_video: bool = True,
     api_key_env: str = "LIVEKIT_API_KEY",
@@ -40,7 +41,7 @@ def generate_livekit_access_token(
     api_key = os.environ.get(str(api_key_env), "").strip()
     api_secret = os.environ.get(str(api_secret_env), "").strip()
     if not api_key or not api_secret:
-        raise RuntimeError("Thiếu LIVEKIT_API_KEY/LIVEKIT_API_SECRET ở backend.")
+        raise RuntimeError("Thiếu cấu hình API key/secret LiveKit ở backend.")
 
     try:
         from livekit import api  # type: ignore
@@ -58,6 +59,7 @@ def generate_livekit_access_token(
         room=room_name,
         can_publish=bool(publish_sources),
         can_publish_sources=publish_sources,
+        can_publish_data=bool(can_publish_data),
         can_subscribe=bool(can_subscribe_audio or can_subscribe_video),
     )
 
