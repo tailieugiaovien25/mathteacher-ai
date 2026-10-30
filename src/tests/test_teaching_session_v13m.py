@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from ai_kernel.governance import AdminPolicyError
-from ai_kernel.teaching_assistant import TeachingAssistantMode, TeachingAssistantController, default_teaching_personas, default_teaching_policy
+from ai_kernel.teaching_assistant import TeachingAssistantMode, TeachingAssistantTurn, TeachingAssistantController, default_teaching_personas, default_teaching_policy
 from ai_kernel.teaching_classroom import ClassroomPhase, LessonActivityContext, TeachingClassroomOrchestrator
 from ai_kernel.teaching_classroom_executor import InMemoryClassroomRuntime, TeachingClassroomActionExecutor, ClassroomExecutionStatus
 from ai_kernel.teaching_session import TeachingSessionManager, TeachingSessionStatus
@@ -90,13 +90,20 @@ def test_teacher_override_blocks_plan_then_release_resumes():
 def test_teacher_override_restores_paused_state_without_resuming_session():
     manager, _ = make_manager()
     manager.start(lesson_id="lesson-1", activities=activities())
+    plan = manager.build_plan(TeachingClassroomOrchestrator(), mode=TeachingAssistantMode.MC, include_slide=True)
     manager.pause(reason="Chờ giáo viên trao đổi với học sinh.")
+    assert manager.controller.session.turn is TeachingAssistantTurn.PAUSED
+    direct_result = manager.executor.execute(plan.actions[0], teacher_confirmed=True)
+    assert direct_result.status is ClassroomExecutionStatus.BLOCKED
     manager.teacher_take_control()
     assert manager.snapshot().status is TeachingSessionStatus.TEACHER_CONTROL
     manager.teacher_release_control()
     assert manager.snapshot().status is TeachingSessionStatus.PAUSED
+    assert manager.controller.session.turn is TeachingAssistantTurn.PAUSED
     with pytest.raises(AdminPolicyError):
         manager.build_plan(TeachingClassroomOrchestrator(), mode=TeachingAssistantMode.MC)
+    manager.resume()
+    assert manager.controller.session.turn is TeachingAssistantTurn.LISTENING
 
 
 def test_teacher_override_restores_pending_confirmation_state():
