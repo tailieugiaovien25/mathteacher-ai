@@ -22,6 +22,7 @@ class TeachingAssistantTurn(str, Enum):
     SPEAKING = "speaking"
     INTERRUPTED = "interrupted"
     TEACHER_CONTROL = "teacher_control"
+    PAUSED = "paused"
     STOPPED = "stopped"
 
 
