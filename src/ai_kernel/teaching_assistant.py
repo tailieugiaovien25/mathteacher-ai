@@ -106,6 +106,7 @@ class TeachingAssistantController:
             raise ValueError("persona_id và policy.persona_id phải khớp")
         self.persona = persona
         self.policy = policy
+        self._turn_before_teacher_control: TeachingAssistantTurn | None = None
         self.session = TeachingAssistantSession(
             session_id="ta_" + uuid4().hex,
             persona_id=persona.persona_id,
