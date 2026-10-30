@@ -100,7 +100,8 @@ class LocalLiveKitAgentSession:
 
             if active:
                 self._started = True
-                self._elapsed_ms = 0
+                # Count the first voiced block, but not the preceding pre-roll.
+                self._elapsed_ms = duration_ms
                 if self._pre_roll_frames:
                     self._frames.extend(self._pre_roll_frames)
                 else:
