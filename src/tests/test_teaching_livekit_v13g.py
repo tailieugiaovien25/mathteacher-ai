@@ -43,7 +43,7 @@ def test_livekit_html_serializes_script_values_safely():
     )
     assert "const url = \"wss://livekit.example.test';alert(1);//\";" in html
     assert "token</script>" not in html
-    assert "\\u003c/script>" in html
+    assert "\\u003c/script\\u003e" in html
     assert 'import * as LivekitClient from "https://cdn.example.test/sdk.mjs?value=\\u003c/script>";' in html
 
 
@@ -100,6 +100,7 @@ def test_token_generation_keeps_secret_server_side(monkeypatch):
     assert result.ttl_seconds == 120
     assert grants_seen[-1]["can_publish"] is True
     assert grants_seen[-1]["can_publish_sources"] == ["microphone"]
+    assert grants_seen[-1]["can_publish_data"] is False
 
     generate_livekit_access_token(
         room_name="room", identity="teacher",
