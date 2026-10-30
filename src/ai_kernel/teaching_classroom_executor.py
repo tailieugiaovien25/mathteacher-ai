@@ -191,6 +191,14 @@ class TeachingClassroomActionExecutor:
                     message="Giáo viên đang giữ quyền điều khiển; Trợ giảng không được thực thi action.",
                 )
 
+            if self.controller.session.turn is TeachingAssistantTurn.PAUSED:
+                return ClassroomExecutionResult(
+                    action_id=action.action_id,
+                    tool_id=action.tool_id,
+                    status=ClassroomExecutionStatus.BLOCKED,
+                    message="Teaching Assistant đang tạm dừng; không thể thực thi action.",
+                )
+
             self.controller.policy.check_action(action)
 
             if action.action_class in self.controller.policy.teacher_confirmation_classes:
