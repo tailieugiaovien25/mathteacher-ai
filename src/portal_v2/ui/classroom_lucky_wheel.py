@@ -281,18 +281,64 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
 
   let aiEnabled = true;
   let recognition = null;
+  let speechGeneration = 0;
 
-  function say(text, onend) {
-    if (!aiEnabled || !('speechSynthesis' in window) || !text) {
+  function stopSpeech() {
+    speechGeneration += 1;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }
+
+  function vietnameseVoice() {
+    if (!('speechSynthesis' in window)) return null;
+    return window.speechSynthesis.getVoices().find(voice =>
+      /^vi(?:[-_]|$)/i.test(voice.lang || '')
+    ) || null;
+  }
+
+  function waitForVietnameseVoice(timeoutMs = 2500) {
+    return new Promise(resolve => {
+      const ready = vietnameseVoice();
+      if (ready) return resolve(ready);
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        window.speechSynthesis.removeEventListener?.('voiceschanged', finish);
+        resolve(vietnameseVoice());
+      };
+      const timer = setTimeout(finish, timeoutMs);
+      window.speechSynthesis.addEventListener?.('voiceschanged', finish, {once:true});
+    });
+  }
+
+  async function say(text, onend) {
+    if (!aiEnabled || !('speechSynthesis' in window) ||
+        typeof SpeechSynthesisUtterance === 'undefined' || !text) {
       if (onend) onend();
       return;
     }
+    const request = ++speechGeneration;
     window.speechSynthesis.cancel();
+    const voice = await waitForVietnameseVoice();
+    if (request !== speechGeneration) return;
+    if (!voice) {
+      aiStatus.textContent = 'Thiết bị chưa có giọng đọc tiếng Việt. Hãy cài hoặc bật Vietnamese speech voice trong trình duyệt/hệ điều hành.';
+      if (onend) onend();
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'vi-VN';
+    utterance.voice = voice;
+    utterance.lang = voice.lang || 'vi-VN';
     utterance.rate = 0.96;
     utterance.pitch = 1.04;
     if (onend) utterance.onend = onend;
+    utterance.onerror = () => {
+      if (request === speechGeneration) {
+        aiStatus.textContent = 'Không phát được giọng tiếng Việt. Hãy thử lại hoặc chọn giọng tiếng Việt khác trên thiết bị.';
+        if (onend) onend();
+      }
+    };
     window.speechSynthesis.speak(utterance);
   }
 
@@ -370,7 +416,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     aiToggle.setAttribute('aria-pressed', String(aiEnabled));
     aiToggle.textContent = aiEnabled ? '🔊 MC trợ giảng: Bật' : '🔇 MC trợ giảng: Tắt';
     if (!aiEnabled) {
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      stopSpeech();
       if (pending !== null && active === null) openQuestion(pending);
     }
     if (aiEnabled && active !== null) askQuestion(active);
@@ -535,7 +581,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   function home() {
     stopTrack();
     stopAudio();
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    stopSpeech();
     const activeRecognition = recognition;
     recognition = null;
     if (activeRecognition) activeRecognition.abort();
