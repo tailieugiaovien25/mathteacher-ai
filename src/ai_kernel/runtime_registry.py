@@ -95,16 +95,31 @@ class AIRuntimeManager:
         store: JSONAIRuntimeConfigStore | None = None,
         provider: str = "ollama",
         base_url: str = "http://127.0.0.1:11434",
+        api_key: str = "",
         selected_profile_id: str = "",
+        runtime_config_authoritative: bool = False,
     ) -> None:
         self.profiles = tuple(profiles or default_model_profiles())
         self._by_id = {item.profile_id: item for item in self.profiles}
         self.governance = governance or AIKernelGovernance()
         self.store = store or JSONAIRuntimeConfigStore()
-        self._bootstrap(provider=provider, base_url=base_url, selected_profile_id=selected_profile_id)
+        self._api_key = str(api_key or "")
+        self._bootstrap(
+            provider=provider,
+            base_url=base_url,
+            selected_profile_id=selected_profile_id,
+            runtime_config_authoritative=runtime_config_authoritative,
+        )
 
-    def _bootstrap(self, *, provider: str, base_url: str, selected_profile_id: str) -> None:
-        current = self.store.load()
+    def _bootstrap(
+        self,
+        *,
+        provider: str,
+        base_url: str,
+        selected_profile_id: str,
+        runtime_config_authoritative: bool,
+    ) -> None:
+        current = None if runtime_config_authoritative else self.store.load()
         if current is not None:
             self._config = self._sanitize(current)
             return
@@ -249,7 +264,11 @@ class AIRuntimeManager:
                 active_model_installed=False,
                 message="Provider hiện tại chưa có runtime inspector local.",
             )
-        provider = OllamaProvider(base_url=self._config.base_url, model=active.model)
+        provider = OllamaProvider(
+            base_url=self._config.base_url,
+            model=active.model,
+            api_key=self._api_key,
+        )
         reachable = provider.health()
         if not reachable:
             return AIRuntimeStatus(
@@ -259,7 +278,7 @@ class AIRuntimeManager:
                 active_profile_id=active.profile_id,
                 active_model=active.model,
                 active_model_installed=False,
-                message="Không kết nối được Ollama local.",
+                message="Không kết nối được Ollama endpoint.",
             )
         try:
             local_models = provider.list_models()
@@ -282,5 +301,5 @@ class AIRuntimeManager:
             active_model=active.model,
             active_model_installed=installed,
             local_models=local_models,
-            message="Model active đã cài đặt." if installed else "Model active chưa được cài đặt local.",
+            message="Model active có trong danh sách endpoint." if installed else "Model active không có trong danh sách endpoint.",
         )

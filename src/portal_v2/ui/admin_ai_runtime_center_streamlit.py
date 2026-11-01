@@ -12,10 +12,12 @@ def render_admin_ai_runtime_center(st, *, admin_actor: str) -> None:
         store=JSONAIRuntimeConfigStore(),
         provider=config.provider,
         base_url=config.ollama_base_url,
+        api_key=config.ollama_api_key,
         selected_profile_id=next(
             (item.profile_id for item in default_model_profiles() if item.provider == config.provider and item.model == config.model),
             "",
         ),
+        runtime_config_authoritative=config.runtime_config_authoritative,
     )
     runtime = manager.inspect_runtime()
     current = manager.config()
@@ -28,7 +30,7 @@ def render_admin_ai_runtime_center(st, *, admin_actor: str) -> None:
     cols[1].metric("Endpoint", runtime.base_url)
     cols[2].metric("Runtime", "SẴN SÀNG" if runtime.reachable else "CHƯA KẾT NỐI")
     cols[3].metric("Model active", runtime.active_model)
-    cols[4].metric("Đã cài", "Có" if runtime.active_model_installed else "Chưa")
+    cols[4].metric("Có trong endpoint", "Có" if runtime.active_model_installed else "Không")
 
     st.info("V1 của Runtime Center không pull, xóa hoặc cập nhật model tự động. Các thao tác đó vẫn nằm ngoài quyền của AI.")
 
@@ -69,18 +71,18 @@ def render_admin_ai_runtime_center(st, *, admin_actor: str) -> None:
         except Exception as exc:
             st.error(str(exc))
 
-    st.markdown("### Local models")
+    st.markdown("### Models tại endpoint")
     if runtime.local_models:
         st.dataframe(
             [
-                {"Model local": name, "Active": name == runtime.active_model, "Có trong registry": any(item.model == name for item in manager.profiles)}
+                {"Model": name, "Active": name == runtime.active_model, "Có trong registry": any(item.model == name for item in manager.profiles)}
                 for name in runtime.local_models
             ],
             hide_index=True,
             use_container_width=True,
         )
     else:
-        st.caption("Chưa đọc được danh sách model local hoặc Ollama chưa chạy.")
+        st.caption("Chưa đọc được danh sách model hoặc Ollama endpoint chưa phản hồi.")
 
     st.markdown("### Registry model")
     st.dataframe(

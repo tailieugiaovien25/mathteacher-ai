@@ -92,7 +92,8 @@ class AIRouter:
                 return self.provider
             if profile.provider == "ollama":
                 base_url = str(getattr(self.provider, "base_url", "http://127.0.0.1:11434"))
-                return OllamaProvider(base_url=base_url, model=profile.model)
+                api_key = str(getattr(self.provider, "api_key", "") or "")
+                return OllamaProvider(base_url=base_url, model=profile.model, api_key=api_key)
         if profile.provider == "ollama":
             return OllamaProvider(model=profile.model)
         if self.provider is None:
