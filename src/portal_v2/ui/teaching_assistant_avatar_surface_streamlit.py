@@ -202,9 +202,114 @@ def _save_audio_upload(uploaded: Any) -> Path:
     return out
 
 
+_CHAT_CONTEXT_KEY = "ta_chat_context_v1"
+_CHAT_AUDIENCE_KEY = "ta_chat_audience_v1"
+_CHAT_HISTORY_LIMIT = 40
+
+
+def _teaching_chat_system_prompt(mode: str) -> str:
+    if mode == "student":
+        return (
+            "Bạn là Trợ lý học tập Toán THCS của MathTeacher AI. "
+            "Giao tiếp thân thiện, dễ hiểu; khuyến khích học sinh tự suy nghĩ "
+            "và trình bày cách làm. Không thực hiện hành động thay đổi hệ thống "
+            "hoặc dữ liệu."
+        )
+    from ai_kernel.teaching_voice import TeachingVoiceConfig
+
+    return TeachingVoiceConfig().system_prompt
+
+
+def _render_teaching_chat(st: Any, *, user_id: str | None, teacher_control: bool) -> None:
+    from ai_kernel.teaching_voice import AIKernelTeachingBrain
+
+    owner_id = str(user_id or "").strip()
+    context = st.session_state.get(_CHAT_CONTEXT_KEY)
+    if not isinstance(context, dict) or context.get("owner_id") != owner_id:
+        context = {"owner_id": owner_id, "threads": {"teacher": [], "student": []}}
+        st.session_state[_CHAT_CONTEXT_KEY] = context
+        st.session_state.pop(_CHAT_AUDIENCE_KEY, None)
+        st.session_state.pop("ta_chat_input_v1", None)
+
+    threads = context.get("threads")
+    if not isinstance(threads, dict):
+        threads = {"teacher": [], "student": []}
+        context["threads"] = threads
+    threads.setdefault("teacher", [])
+    threads.setdefault("student", [])
+
+    if st.session_state.get(_CHAT_AUDIENCE_KEY) not in {"teacher", "student"}:
+        st.session_state[_CHAT_AUDIENCE_KEY] = "teacher"
+
+    st.subheader("Trò chuyện với AI trợ giảng")
+    st.caption("Hội thoại được lưu trong phiên đăng nhập hiện tại và tự xóa khi đăng xuất.")
+    mode = st.radio(
+        "Trợ giảng đang hỗ trợ",
+        options=("teacher", "student"),
+        format_func=lambda value: "Giáo viên" if value == "teacher" else "Học sinh",
+        horizontal=True,
+        key=_CHAT_AUDIENCE_KEY,
+    )
+    messages = threads[mode]
+
+    if st.button("Xóa toàn bộ hội thoại", key="ta_chat_clear_v1", disabled=not any(threads.values())):
+        context["threads"] = {"teacher": [], "student": []}
+        st.session_state[_CHAT_CONTEXT_KEY] = context
+        st.rerun()
+
+    for message in messages:
+        role = message.get("role")
+        if role not in {"user", "assistant"}:
+            continue
+        with st.chat_message(role):
+            st.markdown(str(message.get("content", "")))
+
+    if teacher_control:
+        st.info("Giáo viên đang giữ quyền điều khiển; trợ giảng tạm dừng nhận hội thoại mới.")
+    prompt = st.chat_input(
+        "Nhập câu hỏi cho trợ giảng…",
+        key="ta_chat_input_v1",
+        max_chars=4000,
+        disabled=teacher_control,
+    )
+    if not prompt or not str(prompt).strip():
+        return
+
+    transcript = str(prompt).strip()
+    messages.append({"role": "user", "content": transcript})
+    threads[mode] = messages[-_CHAT_HISTORY_LIMIT:]
+    context["threads"] = threads
+    st.session_state[_CHAT_CONTEXT_KEY] = context
+
+    try:
+        with st.spinner("Trợ giảng đang suy nghĩ…"):
+            response = AIKernelTeachingBrain().respond(
+                transcript=transcript,
+                system_prompt=_teaching_chat_system_prompt(mode),
+                history=tuple(messages[:-1][-8:]),
+                mode=mode,
+                channel="chat",
+            )
+        answer = str(response or "").strip()
+        if not answer:
+            raise RuntimeError("AI Kernel returned an empty response")
+    except Exception:
+        answer = (
+            "Em chưa thể trả lời lúc này. Con thử gửi lại sau ít phút nhé."
+            if mode == "student"
+            else "Em chưa thể trả lời lúc này. Thầy/cô thử gửi lại sau ít phút nhé."
+        )
+
+    messages.append({"role": "assistant", "content": answer})
+    threads[mode] = messages[-_CHAT_HISTORY_LIMIT:]
+    context["threads"] = threads
+    st.session_state[_CHAT_CONTEXT_KEY] = context
+    st.rerun()
+
+
 def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = None, user_id: str | None = None) -> None:
     """Render the first browser-facing avatar + local voice surface."""
-    del client, user_id
+    del client
     # Lazy imports keep the rest of the portal import-safe when optional voice
     # dependencies are not installed.
     from ai_kernel.teaching_avatar import AvatarState
@@ -260,6 +365,9 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
     enable_livekit = str(os.environ.get("MATHTEACHER_ENABLE_LIVEKIT", "false")).lower() in {"1", "true", "yes", "on"}
     if enable_livekit:
         render_livekit_realtime_panel(st, identity="teacher")
+
+    teacher_control = bool(st.session_state.get("ta_teacher_control_v13e", False))
+    _render_teaching_chat(st, user_id=user_id, teacher_control=teacher_control)
 
     left, center, right = st.columns(3)
     with left:
@@ -518,7 +626,6 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
         except Exception as exc:
             st.warning(f"ChÆ°a thá»ƒ má»Ÿ bá»™ láº­p káº¿ hoáº¡ch MC/hoáº¡t Ä‘á»™ng: {exc}")
 
-    teacher_control = bool(st.session_state.get("ta_teacher_control_v13e", False))
     if teacher_control:
         st.warning("GiÃ¡o viÃªn Ä‘ang giá»¯ quyá»n Ä‘iá»u khiá»ƒn. Avatar khÃ´ng xá»­ lÃ½ há»™i thoáº¡i má»›i cho tá»›i khi Ä‘Æ°á»£c báº­t láº¡i.")
         if st.button("â–¶ï¸ Cho phÃ©p Trá»£ giáº£ng tiáº¿p tá»¥c", use_container_width=True):
@@ -563,8 +670,20 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                 from ai_kernel.teaching_voice import CommandTTSAdapter
                 tts = CommandTTSAdapter(tts_command)
 
+            chat_mode = str(st.session_state.get(_CHAT_AUDIENCE_KEY, "teacher"))
+            if chat_mode not in {"teacher", "student"}:
+                chat_mode = "teacher"
+            chat_context = st.session_state.get(_CHAT_CONTEXT_KEY) or {
+                "owner_id": str(user_id or "").strip(),
+                "threads": {"teacher": [], "student": []},
+            }
+            chat_threads = chat_context.setdefault("threads", {"teacher": [], "student": []})
+            chat_history = list(chat_threads.setdefault(chat_mode, []))
             bridge = TeachingAssistantVoiceBridge(
-                config=TeachingVoiceConfig(mode="teacher"),
+                config=TeachingVoiceConfig(
+                    mode=chat_mode,
+                    system_prompt=_teaching_chat_system_prompt(chat_mode),
+                ),
                 stt=FasterWhisperSTT(
                     model_size=os.environ.get("MATHTEACHER_STT_MODEL", "small"),
                     device=os.environ.get("MATHTEACHER_STT_DEVICE", "cpu"),
@@ -573,7 +692,11 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                 brain=AIKernelTeachingBrain(),
                 tts=tts,
             )
+            bridge.history = chat_history
             turn = bridge.process_audio(audio_path, output_path=audio_path.with_name(audio_path.stem + "_reply.mp3") if tts else None)
+            chat_threads[chat_mode] = bridge.history[-_CHAT_HISTORY_LIMIT:]
+            chat_context["threads"] = chat_threads
+            st.session_state[_CHAT_CONTEXT_KEY] = chat_context
             st.session_state[state_key] = AvatarState.SPEAKING.value
             st.success(f"AI trả lời: {turn.response_text}")
             st.session_state["ta_speech_text"] = turn.response_text
@@ -582,6 +705,7 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                 st.session_state[audio_key] = "data:audio/mpeg;base64," + base64.b64encode(audio_bytes).decode("ascii")
                 st.audio(audio_bytes, format="audio/mp3")
             st.caption("Voice surface chá»‰ tráº£ lá»i; khÃ´ng tá»± thá»±c thi Classroom Action.")
+            st.rerun()
         except Exception as exc:
             st.session_state[state_key] = AvatarState.IDLE.value
             st.error(f"ChÆ°a thá»ƒ cháº¡y local voice: {exc}")

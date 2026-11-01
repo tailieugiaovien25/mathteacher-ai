@@ -88,6 +88,9 @@ PORTAL_SESSION_KEYS = (
     "assessment_ppct_rows",
     "assessment_ppct_evidence",
     "assessment_ppct_scope_confirmation",
+    "ta_chat_context_v1",
+    "ta_chat_audience_v1",
+    "ta_chat_input_v1",
 )
 
 
