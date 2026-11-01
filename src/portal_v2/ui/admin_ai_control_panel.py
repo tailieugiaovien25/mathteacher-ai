@@ -23,10 +23,14 @@ def render_admin_ai_control_panel(st) -> None:
     cols[3].metric("Profile được phép", len(snapshot.enabled_profile_ids))
 
     if snapshot.provider == "ollama":
-        provider = OllamaProvider(base_url=config.ollama_base_url, model=config.model)
+        provider = OllamaProvider(
+            base_url=config.ollama_base_url,
+            model=config.model,
+            api_key=config.ollama_api_key,
+        )
         reachable = provider.health()
         cols = st.columns(2)
-        cols[0].metric("Ollama local", "SẴN SÀNG" if reachable else "CHƯA KẾT NỐI")
+        cols[0].metric("Ollama endpoint", "SẴN SÀNG" if reachable else "CHƯA KẾT NỐI")
         if reachable:
             try:
                 local_models = provider.list_models()

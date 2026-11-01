@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib import error, request
 
 from ai_platform.contracts import AIRequest, AIResponse
@@ -13,12 +13,17 @@ class OllamaProviderError(RuntimeError):
 
 @dataclass(frozen=True)
 class OllamaProvider:
-    """Local Ollama provider; no API key and no cloud persistence required."""
+    """Ollama local or cloud API provider."""
 
     base_url: str = "http://127.0.0.1:11434"
     model: str = "qwen3:8b"
     timeout_seconds: float = 120.0
     provider_id: str = "ollama"
+    api_key: str = field(default="", repr=False, compare=False)
+
+    def _authorization_headers(self) -> dict[str, str]:
+        key = self.api_key.strip()
+        return {"Authorization": f"Bearer {key}"} if key else {}
 
     @staticmethod
     def _context_options(request_data: AIRequest) -> dict[str, dict[str, int]]:
@@ -36,7 +41,7 @@ class OllamaProvider:
     def health(self) -> bool:
         req = request.Request(
             f"{self.base_url}/api/tags",
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", **self._authorization_headers()},
             method="GET",
         )
         try:
@@ -48,7 +53,7 @@ class OllamaProvider:
     def list_models(self) -> tuple[str, ...]:
         req = request.Request(
             f"{self.base_url}/api/tags",
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", **self._authorization_headers()},
             method="GET",
         )
         try:
@@ -76,7 +81,11 @@ class OllamaProvider:
         req = request.Request(
             f"{self.base_url}/api/chat",
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                **self._authorization_headers(),
+            },
             method="POST",
         )
         try:
@@ -115,7 +124,7 @@ class OllamaProvider:
         req = request.Request(
             f"{self.base_url}/api/chat",
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", **self._authorization_headers()},
             method="POST",
         )
         try:

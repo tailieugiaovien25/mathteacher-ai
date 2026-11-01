@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 
 
@@ -21,6 +21,8 @@ class AIPlatformConfig:
     marketing_enabled: bool = False
     commercial_mode: bool = False
     ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_api_key: str = field(default="", repr=False, compare=False)
+    runtime_config_authoritative: bool = field(default=False, repr=False, compare=False)
 
     @classmethod
     def from_environment(cls) -> "AIPlatformConfig":
@@ -31,6 +33,15 @@ class AIPlatformConfig:
             marketing_enabled=_env_bool("MARKETING_AI_ENABLED", False),
             commercial_mode=_env_bool("MATH_TEACHER_COMMERCIAL_MODE", False),
             ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/") or "http://127.0.0.1:11434",
+            ollama_api_key=os.getenv("OLLAMA_API_KEY", "").strip(),
+            runtime_config_authoritative=any(
+                os.getenv(name, "").strip()
+                for name in (
+                    "MATH_TEACHER_AI_PROVIDER",
+                    "MATH_TEACHER_AI_MODEL",
+                    "OLLAMA_BASE_URL",
+                )
+            ),
         )
 
     @property

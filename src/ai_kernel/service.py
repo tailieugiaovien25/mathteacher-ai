@@ -33,7 +33,9 @@ class AIKernelService:
             governance=self.governance,
             provider=self.config.provider,
             base_url=self.config.ollama_base_url,
+            api_key=self.config.ollama_api_key,
             selected_profile_id=next((p.profile_id for p in resolved_profiles if p.provider == self.config.provider and p.model == self.config.model), ""),
+            runtime_config_authoritative=self.config.runtime_config_authoritative,
         )
         provider = build_ai_provider(self.config)
         self.router = AIRouter(

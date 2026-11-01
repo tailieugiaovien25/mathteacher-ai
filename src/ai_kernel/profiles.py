@@ -74,6 +74,19 @@ def default_model_profiles() -> tuple[ModelProfile, ...]:
             notes="Ollama Cloud; dùng khi máy local không đủ tài nguyên cho Trợ giảng.",
         ),
         ModelProfile(
+            profile_id="gemma4-ollama-cloud-api",
+            provider="ollama",
+            model="gemma4:31b",
+            capabilities=frozenset({
+                ModelCapability.GENERAL,
+                ModelCapability.VIETNAMESE,
+                ModelCapability.MATHEMATICS,
+                ModelCapability.REASONING,
+            }),
+            local_first=False,
+            notes="Ollama Cloud API; cần OLLAMA_BASE_URL=https://ollama.com và OLLAMA_API_KEY ở backend.",
+        ),
+        ModelProfile(
             profile_id="mistral-document-multimodal",
             provider="ollama",
             model="mistral-small3.1:24b",
