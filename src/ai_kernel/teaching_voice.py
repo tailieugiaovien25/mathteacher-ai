@@ -161,8 +161,11 @@ class AIKernelTeachingBrain:
         from ai_kernel.service import AIKernelService
         self.service = service or AIKernelService()
 
-    def respond(self, *, transcript, system_prompt, history=(), mode="teacher"):
+    def respond(self, *, transcript, system_prompt, history=(), mode="teacher", channel="voice"):
         normalized_mode = str(mode or "teacher").strip().lower()
+        normalized_channel = str(channel or "voice").strip().lower()
+        if normalized_channel not in {"voice", "chat"}:
+            normalized_channel = "voice"
         skill_id = self.MODE_TO_SKILL.get(
             normalized_mode,
             self.MODE_TO_SKILL["teacher"],
@@ -197,13 +200,13 @@ class AIKernelTeachingBrain:
         )
 
         response = self.service.run(
-            task_id="teaching_assistant_voice",
+            task_id=f"teaching_assistant_{normalized_channel}",
             prompt=prompt,
             capabilities=("general", "vietnamese", "mathematics"),
             owner=AIOwnership.USER,
             action=AIActionClass.ADVISORY,
             metadata={
-                "channel": "voice",
+                "channel": normalized_channel,
                 "interface": "teaching_assistant",
                 "mutating": "false",
             },

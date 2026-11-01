@@ -79,3 +79,38 @@ def test_ollama_payload_contract(monkeypatch):
     assert captured["body"]["model"] == "qwen3:0.6b"
     assert captured["body"]["stream"] is False
     assert captured["body"]["messages"][-1]["content"] == "Bắt đầu tiết học."
+
+
+def test_ai_kernel_teaching_brain_routes_text_chat_as_student_advisory():
+    from types import SimpleNamespace
+
+    from ai_kernel.contracts import AIActionClass, AIOwnership
+    from ai_kernel.teaching_voice import AIKernelTeachingBrain
+
+    captured = {}
+
+    class FakeService:
+        def run(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(text="Em gợi ý con thử vẽ sơ đồ nhé.")
+
+    brain = AIKernelTeachingBrain(service=FakeService())
+    answer = brain.respond(
+        transcript="Con chưa hiểu bài toán này.",
+        system_prompt="Hãy hướng dẫn học sinh tự suy nghĩ.",
+        history=({"role": "user", "content": "Con đã thử cách nào?"},),
+        mode="student",
+        channel="chat",
+    )
+
+    assert answer == "Em gợi ý con thử vẽ sơ đồ nhé."
+    assert captured["task_id"] == "teaching_assistant_chat"
+    assert captured["skill_id"] == "student.self_learning"
+    assert captured["owner"] is AIOwnership.USER
+    assert captured["action"] is AIActionClass.ADVISORY
+    assert captured["metadata"] == {
+        "channel": "chat",
+        "interface": "teaching_assistant",
+        "mutating": "false",
+    }
+    assert "Recent conversation:" in captured["prompt"]
