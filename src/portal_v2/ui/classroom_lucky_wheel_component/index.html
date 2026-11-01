@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+    iframe{display:block;width:100%;height:820px;border:0}
+  </style>
+</head>
+<body>
+  <iframe id="wheel" title="Vòng quay may mắn" allow="microphone; autoplay; fullscreen" allowfullscreen></iframe>
+  <script>
+    const frame = document.getElementById('wheel');
+    let previousHtml = '';
+    let latestResponse = null;
+
+    function send(type, extra) {
+      parent.postMessage(Object.assign({isStreamlitMessage:true,type}, extra || {}), '*');
+    }
+
+    function deliverResponse() {
+      if (latestResponse && frame.contentWindow) {
+        frame.contentWindow.postMessage({mathteacherAssistantResponse:latestResponse}, '*');
+      }
+    }
+
+    frame.addEventListener('load', deliverResponse);
+    window.addEventListener('message', event => {
+      if (event.source === parent && event.data?.type === 'streamlit:render') {
+        const args = event.data.args || {};
+        const html = String(args.html || '');
+        if (html && html !== previousHtml) {
+          previousHtml = html;
+          frame.srcdoc = html;
+        }
+        if (args.ai_response && args.ai_response.event_id) {
+          latestResponse = args.ai_response;
+          deliverResponse();
+        }
+        send('streamlit:setFrameHeight', {height:820});
+      } else if (event.source === frame.contentWindow && event.data?.mathteacherWheel) {
+        send('streamlit:setComponentValue', {value:event.data.mathteacherWheel,dataType:'json'});
+      }
+    });
+
+    send('streamlit:componentReady', {apiVersion:1});
+    send('streamlit:setFrameHeight', {height:820});
+  </script>
+</body>
+</html>

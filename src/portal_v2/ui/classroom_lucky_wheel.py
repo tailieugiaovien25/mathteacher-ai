@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from html import escape
+from pathlib import Path
 
 from portal_v2.ui.classroom_sound_layer import stage_audio_sources
 
@@ -15,6 +16,7 @@ def build_offline_wheel(
     slides: list[tuple[dict, dict]],
     *,
     session_id: str,
+    ai_bridge: bool = False,
 ) -> bytes:
     """Build the R15 lucky-wheel stage.
 
@@ -152,6 +154,11 @@ body.question-selected #wheel-panel .score-zone{display:none}
 #wheel-feedback{
   min-height:3.4em;font-weight:850;color:#0d5688;line-height:1.35;margin:14px 0 0
 }
+.wheel-ai-status{display:inline-block;max-width:260px;color:#21446c;font-size:.9rem;font-weight:750}
+.wheel-ai-button{border:1px solid #9cc5e3!important;background:#eef8ff!important;color:#12476e!important;
+  box-shadow:0 4px 0 #9cc5e3!important;font-size:.88rem!important;padding:8px 10px!important}
+.wheel-ai-button:disabled{opacity:.5;cursor:not-allowed}
+.toolbar .wheel-ai-status{flex-basis:100%;text-align:right;max-width:none;min-height:1.3em}
 
 .score-zone{margin-top:20px;padding-top:18px;border-top:1px solid #c6ddeb}
 .score-zone h2{margin:.2em 0 .5em}
@@ -180,6 +187,12 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     toolbar = (
         '<button type="button" id="wheel-home" title="Trở lại vòng quay">'
         '🎡 Vòng quay</button>'
+        '<button type="button" class="wheel-ai-button" id="wheel-ai-toggle" aria-pressed="true">'
+        '🔊 MC trợ giảng: Bật</button>'
+        '<button type="button" class="wheel-ai-button" id="wheel-ai-listen" disabled>'
+        '🎙 Nghe câu trả lời</button>'
+        '<span class="wheel-ai-status" id="wheel-ai-status" role="status" aria-live="polite">'
+        'MC sẽ tự đọc câu được chọn.</span>'
     )
 
     slot_buttons = "".join(
@@ -253,6 +266,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   const SLICE = 360 / QUESTION_COUNT;
   const key = __STORAGE__;
   const wheelAudioSrc = __WHEEL_AUDIO__;
+  const aiBridgeEnabled = __AI_BRIDGE__;
 
   const panel = document.getElementById('wheel-panel');
   const disc = document.getElementById('wheel-disc');
@@ -261,6 +275,129 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   const revealButton = document.getElementById('reveal');
   const feedback = document.getElementById('wheel-feedback');
   const slotButtons = [...document.querySelectorAll('.slot-button')];
+  const aiToggle = document.getElementById('wheel-ai-toggle');
+  const aiListen = document.getElementById('wheel-ai-listen');
+  const aiStatus = document.getElementById('wheel-ai-status');
+
+  let aiEnabled = true;
+  let recognition = null;
+
+  function say(text, onend) {
+    if (!aiEnabled || !('speechSynthesis' in window) || !text) {
+      if (onend) onend();
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'vi-VN';
+    utterance.rate = 0.96;
+    utterance.pitch = 1.04;
+    if (onend) utterance.onend = onend;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function cleanSpeech(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+      .replace(/[^a-z0-9+.,-]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function assessSpokenAnswer(slide, transcript) {
+    const heard = cleanSpeech(transcript);
+    const choices = [...slide.querySelectorAll('.mcq')];
+    if (choices.length) {
+      const matched = choices.find(choice => {
+        const code = cleanSpeech(choice.querySelector('b')?.textContent).replace(/\.$/, '');
+        const text = cleanSpeech(choice.textContent);
+        return (code && new RegExp(`(?:^|\\s)(?:dap an )?${code}(?:$|\\s)`).test(heard)) ||
+          (text.length > 8 && heard.includes(text.slice(text.indexOf(' ') + 1)));
+      });
+      return matched ? (matched.dataset.correct === 'true' ? 'correct' : 'wrong') : 'unclear';
+    }
+
+    const truths = [...slide.querySelectorAll('.truth')];
+    if (truths.length === 1) {
+      if (/\b(dung|dung a|true)\b/.test(heard))
+        return truths[0].dataset.correct === 'true' ? 'correct' : 'wrong';
+      if (/\b(sai|false)\b/.test(heard))
+        return truths[0].dataset.correct === 'false' ? 'correct' : 'wrong';
+      return 'unclear';
+    }
+
+    const shortAnswer = slide.querySelector('.answer p:not(:has(strong))');
+    const expected = cleanSpeech(shortAnswer?.textContent);
+    if (expected && heard && (heard === expected || heard.includes(expected))) return 'correct';
+    return 'teacher-check';
+  }
+
+  function respondToStudent(transcript) {
+    if (active === null) return;
+    if (aiBridgeEnabled) {
+      const eventId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      aiStatus.textContent = 'Trợ giảng đang nghe và chuẩn bị phản hồi…';
+      window.parent.postMessage({mathteacherWheel: {
+        event_id: eventId, action: 'student_answer', question_index: active,
+        transcript: String(transcript || '').slice(0, 1000)
+      }}, '*');
+      return;
+    }
+    const slide = slides[active];
+    const result = assessSpokenAnswer(slide, transcript);
+    const messages = {
+      correct: `Câu trả lời của đội là: ${transcript}. Chính xác! Xin chúc mừng cả đội.`,
+      wrong: `Câu trả lời của đội là: ${transcript}. Chưa chính xác, các đội hãy thử suy nghĩ thêm nhé.`,
+      unclear: `MC nghe được: ${transcript}. Câu trả lời chưa rõ để chấm tự động; thầy cô hãy xác nhận giúp nhé.`,
+      'teacher-check': `MC đã ghi nhận câu trả lời: ${transcript}. Mời thầy cô xác nhận đáp án và điểm số.`
+    };
+    aiStatus.textContent = messages[result];
+    say(messages[result]);
+  }
+
+  function askQuestion(slot) {
+    const slide = slides[slot];
+    const prompt = slide?.querySelector('h1')?.innerText?.trim() || `Câu hỏi số ${slot + 1}`;
+    const options = [...slide.querySelectorAll('.mcq')].map(option => option.innerText.trim());
+    const statements = [...slide.querySelectorAll('.truth b')].map(item => item.innerText.trim());
+    const choices = options.length ? ` Các phương án là: ${options.join('. ')}.`
+      : statements.length ? ` Các nhận định là: ${statements.join('. ')}.` : '';
+    aiStatus.textContent = `Câu ${slot + 1} đang được đọc. Bấm “Nghe câu trả lời” để nhận phản hồi.`;
+    say(`Vòng quay đã chọn câu ${slot + 1}. Mời các đội lắng nghe câu hỏi. ${prompt}${choices}`);
+    aiListen.disabled = false;
+  }
+
+  aiToggle.addEventListener('click', () => {
+    aiEnabled = !aiEnabled;
+    aiToggle.setAttribute('aria-pressed', String(aiEnabled));
+    aiToggle.textContent = aiEnabled ? '🔊 MC trợ giảng: Bật' : '🔇 MC trợ giảng: Tắt';
+    if (!aiEnabled) {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      if (pending !== null && active === null) openQuestion(pending);
+    }
+    if (aiEnabled && active !== null) askQuestion(active);
+  });
+
+  aiListen.addEventListener('click', () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      aiStatus.textContent = 'Trình duyệt chưa hỗ trợ nhận dạng giọng nói. Thầy cô có thể xác nhận đáp án trực tiếp.';
+      return;
+    }
+    if (recognition) recognition.abort();
+    recognition = new SpeechRecognition();
+    const currentRecognition = recognition;
+    recognition.lang = 'vi-VN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => { aiStatus.textContent = 'MC đang nghe câu trả lời…'; };
+    recognition.onresult = event => respondToStudent(event.results[0][0].transcript);
+    recognition.onerror = event => {
+      if (recognition !== currentRecognition) return;
+      aiStatus.textContent = event.error === 'not-allowed'
+        ? 'Trình duyệt chưa được cấp quyền dùng micro.'
+        : 'MC chưa nghe rõ. Hãy bấm nghe và thử lại.';
+    };
+    recognition.start();
+  });
 
   let used = [];
   let scores = {};
@@ -398,6 +535,10 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   function home() {
     stopTrack();
     stopAudio();
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    const activeRecognition = recognition;
+    recognition = null;
+    if (activeRecognition) activeRecognition.abort();
     spinning = false;
     settling = false;
     pending = null;
@@ -406,6 +547,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     panel.hidden = false;
     clearQuestionVisuals();
     active = null;
+    aiListen.disabled = true;
+    aiStatus.textContent = 'MC sẽ tự đọc câu được chọn.';
     if (revealButton) revealButton.disabled = true;
     feedback.textContent = remaining().length
       ? 'Sẵn sàng. Bấm QUAY, sau đó bấm DỪNG.'
@@ -447,7 +590,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     save();
 
     if (revealButton) revealButton.disabled = false;
-    playAudio('question');
+    if (aiEnabled) askQuestion(slot);
+    else playAudio('question');
     render();
 
     requestAnimationFrame(() => {
@@ -458,6 +602,16 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   document.body.classList.add('wheel-mode');
   requestAnimationFrame(layoutWheelLabels);
   addEventListener('resize', layoutWheelLabels);
+
+  window.addEventListener('message', event => {
+    if (event.source !== window.parent || !event.data?.mathteacherAssistantResponse) return;
+    const response = event.data.mathteacherAssistantResponse;
+    if (!response.event_id || response.event_id === window.__lastMathteacherResponse) return;
+    window.__lastMathteacherResponse = response.event_id;
+    const message = String(response.text || 'Trợ giảng chưa thể phản hồi lúc này.').slice(0, 1200);
+    aiStatus.textContent = message;
+    say(message);
+  });
 
   document.getElementById('sound').onclick = () => {
     sound = !sound;
@@ -533,8 +687,9 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
       settling = false;
       pending = chosen;
       feedback.textContent =
-        `Mũi tên đã chọn CÂU ${chosen + 1}. Bấm ô số ${chosen + 1} để mở câu hỏi.`;
+        `Mũi tên đã chọn CÂU ${chosen + 1}. MC đang mở câu hỏi…`;
       render();
+      say(`Vòng quay dừng ở câu số ${chosen + 1}.`, () => openQuestion(chosen));
     }, delay);
   };
 
@@ -599,5 +754,92 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     script = (
         script.replace("__STORAGE__", storage)
         .replace("__WHEEL_AUDIO__", wheel_sound)
+        .replace("__AI_BRIDGE__", "true" if ai_bridge else "false")
     )
     return base.replace("</body>", script + "</body>", 1).encode("utf-8")
+
+
+def render_ai_integrated_wheel(st, html: bytes, slides: list[tuple[dict, dict]], *, session_id: str) -> None:
+    """Render the wheel as a bidirectional Streamlit component and route answers to AI."""
+    import streamlit.components.v1 as components
+
+    component_dir = Path(__file__).with_name("classroom_lucky_wheel_component")
+    component = components.declare_component(
+        "mathteacher_lucky_wheel_ai_mc_v1",
+        path=str(component_dir),
+    )
+    event = component(
+        html=html.decode("utf-8"),
+        ai_response=st.session_state.get(f"wheel_ai_response:{session_id}"),
+        key=f"classroom_wheel_ai_component_{session_id}",
+        default=None,
+    )
+    if not isinstance(event, dict) or event.get("action") != "student_answer":
+        return
+    event_id = str(event.get("event_id", ""))[:100]
+    processed_key = f"wheel_ai_processed:{session_id}"
+    if not event_id or st.session_state.get(processed_key) == event_id:
+        return
+    st.session_state[processed_key] = event_id
+
+    try:
+        index = int(event.get("question_index", -1))
+        transcript = str(event.get("transcript", "")).strip()[:1000]
+        if not 0 <= index < len(slides) or not transcript:
+            raise ValueError("Không nhận được câu hỏi hoặc câu trả lời hợp lệ.")
+        row, detail = slides[index]
+        answers = [
+            str(answer.get("exact_answer_text", "")).strip()
+            for answer in detail.get("answers", [])
+            if str(answer.get("exact_answer_text", "")).strip()
+        ]
+        kind = str(row.get("question_type_code", ""))
+        if kind == "MULTIPLE_CHOICE":
+            answers = [
+                "Phương án " + ", ".join(
+                    str(option.get("option_code", ""))
+                    for option in detail.get("options", [])
+                    if option.get("is_correct")
+                )
+            ]
+        elif kind == "TRUE_FALSE":
+            answers = [
+                "; ".join(
+                    f"{position}. {'Đúng' if statement.get('correct_value') else 'Sai'}"
+                    for position, statement in enumerate(detail.get("statements", []), 1)
+                )
+            ]
+
+        from ai_kernel.teaching_voice import AIKernelTeachingBrain
+
+        prompt = (
+            "Bạn là MC kiêm trợ giảng Toán 6 trong trò chơi Vòng quay may mắn. "
+            "Hãy phản hồi trực tiếp, tự nhiên, tối đa 2 câu, bằng tiếng Việt. "
+            "So sánh câu trả lời học sinh với đáp án chuẩn. Nếu đúng, khen ngắn gọn. "
+            "Nếu sai, động viên và cho một gợi ý nhỏ, không tiết lộ đáp án. "
+            "Nếu không đủ dữ liệu để chấm, nói rõ mời giáo viên xác nhận. "
+            "Không cộng điểm và không tự nhận đã cập nhật bảng điểm.\n\n"
+            f"Câu hỏi: {row.get('prompt_text', '')}\n"
+            f"Đáp án chuẩn dành riêng cho trợ giảng: {'; '.join(answers) or 'Chưa có đáp án.'}\n"
+            f"Câu học sinh vừa nói: {transcript}"
+        )
+        response = AIKernelTeachingBrain().respond(
+            transcript=prompt,
+            system_prompt=(
+                "Bạn là MC trợ giảng Toán thân thiện cho học sinh lớp 6. "
+                "Chỉ đánh giá theo dữ liệu được cung cấp; không bịa đáp án, "
+                "không tiết lộ đáp án khi học sinh sai."
+            ),
+            mode="student",
+            channel="chat",
+        )
+        text = str(response or "").strip()[:1200]
+        if not text:
+            raise RuntimeError("AI chưa tạo được phản hồi.")
+    except Exception:
+        text = "MC đã ghi nhận câu trả lời. Mời thầy cô xác nhận đáp án và tiếp tục trò chơi nhé."
+    st.session_state[f"wheel_ai_response:{session_id}"] = {
+        "event_id": event_id,
+        "text": text,
+    }
+    st.rerun()
