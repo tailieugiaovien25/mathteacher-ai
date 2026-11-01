@@ -25,6 +25,7 @@ class ModelProfile:
     commercially_permissive: bool = True
     admin_enabled: bool = True
     notes: str = ""
+    context_window: int = 4096
 
 
 def default_model_profiles() -> tuple[ModelProfile, ...]:
@@ -36,6 +37,7 @@ def default_model_profiles() -> tuple[ModelProfile, ...]:
             model="qwen3:0.6b",
             capabilities=frozenset({ModelCapability.GENERAL, ModelCapability.VIETNAMESE}),
             notes="Profile nhẹ cho máy RAM thấp; phù hợp kiểm thử/AI Trợ giảng Lite trên PC cá nhân.",
+            context_window=2048,
         ),
         ModelProfile(
             profile_id="qwen3-local-8b",
