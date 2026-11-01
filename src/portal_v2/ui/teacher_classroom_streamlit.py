@@ -871,8 +871,13 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                             raise ValueError("Một câu không còn được duyệt hoặc nằm ngoài khối Toán 6–9.")
                         slides.append((row, _detail(client, str(entry["question_version_id"]))))
                     st.session_state["prepared_classroom_wheel"] = (
-                        selected_id, build_offline_wheel(session["title"], slides,
-                                                         session_id=selected_id))
+                        selected_id,
+                        build_offline_wheel(session["title"], slides,
+                                            session_id=selected_id),
+                        slides,
+                        build_offline_wheel(session["title"], slides,
+                                            session_id=selected_id, ai_bridge=True),
+                    )
                 except Exception as exc:
                     st.error(f"Không chuẩn bị được vòng quay: {exc}")
             prepared_wheel = st.session_state.get("prepared_classroom_wheel")
@@ -880,10 +885,23 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                 st.download_button("⬇ Tải vòng quay HTML ngoại tuyến", prepared_wheel[1],
                     file_name=f"vong-quay-{selected_id[:8]}.html", mime="text/html",
                     key=f"download_wheel_{selected_id}", use_container_width=True)
-                from streamlit.components.v1 import html as component_html
-                component_html(prepared_wheel[1].decode("utf-8"), height=820, scrolling=True)
-                st.caption("Mở tệp HTML đã tải để trình chiếu toàn màn hình. "
-                           "Điểm trong bản tải về lưu riêng ở trình duyệt, không đồng bộ lên máy chủ.")
+                if len(prepared_wheel) >= 4:
+                    from portal_v2.ui.classroom_lucky_wheel import render_ai_integrated_wheel
+                    render_ai_integrated_wheel(
+                        st,
+                        prepared_wheel[3],
+                        prepared_wheel[2],
+                        session_id=selected_id,
+                    )
+                    st.caption(
+                        "MC tự đọc câu hỏi. Bấm ‘Nghe câu trả lời’ để nhận dạng tiếng Việt; "
+                        "AI trợ giảng sẽ phản hồi bằng đáp án đã duyệt. Cần cấp quyền micro "
+                        "và kết nối Internet để gọi AI. Bản ghi câu trả lời được gửi tới nhà cung cấp "
+                        "AI đang cấu hình cho ứng dụng."
+                    )
+                else:
+                    st.info("Hãy bấm ‘Chuẩn bị vòng quay’ lại để bật MC AI liền mạch.")
+                st.caption("Bản HTML tải về dùng ngoại tuyến; dữ liệu điểm lưu riêng trên trình duyệt.")
             return
     if queue:
         with st.expander("Sân khấu trình chiếu · dùng trực tiếp hoặc tải về", expanded=False):
