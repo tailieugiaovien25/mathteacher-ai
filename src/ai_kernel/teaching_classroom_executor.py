@@ -166,7 +166,36 @@ class StreamlitClassroomRuntime:
         return {"accepted": True, "event": self.session_state[self.EVENT_KEY], "state": state}
 
     def read_status(self) -> Mapping[str, Any]:
-        return dict(self.session_state.get(self.STATE_KEY) or self.session_state.get(self.LEGACY_STATE_KEY, {}))
+        state = dict(
+            self.session_state.get(self.STATE_KEY)
+            or self.session_state.get(self.LEGACY_STATE_KEY, {})
+        )
+
+        timer = state.get("timer")
+        if isinstance(timer, Mapping) and timer.get("status") == "running":
+            try:
+                started_at = datetime.fromisoformat(
+                    str(timer.get("started_at", "")).replace("Z", "+00:00")
+                )
+                if started_at.tzinfo is None:
+                    started_at = started_at.replace(tzinfo=timezone.utc)
+
+                seconds = int(timer.get("seconds", 0))
+                now = datetime.now(timezone.utc)
+
+                if seconds > 0 and (now - started_at).total_seconds() >= seconds:
+                    completed_timer = dict(timer)
+                    completed_timer["status"] = "completed"
+                    completed_timer["completed_at"] = now.isoformat()
+                    state["timer"] = completed_timer
+
+                    self.session_state[self.STATE_KEY] = state
+                    self.session_state[self.LEGACY_STATE_KEY] = state
+            except (TypeError, ValueError, OverflowError):
+                # Invalid timer metadata must not crash the teaching UI.
+                pass
+
+        return state
 
 
 class TeachingClassroomActionExecutor:

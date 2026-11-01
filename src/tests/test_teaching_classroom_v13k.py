@@ -102,3 +102,77 @@ def test_runtime_overlay_contains_live_classroom_controls():
     assert "Tính 2+2" in html
     assert "Gợi ý" in html
     assert "srcdoc=\"&lt;html&gt;" in html
+def test_timer_expiry_marks_completed_and_syncs_state_keys():
+    state = {
+        StreamlitClassroomRuntime.STATE_KEY: {
+            "timer": {
+                "status": "running",
+                "seconds": 60,
+                "started_at": "2000-01-01T00:00:00+00:00",
+            },
+            "quiz": {"question": "2 + 2 = ?"},
+        }
+    }
+
+    runtime = StreamlitClassroomRuntime(state)
+    result = runtime.read_status()
+
+    assert result["timer"]["status"] == "completed"
+    assert result["timer"]["completed_at"]
+    assert result["quiz"]["question"] == "2 + 2 = ?"
+    assert state[StreamlitClassroomRuntime.STATE_KEY] == result
+    assert state[StreamlitClassroomRuntime.LEGACY_STATE_KEY] == result
+
+    completed_at = result["timer"]["completed_at"]
+    second_result = runtime.read_status()
+    assert second_result["timer"]["completed_at"] == completed_at
+
+
+def test_timer_that_has_not_expired_remains_running():
+    state = {
+        StreamlitClassroomRuntime.STATE_KEY: {
+            "timer": {
+                "status": "running",
+                "seconds": 60,
+                "started_at": "2999-01-01T00:00:00+00:00",
+            }
+        }
+    }
+
+    result = StreamlitClassroomRuntime(state).read_status()
+
+    assert result["timer"]["status"] == "running"
+    assert "completed_at" not in result["timer"]
+
+
+def test_stopped_timer_remains_stopped():
+    state = {
+        StreamlitClassroomRuntime.STATE_KEY: {
+            "timer": {
+                "status": "stopped",
+                "stopped_at": "2026-11-01T00:00:00+00:00",
+            }
+        }
+    }
+
+    result = StreamlitClassroomRuntime(state).read_status()
+
+    assert result["timer"]["status"] == "stopped"
+    assert "completed_at" not in result["timer"]
+
+
+def test_invalid_timer_timestamp_does_not_crash_or_complete():
+    state = {
+        StreamlitClassroomRuntime.STATE_KEY: {
+            "timer": {
+                "status": "running",
+                "seconds": 60,
+                "started_at": "invalid-timestamp",
+            }
+        }
+    }
+
+    result = StreamlitClassroomRuntime(state).read_status()
+
+    assert result["timer"]["status"] == "running"
+    assert "completed_at" not in result["timer"]

@@ -510,10 +510,14 @@ def render_teaching_assistant_avatar_surface(st: Any, *, client: Any | None = No
                                 st.rerun()
                 else:
                     st.caption("Ká»‹ch báº£n nÃ y chá»‰ gá»“m lá»i dáº«n, chÆ°a Ä‘á» xuáº¥t thao tÃ¡c ká»¹ thuáº­t.")
-                status = StreamlitClassroomRuntime(st.session_state).read_status()
-                if status:
-                    with st.expander("Tráº¡ng thÃ¡i lá»›p há»c do Trá»£ giáº£ng vá»«a cáº­p nháº­t", expanded=False):
-                        st.json(status)
+                @st.fragment(run_every=1)
+                def _render_classroom_runtime_status():
+                    current_status = StreamlitClassroomRuntime(st.session_state).read_status()
+                    if current_status:
+                        with st.expander("Trạng thái lớp học do Trợ giảng vừa cập nhật", expanded=False):
+                            st.json(current_status)
+
+                _render_classroom_runtime_status()
                 st.caption("V13K: Action Ä‘Æ°á»£c Ä‘áº©y vÃ o BÃ i giáº£ng/SÃ¢n kháº¥u/Timer/Quiz/Whiteboard sau xÃ¡c nháº­n; Teacher Override luÃ´n cháº·n executor.")
         except Exception as exc:
             st.warning(f"ChÆ°a thá»ƒ má»Ÿ bá»™ láº­p káº¿ hoáº¡ch MC/hoáº¡t Ä‘á»™ng: {exc}")
