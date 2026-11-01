@@ -110,6 +110,16 @@ class AIRouter:
                 f"Provider {decision.profile.provider} không hỗ trợ streaming."
             )
 
+        provider_metadata = {
+            **dict(request.metadata),
+            "profile_id": decision.profile.profile_id,
+            "ownership": request.owner.value,
+            "action": request.action.value,
+            "audit_id": event.audit_id,
+        }
+        if decision.profile.provider == "ollama":
+            provider_metadata["ollama_num_ctx"] = str(decision.profile.context_window)
+
         ai_request = AIRequest(
             task=request.task_id,
             prompt=request.prompt,
@@ -119,19 +129,22 @@ class AIRouter:
                 "không tự thực hiện thao tác production. "
                 "Chỉ đưa ra kết luận dựa trên bằng chứng đã cung cấp."
             ),
-            metadata={
-                **dict(request.metadata),
-                "profile_id": decision.profile.profile_id,
-                "ownership": request.owner.value,
-                "action": request.action.value,
-                "audit_id": event.audit_id,
-            },
+            metadata=provider_metadata,
         )
         return stream_method(ai_request)
     def generate(self, request: AIKernelRequest) -> AIKernelResponse:
         decision = self.choose(request)
         event = make_audit_event(request, decision.profile.profile_id)
         provider = self._provider_for(decision.profile)
+        provider_metadata = {
+            **dict(request.metadata),
+            "profile_id": decision.profile.profile_id,
+            "ownership": request.owner.value,
+            "action": request.action.value,
+        }
+        if decision.profile.provider == "ollama":
+            provider_metadata["ollama_num_ctx"] = str(decision.profile.context_window)
+
         ai_response = provider.generate(
             AIRequest(
                 task=request.task_id,
@@ -142,12 +155,7 @@ class AIRouter:
                     "khÃ´ng tá»± thá»±c hiá»‡n thao tÃ¡c production. "
                     "Chá»‰ Ä‘Æ°a ra káº¿t luáº­n dá»±a trÃªn báº±ng chá»©ng Ä‘Ã£ cung cáº¥p."
                 ),
-                metadata={
-                    **dict(request.metadata),
-                    "profile_id": decision.profile.profile_id,
-                    "ownership": request.owner.value,
-                    "action": request.action.value,
-                },
+                metadata=provider_metadata,
             )
         )
         return AIKernelResponse(

@@ -20,6 +20,19 @@ class OllamaProvider:
     timeout_seconds: float = 120.0
     provider_id: str = "ollama"
 
+    @staticmethod
+    def _context_options(request_data: AIRequest) -> dict[str, dict[str, int]]:
+        raw_num_ctx = request_data.metadata.get("ollama_num_ctx")
+        if raw_num_ctx is None:
+            return {}
+        try:
+            num_ctx = int(raw_num_ctx)
+        except (TypeError, ValueError) as exc:
+            raise OllamaProviderError("Ollama num_ctx must be an integer.") from exc
+        if not 512 <= num_ctx <= 32768:
+            raise OllamaProviderError("Ollama num_ctx must be between 512 and 32768.")
+        return {"options": {"num_ctx": num_ctx}}
+
     def health(self) -> bool:
         req = request.Request(
             f"{self.base_url}/api/tags",
@@ -59,6 +72,7 @@ class OllamaProvider:
                 {"role": "user", "content": request_data.prompt},
             ],
         }
+        payload.update(self._context_options(request_data))
         req = request.Request(
             f"{self.base_url}/api/chat",
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -97,6 +111,7 @@ class OllamaProvider:
                 {"role": "user", "content": request_data.prompt},
             ],
         }
+        payload.update(self._context_options(request_data))
         req = request.Request(
             f"{self.base_url}/api/chat",
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
