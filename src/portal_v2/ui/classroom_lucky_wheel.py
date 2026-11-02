@@ -9,6 +9,7 @@ from portal_v2.ui.classroom_sound_layer import stage_audio_sources
 
 
 WHEEL_QUESTION_COUNT = 9
+WHEEL_BUILD_VERSION = 2
 
 
 def build_offline_wheel(

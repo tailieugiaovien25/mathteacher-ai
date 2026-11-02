@@ -5,7 +5,36 @@ from typing import Any
 from html import escape
 import json
 import re
+import time
 from portal_v2.ui.classroom_sound_layer import stage_audio_sources
+
+
+_TRANSIENT_CLASSROOM_READ_ERRORS = frozenset({
+    "ConnectionTerminated", "ConnectionResetError", "ConnectError",
+    "ReadError", "ReadTimeout", "RemoteProtocolError",
+})
+
+
+def _is_transient_classroom_read_error(error: BaseException) -> bool:
+    current = error
+    seen = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if type(current).__name__ in _TRANSIENT_CLASSROOM_READ_ERRORS:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _execute_classroom_read(query: Any) -> Any:
+    """Retry once when Supabase's HTTP/2 connection drops during a read."""
+    try:
+        return query.execute()
+    except Exception as error:
+        if not _is_transient_classroom_read_error(error):
+            raise
+        time.sleep(0.15)
+        return query.execute()
 
 
 def _rows(result: Any) -> list[dict]:
@@ -13,34 +42,79 @@ def _rows(result: Any) -> list[dict]:
 
 
 def _question_bank(client: Any, user_id: str) -> list[dict]:
-    items = _rows(client.table("assessment_question_items")
-                  .select("question_id,question_code,grade_level,subject_code,lifecycle_status")
-                  .eq("owner_user_id", user_id).limit(1000).execute())
+    items = _rows(_execute_classroom_read(
+        client.table("assessment_question_items")
+        .select("question_id,question_code,grade_level,subject_code,lifecycle_status")
+        .eq("owner_user_id", user_id).limit(1000)
+    ))
     if not items:
         return []
     by_id = {str(item["question_id"]): item for item in items}
-    versions = _rows(client.table("assessment_question_versions")
-                    .select("question_id,question_version_id,prompt_text,question_type_code,cognitive_level_code,version_number")
-                    .eq("review_status", "APPROVED")
-                    .in_("question_id", list(by_id)).limit(1000).execute())
+    versions = _rows(_execute_classroom_read(
+        client.table("assessment_question_versions")
+        .select("question_id,question_version_id,prompt_text,question_type_code,cognitive_level_code,version_number")
+        .eq("review_status", "APPROVED")
+        .in_("question_id", list(by_id)).limit(1000)
+    ))
     return [{**version, "item": by_id[str(version["question_id"])]}
             for version in versions if str(version["question_id"]) in by_id]
 
 
 def _detail(client: Any, version_id: str) -> dict:
-    options = _rows(client.table("assessment_question_options")
-                    .select("option_code,option_text,is_correct,sequence_number")
-                    .eq("question_version_id", version_id).order("sequence_number").execute())
-    statements = _rows(client.table("assessment_question_statements")
-                       .select("statement_text,correct_value,sequence_number")
-                       .eq("question_version_id", version_id).order("sequence_number").execute())
-    answers = _rows(client.table("assessment_question_answers")
-                    .select("exact_answer_text,answer_explanation")
-                    .eq("question_version_id", version_id).limit(1).execute())
-    solutions = _rows(client.table("assessment_question_solutions")
-                      .select("solution_text,sequence_number")
-                      .eq("question_version_id", version_id).order("sequence_number").limit(5).execute())
+    options = _rows(_execute_classroom_read(
+        client.table("assessment_question_options")
+        .select("option_code,option_text,is_correct,sequence_number")
+        .eq("question_version_id", version_id).order("sequence_number")
+    ))
+    statements = _rows(_execute_classroom_read(
+        client.table("assessment_question_statements")
+        .select("statement_text,correct_value,sequence_number")
+        .eq("question_version_id", version_id).order("sequence_number")
+    ))
+    answers = _rows(_execute_classroom_read(
+        client.table("assessment_question_answers")
+        .select("exact_answer_text,answer_explanation")
+        .eq("question_version_id", version_id).limit(1)
+    ))
+    solutions = _rows(_execute_classroom_read(
+        client.table("assessment_question_solutions")
+        .select("solution_text,sequence_number")
+        .eq("question_version_id", version_id).order("sequence_number").limit(5)
+    ))
     return {"options": options, "statements": statements, "answers": answers, "solutions": solutions}
+
+
+def _prepare_classroom_wheel(
+    title: str,
+    queue: list[dict],
+    by_version: dict[str, dict],
+    client: Any,
+    session_id: str,
+) -> tuple[Any, ...]:
+    from portal_v2.ui.classroom_lucky_wheel import (
+        WHEEL_BUILD_VERSION,
+        build_offline_wheel,
+    )
+
+    slides = []
+    for entry in queue:
+        row = by_version.get(str(entry["question_version_id"]))
+        if (
+            not row
+            or int(row["item"]["grade_level"]) not in (6, 7, 8, 9)
+            or row["item"].get("subject_code") != "MATH"
+            or row["item"].get("lifecycle_status") != "ACTIVE"
+        ):
+            raise ValueError("Một câu không còn được duyệt hoặc nằm ngoài khối Toán 6–9.")
+        slides.append((row, _detail(client, str(entry["question_version_id"]))))
+
+    return (
+        session_id,
+        build_offline_wheel(title, slides, session_id=session_id),
+        slides,
+        build_offline_wheel(title, slides, session_id=session_id, ai_bridge=True),
+        WHEEL_BUILD_VERSION,
+    )
 
 
 def _render_question(st: Any, client: Any, row: dict, *, show_answer: bool) -> None:
@@ -711,11 +785,16 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
 <h2>Lớp học ôn tập</h2><p>Chọn câu hỏi đã duyệt, trình chiếu trên lớp và mang theo bản dùng khi mất mạng.</p></div>""", unsafe_allow_html=True)
     try:
         bank = _question_bank(client, user_id)
-        sessions = _rows(client.table("teacher_classroom_sessions")
-                         .select("session_id,title,status,current_position,show_answer,class_id,created_at")
-                         .eq("teacher_user_id", user_id).order("created_at", desc=True).limit(30).execute())
+        sessions = _rows(_execute_classroom_read(
+            client.table("teacher_classroom_sessions")
+            .select("session_id,title,status,current_position,show_answer,class_id,created_at")
+            .eq("teacher_user_id", user_id).order("created_at", desc=True).limit(30)
+        ))
     except Exception as exc:
-        st.error(f"Không tải được lớp học. Kiểm tra migration lớp học và quyền truy cập: {exc}")
+        if _is_transient_classroom_read_error(exc):
+            st.warning(f"Kết nối dữ liệu lớp học đang gián đoạn. Hãy tải lại trang sau ít giây: {exc}")
+        else:
+            st.error(f"Không tải được lớp học. Kiểm tra migration lớp học và quyền truy cập: {exc}")
         return
     if not bank:
         st.info("Tài khoản này chưa có câu hỏi đã duyệt trong ngân hàng.")
@@ -778,9 +857,11 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
         f'<span class="classroom-pill">{escape(str(session["status"]))}</span>'
         f'<span>Lớp {escape(str(session["class_id"]))}</span></div>', unsafe_allow_html=True)
     try:
-        queue = _rows(client.table("teacher_classroom_questions")
-                      .select("position,question_version_id")
-                      .eq("session_id", selected_id).order("position").limit(100).execute())
+        queue = _rows(_execute_classroom_read(
+            client.table("teacher_classroom_questions")
+            .select("position,question_version_id")
+            .eq("session_id", selected_id).order("position").limit(100)
+        ))
     except Exception as exc:
         st.error(f"Không đọc được danh sách câu: {exc}")
         return
@@ -861,27 +942,25 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                        "Điểm và câu đã chơi được lưu trong trình duyệt này.")
             if st.button("🎡 Chuẩn bị vòng quay", key=f"prepare_wheel_{selected_id}"):
                 try:
-                    from portal_v2.ui.classroom_lucky_wheel import build_offline_wheel
-                    slides = []
-                    for entry in queue:
-                        row = by_version.get(str(entry["question_version_id"]))
-                        if (not row or int(row["item"]["grade_level"]) not in (6, 7, 8, 9)
-                                or row["item"].get("subject_code") != "MATH"
-                                or row["item"].get("lifecycle_status") != "ACTIVE"):
-                            raise ValueError("Một câu không còn được duyệt hoặc nằm ngoài khối Toán 6–9.")
-                        slides.append((row, _detail(client, str(entry["question_version_id"]))))
-                    st.session_state["prepared_classroom_wheel"] = (
-                        selected_id,
-                        build_offline_wheel(session["title"], slides,
-                                            session_id=selected_id),
-                        slides,
-                        build_offline_wheel(session["title"], slides,
-                                            session_id=selected_id, ai_bridge=True),
+                    st.session_state["prepared_classroom_wheel"] = _prepare_classroom_wheel(
+                        str(session["title"]), queue, by_version, client, selected_id
                     )
                 except Exception as exc:
                     st.error(f"Không chuẩn bị được vòng quay: {exc}")
             prepared_wheel = st.session_state.get("prepared_classroom_wheel")
             if prepared_wheel and prepared_wheel[0] == selected_id:
+                from portal_v2.ui.classroom_lucky_wheel import WHEEL_BUILD_VERSION
+                if len(prepared_wheel) < 5 or prepared_wheel[4] != WHEEL_BUILD_VERSION:
+                    try:
+                        prepared_wheel = _prepare_classroom_wheel(
+                            str(session["title"]), queue, by_version, client, selected_id
+                        )
+                        st.session_state["prepared_classroom_wheel"] = prepared_wheel
+                        st.session_state.pop(f"wheel_ai_response:{selected_id}", None)
+                        st.session_state.pop(f"wheel_ai_processed:{selected_id}", None)
+                    except Exception as exc:
+                        st.error(f"Không thể làm mới vòng quay: {exc}")
+                        return
                 st.download_button("⬇ Tải vòng quay HTML ngoại tuyến", prepared_wheel[1],
                     file_name=f"vong-quay-{selected_id[:8]}.html", mime="text/html",
                     key=f"download_wheel_{selected_id}", use_container_width=True)
