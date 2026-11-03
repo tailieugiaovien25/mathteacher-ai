@@ -11,7 +11,7 @@ from portal_v2.ui.classroom_sound_layer import stage_audio_sources
 
 
 WHEEL_QUESTION_COUNT = 9
-WHEEL_BUILD_VERSION = 5
+WHEEL_BUILD_VERSION = 6
 
 
 def _normalize_answer_text(value: object) -> str:
@@ -381,6 +381,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   let recognition = null;
   let speechGeneration = 0;
   let aiResponseTimeout = null;
+  let autoRevealTimer = null;
 
   function stopSpeech() {
     speechGeneration += 1;
@@ -507,8 +508,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   function sendOperatorAnswer(selection) {
     if (!aiBridgeEnabled || !aiEnabled || active === null) return;
     const eventId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    aiStatus.textContent = 'MC đã nhận câu trả lời. Trợ giảng đang kiểm tra…';
-    say('MC đã nhận câu trả lời. Trợ giảng đang kiểm tra nhé.');
+    aiStatus.textContent = 'Đã nhận câu trả lời. Trợ giảng đang kiểm tra…';
     clearTimeout(aiResponseTimeout);
     aiResponseTimeout = setTimeout(() => {
       aiStatus.textContent = 'Chưa nhận được phản hồi từ trợ giảng. Hãy kiểm tra kết nối AI của ứng dụng.';
@@ -516,6 +516,31 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     window.parent.postMessage({mathteacherWheel: {
       event_id: eventId, action: 'operator_answer', question_index: active, selection
     }}, '*');
+  }
+
+  function scheduleAutomaticReveal(message) {
+    if (autoRevealTimer !== null) clearTimeout(autoRevealTimer);
+    aiStatus.textContent = 'Đã ghi nhận lựa chọn. Sau 3 giây MC sẽ đọc kết quả và tự hiện đáp án.';
+    autoRevealTimer = setTimeout(() => {
+      autoRevealTimer = null;
+      if (active === null || !aiEnabled) return;
+
+      const soundButton = document.getElementById('sound');
+      if (typeof sound !== 'undefined' && !sound) {
+        sound = true;
+        if (soundButton) {
+          soundButton.textContent = '♫ Tắt âm thanh';
+          soundButton.setAttribute('aria-pressed', 'true');
+        }
+      }
+
+      const answer = slides[active]?.querySelector('.answer');
+      if (answer?.hidden && revealButton) revealButton.click();
+      else if (typeof playAudio === 'function') playAudio('final');
+
+      aiStatus.textContent = message;
+      say(message);
+    }, 3000);
   }
 
   document.addEventListener('click', event => {
@@ -531,8 +556,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
         const message = correct
           ? `Chính xác! Người điều khiển đã chọn phương án ${code}. Chúc mừng cả đội!`
           : `Phương án ${code} chưa chính xác. Các em hãy xem lại dữ kiện và thử suy nghĩ thêm nhé.`;
-        aiStatus.textContent = message;
-        say(message);
+        scheduleAutomaticReveal(message);
       }
       return;
     }
@@ -548,8 +572,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
         const message = correct
           ? `Chính xác! Nhận định ${statementIndex + 1} được chọn là ${selectedText}.`
           : `Lựa chọn ${selectedText} cho nhận định ${statementIndex + 1} chưa chính xác. Hãy xem lại nhận định nhé.`;
-        aiStatus.textContent = message;
-        say(message);
+        scheduleAutomaticReveal(message);
       }
     }
   });
@@ -563,8 +586,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
       const result = assessSpokenAnswer(slide, value);
       if (result === 'correct') {
         const message = 'Chính xác! Câu trả lời đã khớp với đáp án chuẩn. Chúc mừng em!';
-        aiStatus.textContent = message;
-        say(message);
+        scheduleAutomaticReveal(message);
         return;
       }
     }
@@ -599,7 +621,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     const statements = [...slide.querySelectorAll('.truth b')].map(item => item.innerText.trim());
     const choices = options.length ? ` Các phương án là: ${options.join('. ')}.`
       : statements.length ? ` Các nhận định là: ${statements.join('. ')}.` : '';
-    aiStatus.textContent = `Câu ${slot + 1} đang được đọc. Chọn phương án, bấm Đúng/Sai hoặc nhập câu trả lời để MC phản hồi tự động.`;
+    aiStatus.textContent = `Câu ${slot + 1} đang được đọc. Sau khi chọn hoặc nhập đáp án, MC sẽ chốt kết quả sau 3 giây.`;
     say(`Vòng quay đã chọn câu ${slot + 1}. Mời các đội lắng nghe câu hỏi. ${prompt}${choices}`);
     aiListen.disabled = false;
   }
@@ -609,6 +631,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     aiToggle.setAttribute('aria-pressed', String(aiEnabled));
     aiToggle.textContent = aiEnabled ? '🔊 MC: ĐANG BẬT · bấm để tắt' : '🔇 MC: ĐANG TẮT · bấm để bật';
     if (!aiEnabled) {
+      if (autoRevealTimer !== null) clearTimeout(autoRevealTimer);
+      autoRevealTimer = null;
       stopSpeech();
       aiStatus.textContent = 'MC đang tắt. Bấm nút này để bật MC tiếng Việt.';
       if (pending !== null && active === null) openQuestion(pending);
@@ -782,6 +806,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   }
 
   function home() {
+    if (autoRevealTimer !== null) clearTimeout(autoRevealTimer);
+    autoRevealTimer = null;
     stopTrack();
     stopAudio();
     stopSpeech();
@@ -807,6 +833,9 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
 
   function openQuestion(slot) {
     if (pending !== slot || spinning || settling || used.includes(slot)) return;
+
+    if (autoRevealTimer !== null) clearTimeout(autoRevealTimer);
+    autoRevealTimer = null;
 
     active = slot;
     pending = null;
@@ -860,8 +889,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     aiResponseTimeout = null;
     window.__lastMathteacherResponse = response.event_id;
     const message = String(response.text || 'Trợ giảng chưa thể phản hồi lúc này.').slice(0, 1200);
-    aiStatus.textContent = message;
-    say(message);
+    scheduleAutomaticReveal(message);
   });
 
   document.getElementById('sound').onclick = () => {
