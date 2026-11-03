@@ -973,9 +973,10 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                         session_id=selected_id,
                     )
                     st.caption(
-                        "MC tự đọc câu hỏi. Bấm ‘Nghe câu trả lời’ để nhận dạng tiếng Việt; "
-                        "AI trợ giảng sẽ phản hồi bằng đáp án đã duyệt. Cần cấp quyền micro "
-                        "và kết nối Internet để gọi AI. Bản ghi câu trả lời được gửi tới nhà cung cấp "
+                        "MC tự đọc câu hỏi và phản hồi khi người điều khiển chọn phương án, "
+                        "bấm Đúng/Sai hoặc nhập câu trả lời; không cần bấm nút nghe. "
+                        "Nút micro là tùy chọn nếu muốn nhận dạng câu trả lời bằng giọng nói. "
+                        "Cần kết nối Internet để gọi AI. Bản ghi câu trả lời được gửi tới nhà cung cấp "
                         "AI đang cấu hình cho ứng dụng."
                     )
                 else:
