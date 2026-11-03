@@ -11,7 +11,7 @@ from portal_v2.ui.classroom_sound_layer import stage_audio_sources
 
 
 WHEEL_QUESTION_COUNT = 9
-WHEEL_BUILD_VERSION = 3
+WHEEL_BUILD_VERSION = 4
 
 
 def _normalize_answer_text(value: object) -> str:
@@ -83,6 +83,28 @@ def _classify_multiple_choice(detail: dict, transcript: str) -> tuple[str, str]:
         "Nếu sai, không tiết lộ mã hoặc nội dung đáp án chuẩn; chỉ đưa một gợi ý ngắn."
     )
     return ("correct" if is_correct else "wrong"), context
+
+
+def _classify_true_false_selection(
+    detail: dict, statement_index: int, selected_value: str
+) -> tuple[str, str]:
+    statements = sorted(
+        detail.get("statements", []), key=lambda item: item.get("sequence_number", 0)
+    )
+    if not 0 <= statement_index < len(statements) or selected_value not in {"true", "false"}:
+        return "teacher-check", "Không xác định được nhận định Đúng/Sai đã chọn."
+    statement = statements[statement_index]
+    selected = selected_value == "true"
+    expected = bool(statement.get("correct_value"))
+    outcome = "ĐÚNG" if selected == expected else "SAI"
+    selection_text = "Đúng" if selected else "Sai"
+    expected_text = "Đúng" if expected else "Sai"
+    context = (
+        f"Người điều khiển ghi nhận nhận định {statement_index + 1} là {selection_text}. "
+        f"Đáp án chuẩn là {expected_text}. Kết quả đối chiếu: {outcome}. "
+        "Nếu học sinh sai, không tiết lộ đáp án chuẩn; chỉ đưa một gợi ý ngắn."
+    )
+    return ("correct" if selected == expected else "wrong"), context
 
 
 def build_offline_wheel(
@@ -480,6 +502,72 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     say(messages[result]);
   }
 
+  function sendOperatorAnswer(selection) {
+    if (!aiBridgeEnabled || !aiEnabled || active === null) return;
+    const eventId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    aiStatus.textContent = 'MC đang đối chiếu lựa chọn vừa ghi nhận…';
+    clearTimeout(aiResponseTimeout);
+    aiResponseTimeout = setTimeout(() => {
+      aiStatus.textContent = 'Chưa nhận được phản hồi từ trợ giảng. Hãy kiểm tra kết nối AI của ứng dụng.';
+    }, 30000);
+    window.parent.postMessage({mathteacherWheel: {
+      event_id: eventId, action: 'operator_answer', question_index: active, selection
+    }}, '*');
+  }
+
+  document.addEventListener('click', event => {
+    if (active === null) return;
+    const slide = event.target.closest?.('.slide');
+    if (!slide || slide !== slides[active]) return;
+
+    const option = event.target.closest?.('.mcq');
+    if (option) {
+      const code = option.querySelector('b')?.textContent?.replace(/[.．。]\s*$/, '').trim();
+      if (code) sendOperatorAnswer({kind:'multiple_choice', option_code:code});
+      return;
+    }
+
+    const truthButton = event.target.closest?.('.truth-actions button');
+    if (truthButton) {
+      const statement = truthButton.closest('.truth');
+      const statementIndex = [...slide.querySelectorAll('.truth')].indexOf(statement);
+      if (statementIndex >= 0) {
+        sendOperatorAnswer({
+          kind:'true_false', statement_index:statementIndex,
+          value:truthButton.dataset.value
+        });
+      }
+    }
+  });
+
+  function submitTypedAnswer(input) {
+    const value = input.value.trim();
+    if (!value || input.dataset.mcSubmittedValue === value) return;
+    input.dataset.mcSubmittedValue = value;
+    sendOperatorAnswer({kind:'typed_answer', answer_text:value.slice(0, 1000)});
+  }
+
+  const typedAnswerTimers = new WeakMap();
+  document.addEventListener('input', event => {
+    const input = event.target.closest?.('.short-label input');
+    if (!input) return;
+    clearTimeout(typedAnswerTimers.get(input));
+    typedAnswerTimers.set(input, setTimeout(() => submitTypedAnswer(input), 900));
+  });
+  document.addEventListener('change', event => {
+    const input = event.target.closest?.('.short-label input');
+    if (input) submitTypedAnswer(input);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    const input = event.target.closest?.('.short-label input');
+    if (input) {
+      event.preventDefault();
+      submitTypedAnswer(input);
+      input.blur();
+    }
+  });
+
   function askQuestion(slot) {
     const slide = slides[slot];
     const prompt = slide?.querySelector('h1')?.innerText?.trim() || `Câu hỏi số ${slot + 1}`;
@@ -487,7 +575,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     const statements = [...slide.querySelectorAll('.truth b')].map(item => item.innerText.trim());
     const choices = options.length ? ` Các phương án là: ${options.join('. ')}.`
       : statements.length ? ` Các nhận định là: ${statements.join('. ')}.` : '';
-    aiStatus.textContent = `Câu ${slot + 1} đang được đọc. Bấm “Nghe câu trả lời” để nhận phản hồi.`;
+    aiStatus.textContent = `Câu ${slot + 1} đang được đọc. Chọn phương án, bấm Đúng/Sai hoặc nhập câu trả lời để MC phản hồi tự động.`;
     say(`Vòng quay đã chọn câu ${slot + 1}. Mời các đội lắng nghe câu hỏi. ${prompt}${choices}`);
     aiListen.disabled = false;
   }
@@ -913,7 +1001,7 @@ def render_ai_integrated_wheel(st, html: bytes, slides: list[tuple[dict, dict]],
         key=f"classroom_wheel_ai_component_{session_id}",
         default=None,
     )
-    if not isinstance(event, dict) or event.get("action") != "student_answer":
+    if not isinstance(event, dict) or event.get("action") not in {"student_answer", "operator_answer"}:
         return
     event_id = str(event.get("event_id", ""))[:100]
     processed_key = f"wheel_ai_processed:{session_id}"
@@ -924,12 +1012,48 @@ def render_ai_integrated_wheel(st, html: bytes, slides: list[tuple[dict, dict]],
     try:
         index = int(event.get("question_index", -1))
         transcript = str(event.get("transcript", "")).strip()[:1000]
-        if not 0 <= index < len(slides) or not transcript:
-            raise ValueError("Không nhận được câu hỏi hoặc câu trả lời hợp lệ.")
+        if not 0 <= index < len(slides):
+            raise ValueError("Không nhận được câu hỏi hợp lệ.")
         row, detail = slides[index]
         kind = str(row.get("question_type_code", ""))
         classification = "teacher-check"
         assessment = ""
+        if event.get("action") == "operator_answer":
+            selection = event.get("selection")
+            if not isinstance(selection, dict):
+                raise ValueError("Không nhận được lựa chọn của người điều khiển.")
+            selection_kind = str(selection.get("kind", ""))
+            if selection_kind == "multiple_choice" and kind == "MULTIPLE_CHOICE":
+                code = str(selection.get("option_code", "")).strip()
+                approved_codes = {
+                    str(option.get("option_code", "")).strip()
+                    for option in detail.get("options", [])
+                }
+                if not code or code not in approved_codes:
+                    raise ValueError("Phương án được chọn không thuộc câu hỏi hiện tại.")
+                transcript = f"Người điều khiển chọn phương án {code}."
+                classification, assessment = _classify_multiple_choice(detail, f"em chọn {code}")
+            elif selection_kind == "true_false" and kind == "TRUE_FALSE":
+                statement_index = int(selection.get("statement_index", -1))
+                selected_value = str(selection.get("value", ""))
+                classification, assessment = _classify_true_false_selection(
+                    detail, statement_index, selected_value
+                )
+                transcript = (
+                    f"Người điều khiển chọn nhận định {statement_index + 1} là "
+                    f"{'Đúng' if selected_value == 'true' else 'Sai'}."
+                )
+            elif selection_kind == "typed_answer":
+                transcript = str(selection.get("answer_text", "")).strip()[:1000]
+                if transcript:
+                    assessment = (
+                        "Người điều khiển đã ghi nhận câu trả lời tự luận của học sinh; "
+                        "hãy so sánh nội dung với đáp án chuẩn, chỉ kết luận khi đủ căn cứ."
+                    )
+            else:
+                raise ValueError("Kiểu lựa chọn không khớp với câu hỏi hiện tại.")
+        if not transcript:
+            raise ValueError("Không nhận được câu trả lời hợp lệ.")
         answers = [
             str(answer.get("exact_answer_text", "")).strip()
             for answer in detail.get("answers", [])
