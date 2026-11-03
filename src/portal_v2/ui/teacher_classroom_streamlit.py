@@ -973,11 +973,10 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                         session_id=selected_id,
                     )
                     st.caption(
-                        "MC tự đọc câu hỏi và phản hồi khi người điều khiển chọn phương án, "
-                        "bấm Đúng/Sai hoặc nhập câu trả lời; không cần bấm nút nghe. "
-                        "Nút micro là tùy chọn nếu muốn nhận dạng câu trả lời bằng giọng nói. "
-                        "Cần kết nối Internet để gọi AI. Bản ghi câu trả lời được gửi tới nhà cung cấp "
-                        "AI đang cấu hình cho ứng dụng."
+                        "MC tự đọc câu hỏi. Sau khi người điều khiển chọn phương án, bấm Đúng/Sai "
+                        "hoặc nhập câu trả lời, sau 3 giây MC tự đọc kết quả, hiện đáp án và phát âm thanh. "
+                        "Không cần bấm nút nghe; micro vẫn là tùy chọn nếu muốn nhận dạng giọng nói. "
+                        "Câu trả lời tự luận cần kết nối Internet để AI kiểm tra."
                     )
                 else:
                     st.info("Hãy bấm ‘Chuẩn bị vòng quay’ lại để bật MC AI liền mạch.")
