@@ -11,7 +11,7 @@ from portal_v2.ui.classroom_sound_layer import stage_audio_sources
 
 
 WHEEL_QUESTION_COUNT = 9
-WHEEL_BUILD_VERSION = 4
+WHEEL_BUILD_VERSION = 5
 
 
 def _normalize_answer_text(value: object) -> str:
@@ -422,7 +422,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     const voice = await waitForVietnameseVoice();
     if (request !== speechGeneration) return;
     if (!voice) {
-      aiStatus.textContent = 'Thiết bị chưa có giọng đọc tiếng Việt. Hãy cài hoặc bật Vietnamese speech voice trong trình duyệt/hệ điều hành.';
+      const notice = 'Thiết bị chưa có giọng đọc tiếng Việt.';
+      if (!aiStatus.textContent.includes(notice)) aiStatus.textContent += ` (${notice})`;
       if (onend) onend();
       return;
     }
@@ -434,7 +435,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     if (onend) utterance.onend = onend;
     utterance.onerror = () => {
       if (request === speechGeneration) {
-        aiStatus.textContent = 'Không phát được giọng tiếng Việt. Hãy thử lại hoặc chọn giọng tiếng Việt khác trên thiết bị.';
+        const notice = 'Không phát được giọng tiếng Việt.';
+        if (!aiStatus.textContent.includes(notice)) aiStatus.textContent += ` (${notice})`;
         if (onend) onend();
       }
     };
@@ -505,7 +507,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   function sendOperatorAnswer(selection) {
     if (!aiBridgeEnabled || !aiEnabled || active === null) return;
     const eventId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    aiStatus.textContent = 'MC đang đối chiếu lựa chọn vừa ghi nhận…';
+    aiStatus.textContent = 'MC đã nhận câu trả lời. Trợ giảng đang kiểm tra…';
+    say('MC đã nhận câu trả lời. Trợ giảng đang kiểm tra nhé.');
     clearTimeout(aiResponseTimeout);
     aiResponseTimeout = setTimeout(() => {
       aiStatus.textContent = 'Chưa nhận được phản hồi từ trợ giảng. Hãy kiểm tra kết nối AI của ứng dụng.';
@@ -516,14 +519,21 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   }
 
   document.addEventListener('click', event => {
-    if (active === null) return;
+    if (active === null || !aiEnabled) return;
     const slide = event.target.closest?.('.slide');
     if (!slide || slide !== slides[active]) return;
 
     const option = event.target.closest?.('.mcq');
     if (option) {
       const code = option.querySelector('b')?.textContent?.replace(/[.．。]\s*$/, '').trim();
-      if (code) sendOperatorAnswer({kind:'multiple_choice', option_code:code});
+      if (code) {
+        const correct = option.dataset.correct === 'true';
+        const message = correct
+          ? `Chính xác! Người điều khiển đã chọn phương án ${code}. Chúc mừng cả đội!`
+          : `Phương án ${code} chưa chính xác. Các em hãy xem lại dữ kiện và thử suy nghĩ thêm nhé.`;
+        aiStatus.textContent = message;
+        say(message);
+      }
       return;
     }
 
@@ -532,10 +542,14 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
       const statement = truthButton.closest('.truth');
       const statementIndex = [...slide.querySelectorAll('.truth')].indexOf(statement);
       if (statementIndex >= 0) {
-        sendOperatorAnswer({
-          kind:'true_false', statement_index:statementIndex,
-          value:truthButton.dataset.value
-        });
+        const value = truthButton.dataset.value;
+        const correct = value === statement.dataset.correct;
+        const selectedText = value === 'true' ? 'Đúng' : 'Sai';
+        const message = correct
+          ? `Chính xác! Nhận định ${statementIndex + 1} được chọn là ${selectedText}.`
+          : `Lựa chọn ${selectedText} cho nhận định ${statementIndex + 1} chưa chính xác. Hãy xem lại nhận định nhé.`;
+        aiStatus.textContent = message;
+        say(message);
       }
     }
   });
@@ -544,6 +558,16 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     const value = input.value.trim();
     if (!value || input.dataset.mcSubmittedValue === value) return;
     input.dataset.mcSubmittedValue = value;
+    const slide = input.closest('.slide');
+    if (slide && active !== null && slide === slides[active]) {
+      const result = assessSpokenAnswer(slide, value);
+      if (result === 'correct') {
+        const message = 'Chính xác! Câu trả lời đã khớp với đáp án chuẩn. Chúc mừng em!';
+        aiStatus.textContent = message;
+        say(message);
+        return;
+      }
+    }
     sendOperatorAnswer({kind:'typed_answer', answer_text:value.slice(0, 1000)});
   }
 
