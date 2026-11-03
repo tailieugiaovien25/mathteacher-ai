@@ -11,7 +11,7 @@ from portal_v2.ui.classroom_sound_layer import stage_audio_sources
 
 
 WHEEL_QUESTION_COUNT = 9
-WHEEL_BUILD_VERSION = 6
+WHEEL_BUILD_VERSION = 7
 
 
 def _normalize_answer_text(value: object) -> str:
@@ -253,6 +253,15 @@ body.question-selected #wheel-panel .score-zone{display:none}
 .wheel-ai-status{display:inline-block;max-width:min(100%,560px);color:#f2fbff;background:#123b60;
   border:1px solid #59c5ff;border-radius:10px;padding:7px 11px;font-size:.94rem;font-weight:800;
   line-height:1.35;white-space:normal;text-align:left;box-shadow:0 2px 8px #06182b66}
+.wheel-voice-panel{flex:1 1 100%;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:12px 14px;background:#eff8ff;color:#123b60;border:1px solid #8fc5e8;border-radius:14px}
+.wheel-voice-panel[hidden]{display:none!important}
+.wheel-voice-panel label{display:grid;gap:5px;font-size:.88rem;font-weight:800}
+.wheel-voice-panel select{min-width:210px;max-width:100%;padding:8px 10px;border:1px solid #8eb6d1;border-radius:8px;
+  background:#fff;color:#143b58;font:inherit}
+.wheel-voice-panel input[type=range]{min-width:150px;accent-color:#1477bb}
+.wheel-voice-panel output,.wheel-voice-status{font-size:.88rem;font-weight:700;color:#174c70}
+.wheel-voice-status{flex:1 1 220px}
 .wheel-ai-button{border:1px solid #9cc5e3!important;background:#eef8ff!important;color:#12476e!important;
   box-shadow:0 4px 0 #9cc5e3!important;font-size:.88rem!important;padding:8px 10px!important}
 .wheel-ai-button:disabled{opacity:.5;cursor:not-allowed}
@@ -287,8 +296,18 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
         '🎡 Vòng quay</button>'
         '<button type="button" class="wheel-ai-button" id="wheel-ai-toggle" aria-pressed="true">'
         '🔊 MC: ĐANG BẬT · bấm để tắt</button>'
+        '<button type="button" class="wheel-ai-button" id="wheel-voice-settings" '
+        'aria-expanded="false" aria-controls="wheel-voice-panel">🎙 Tùy chọn giọng đọc</button>'
         '<button type="button" class="wheel-ai-button" id="wheel-ai-listen" disabled>'
         '🎙 Nghe câu trả lời</button>'
+        '<div class="wheel-voice-panel" id="wheel-voice-panel" hidden>'
+        '<label for="wheel-voice-select">Giọng tiếng Việt'
+        '<select id="wheel-voice-select"><option value="">Đang tìm giọng đọc…</option></select></label>'
+        '<label for="wheel-voice-rate">Tốc độ đọc <output id="wheel-voice-rate-value">0,96×</output>'
+        '<input id="wheel-voice-rate" type="range" min="0.7" max="1.3" step="0.05" value="0.96"></label>'
+        '<button type="button" class="wheel-ai-button" id="wheel-voice-test">▶ Nghe thử</button>'
+        '<span class="wheel-voice-status" id="wheel-voice-status" role="status" aria-live="polite">'
+        'Các giọng hiển thị tùy theo giọng đã cài trên thiết bị.</span></div>'
         '<span class="wheel-ai-status" id="wheel-ai-status" role="status" aria-live="polite">'
         'MC sẽ tự đọc câu được chọn.</span>'
     )
@@ -376,12 +395,96 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   const aiToggle = document.getElementById('wheel-ai-toggle');
   const aiListen = document.getElementById('wheel-ai-listen');
   const aiStatus = document.getElementById('wheel-ai-status');
+  const voiceSettingsButton = document.getElementById('wheel-voice-settings');
+  const voicePanel = document.getElementById('wheel-voice-panel');
+  const voiceSelect = document.getElementById('wheel-voice-select');
+  const voiceRate = document.getElementById('wheel-voice-rate');
+  const voiceRateValue = document.getElementById('wheel-voice-rate-value');
+  const voicePreview = document.getElementById('wheel-voice-status');
+  const voiceTest = document.getElementById('wheel-voice-test');
+  const voicePrefsKey = 'mathteacher-ai:voice-settings:v1';
 
   let aiEnabled = true;
   let recognition = null;
   let speechGeneration = 0;
   let aiResponseTimeout = null;
   let autoRevealTimer = null;
+  const speechPrefs = {voiceURI:'', rate:0.96, pitch:1.04};
+  try {
+    const savedPrefs = JSON.parse(localStorage.getItem(voicePrefsKey) || '{}');
+    if (typeof savedPrefs.voiceURI === 'string') speechPrefs.voiceURI = savedPrefs.voiceURI;
+    if (Number.isFinite(savedPrefs.rate)) speechPrefs.rate = Math.max(0.7, Math.min(1.3, savedPrefs.rate));
+    if (Number.isFinite(savedPrefs.pitch)) speechPrefs.pitch = Math.max(0.7, Math.min(1.3, savedPrefs.pitch));
+  } catch (error) {}
+  voiceRate.value = String(speechPrefs.rate);
+  voiceRateValue.textContent = `${speechPrefs.rate.toFixed(2).replace('.', ',')}×`;
+
+  function saveSpeechPrefs() {
+    try { localStorage.setItem(voicePrefsKey, JSON.stringify(speechPrefs)); } catch (error) {}
+  }
+
+  function vietnameseVoices() {
+    if (!('speechSynthesis' in window)) return [];
+    return window.speechSynthesis.getVoices().filter(voice => /^vi(?:[-_]|$)/i.test(voice.lang || ''));
+  }
+
+  function refreshVoiceOptions() {
+    const voices = vietnameseVoices();
+    voiceSelect.replaceChildren();
+    if (!voices.length) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'Chưa tìm thấy giọng tiếng Việt';
+      voiceSelect.appendChild(option);
+      voiceSelect.disabled = true;
+      voiceTest.disabled = true;
+      voicePreview.textContent = 'Cài giọng Tiếng Việt trong Windows rồi khởi động lại Chrome.';
+      return;
+    }
+    voiceSelect.disabled = false;
+    voiceTest.disabled = false;
+    voices.forEach(voice => {
+      const option = document.createElement('option');
+      option.value = voice.voiceURI;
+      option.textContent = `${voice.name} (${voice.lang})`;
+      voiceSelect.appendChild(option);
+    });
+    const savedVoice = voices.find(voice => voice.voiceURI === speechPrefs.voiceURI);
+    const preferredVoice = savedVoice || voices.find(voice => /\bAn\b/i.test(voice.name)) || voices[0];
+    voiceSelect.value = preferredVoice.voiceURI;
+    speechPrefs.voiceURI = preferredVoice.voiceURI;
+    saveSpeechPrefs();
+    voicePreview.textContent = `${voices.length} giọng tiếng Việt khả dụng trên thiết bị.`;
+  }
+
+  refreshVoiceOptions();
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.addEventListener?.('voiceschanged', refreshVoiceOptions);
+  }
+  voiceSettingsButton.addEventListener('click', () => {
+    voicePanel.hidden = !voicePanel.hidden;
+    voiceSettingsButton.setAttribute('aria-expanded', String(!voicePanel.hidden));
+    if (!voicePanel.hidden) refreshVoiceOptions();
+  });
+  voiceSelect.addEventListener('change', () => {
+    speechPrefs.voiceURI = voiceSelect.value;
+    saveSpeechPrefs();
+    const voice = vietnameseVoices().find(item => item.voiceURI === speechPrefs.voiceURI);
+    voicePreview.textContent = voice ? `Đã chọn giọng ${voice.name}.` : 'Chưa chọn được giọng đọc.';
+  });
+  voiceRate.addEventListener('input', () => {
+    speechPrefs.rate = Number(voiceRate.value);
+    voiceRateValue.textContent = `${speechPrefs.rate.toFixed(2).replace('.', ',')}×`;
+    saveSpeechPrefs();
+  });
+  voiceTest.addEventListener('click', () => {
+    if (!vietnameseVoice()) {
+      refreshVoiceOptions();
+      return;
+    }
+    voicePreview.textContent = 'Đang phát thử giọng đã chọn…';
+    say('Xin chào! Đây là giọng đọc MC trợ giảng trong trò chơi Vòng quay may mắn.');
+  });
 
   function stopSpeech() {
     speechGeneration += 1;
@@ -389,10 +492,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   }
 
   function vietnameseVoice() {
-    if (!('speechSynthesis' in window)) return null;
-    return window.speechSynthesis.getVoices().find(voice =>
-      /^vi(?:[-_]|$)/i.test(voice.lang || '')
-    ) || null;
+    const voices = vietnameseVoices();
+    return voices.find(voice => voice.voiceURI === speechPrefs.voiceURI) || voices[0] || null;
   }
 
   function waitForVietnameseVoice(timeoutMs = 2500) {
@@ -431,8 +532,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voice;
     utterance.lang = voice.lang || 'vi-VN';
-    utterance.rate = 0.96;
-    utterance.pitch = 1.04;
+    utterance.rate = speechPrefs.rate;
+    utterance.pitch = speechPrefs.pitch;
     if (onend) utterance.onend = onend;
     utterance.onerror = () => {
       if (request === speechGeneration) {
