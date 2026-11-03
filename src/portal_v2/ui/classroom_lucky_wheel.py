@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from html import escape
 from pathlib import Path
 
@@ -9,7 +11,78 @@ from portal_v2.ui.classroom_sound_layer import stage_audio_sources
 
 
 WHEEL_QUESTION_COUNT = 9
-WHEEL_BUILD_VERSION = 2
+WHEEL_BUILD_VERSION = 3
+
+
+def _normalize_answer_text(value: object) -> str:
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", text.replace("đ", "d").replace("Đ", "D").lower()).strip()
+
+
+def _classify_multiple_choice(detail: dict, transcript: str) -> tuple[str, str]:
+    """Match a spoken option code or option text against approved choices."""
+    heard = _normalize_answer_text(transcript)
+    tokens = heard.split()
+    options = sorted(detail.get("options", []), key=lambda item: item.get("sequence_number", 0))
+    by_code = {
+        _normalize_answer_text(option.get("option_code")): option
+        for option in options
+        if _normalize_answer_text(option.get("option_code"))
+    }
+
+    code_hits = []
+    for position, token in enumerate(tokens):
+        option = by_code.get(token)
+        if option is None:
+            continue
+        context = tokens[max(0, position - 3):position]
+        anchored = any(
+            marker in context
+            for marker in ("chon", "dap", "phuong", "lua", "la")
+        )
+        code_hits.append((token, anchored))
+
+    anchored_codes = list(dict.fromkeys(code for code, anchored in code_hits if anchored))
+    if len(anchored_codes) == 1:
+        selected_code = anchored_codes[0]
+    elif not anchored_codes and len({code for code, _ in code_hits}) == 1:
+        selected_code = code_hits[0][0]
+    else:
+        selected_code = ""
+
+    selected = by_code.get(selected_code) if selected_code else None
+    if selected is None:
+        text_matches = []
+        for option in options:
+            option_text = _normalize_answer_text(option.get("option_text"))
+            if not option_text:
+                continue
+            if f" {option_text} " in f" {heard} ":
+                text_matches.append(option)
+        unique_codes = {
+            _normalize_answer_text(option.get("option_code")): option
+            for option in text_matches
+        }
+        if len(unique_codes) == 1:
+            selected = next(iter(unique_codes.values()))
+
+    if selected is None:
+        return "unclear", "Không nhận dạng chắc chắn được phương án học sinh chọn."
+
+    code = str(selected.get("option_code", "")).strip()
+    correct_options = [option for option in options if option.get("is_correct")]
+    correct_codes = [str(option.get("option_code", "")).strip() for option in correct_options]
+    if not correct_codes:
+        return "teacher-check", f"Học sinh chọn phương án {code}; câu hỏi chưa có đáp án chuẩn đã duyệt."
+    is_correct = bool(selected.get("is_correct"))
+    reference = ", ".join(correct_codes)
+    outcome = "ĐÚNG" if is_correct else "SAI"
+    context = (
+        f"Học sinh chọn phương án {code}. Đáp án chuẩn là {reference}. Kết quả đối chiếu: {outcome}. "
+        "Nếu sai, không tiết lộ mã hoặc nội dung đáp án chuẩn; chỉ đưa một gợi ý ngắn."
+    )
+    return ("correct" if is_correct else "wrong"), context
 
 
 def build_offline_wheel(
@@ -854,13 +927,16 @@ def render_ai_integrated_wheel(st, html: bytes, slides: list[tuple[dict, dict]],
         if not 0 <= index < len(slides) or not transcript:
             raise ValueError("Không nhận được câu hỏi hoặc câu trả lời hợp lệ.")
         row, detail = slides[index]
+        kind = str(row.get("question_type_code", ""))
+        classification = "teacher-check"
+        assessment = ""
         answers = [
             str(answer.get("exact_answer_text", "")).strip()
             for answer in detail.get("answers", [])
             if str(answer.get("exact_answer_text", "")).strip()
         ]
-        kind = str(row.get("question_type_code", ""))
         if kind == "MULTIPLE_CHOICE":
+            classification, assessment = _classify_multiple_choice(detail, transcript)
             answers = [
                 "Phương án " + ", ".join(
                     str(option.get("option_code", ""))
@@ -876,40 +952,59 @@ def render_ai_integrated_wheel(st, html: bytes, slides: list[tuple[dict, dict]],
                 )
             ]
 
-        from ai_kernel.teaching_voice import AIKernelTeachingBrain
+        if classification == "unclear":
+            text = "MC chưa nhận ra em chọn phương án nào. Em hãy nói rõ mã phương án, ví dụ: ‘Em chọn A’."
+        else:
+            if not assessment:
+                assessment = (
+                    "Hãy tự đối chiếu câu trả lời với đáp án chuẩn. Nếu chưa đủ dữ liệu để chấm, "
+                    "mời giáo viên xác nhận; không đoán."
+                )
 
-        prompt = (
-            "Bạn là MC kiêm trợ giảng Toán 6 trong trò chơi Vòng quay may mắn. "
-            "Hãy phản hồi trực tiếp, tự nhiên, tối đa 2 câu, bằng tiếng Việt. "
-            "So sánh câu trả lời học sinh với đáp án chuẩn. Nếu đúng, khen ngắn gọn. "
-            "Nếu sai, động viên và cho một gợi ý nhỏ, không tiết lộ đáp án. "
-            "Nếu không đủ dữ liệu để chấm, nói rõ mời giáo viên xác nhận. "
-            "Không cộng điểm và không tự nhận đã cập nhật bảng điểm.\n\n"
-            f"Câu hỏi: {row.get('prompt_text', '')}\n"
-            f"Đáp án chuẩn dành riêng cho trợ giảng: {'; '.join(answers) or 'Chưa có đáp án.'}\n"
-            f"Câu học sinh vừa nói: {transcript}"
-        )
-        response = AIKernelTeachingBrain().respond(
-            transcript=prompt,
-            system_prompt=(
-                "Bạn là MC trợ giảng Toán thân thiện cho học sinh lớp 6. "
-                "Chỉ đánh giá theo dữ liệu được cung cấp; không bịa đáp án, "
-                "không tiết lộ đáp án khi học sinh sai."
-            ),
-            mode="student",
-            channel="chat",
-        )
-        text = str(response or "").strip()[:1200]
-        if not text:
-            raise RuntimeError("AI chưa tạo được phản hồi.")
+            fallback_feedback = {
+                "correct": "Chính xác! Em đã chọn đúng đáp án. Cả lớp hãy chúc mừng bạn nhé!",
+                "wrong": "Chưa chính xác. Em hãy đọc lại dữ kiện và thử suy nghĩ thêm một bước nhé!",
+                "teacher-check": "MC đã ghi nhận câu trả lời. Mời thầy cô xác nhận đáp án và tiếp tục trò chơi nhé.",
+            }
+
+            from ai_kernel.teaching_voice import AIKernelTeachingBrain
+
+            prompt = (
+                "Bạn là MC kiêm trợ giảng Toán 6 trong trò chơi Vòng quay may mắn. "
+                "Hãy phản hồi trực tiếp, tự nhiên, tối đa 2 câu, bằng tiếng Việt. "
+                "Ưu tiên kết luận đối chiếu bên dưới, kết luận này là chuẩn và không được thay đổi. "
+                "Nếu đúng, khen ngắn gọn. Nếu sai, động viên và cho một gợi ý nhỏ, không tiết lộ đáp án. "
+                "Nếu chưa đủ dữ liệu, mời giáo viên xác nhận. Không cộng điểm.\n\n"
+                f"Câu hỏi: {row.get('prompt_text', '')}\n"
+                f"Đáp án chuẩn dành riêng cho trợ giảng: {'; '.join(answers) or 'Chưa có đáp án.'}\n"
+                f"Kết luận đối chiếu: {assessment}\n"
+                f"Câu học sinh vừa nói: {transcript}"
+            )
+            try:
+                response = AIKernelTeachingBrain().respond(
+                    transcript=prompt,
+                    system_prompt=(
+                        "Bạn là MC trợ giảng Toán thân thiện cho học sinh lớp 6. "
+                        "Kết luận chấm máy đã cung cấp là bắt buộc và chính xác. "
+                        "Không bịa, không đổi đúng thành sai hoặc sai thành đúng, "
+                        "không tiết lộ đáp án khi học sinh sai."
+                    ),
+                    mode="student",
+                    channel="chat",
+                )
+                text = str(response or "").strip()[:1200]
+                if not text:
+                    raise RuntimeError("AI chưa tạo được phản hồi.")
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).exception("Lucky wheel AI response failed")
+                text = fallback_feedback[classification]
     except Exception:
         import logging
 
         logging.getLogger(__name__).exception("Lucky wheel AI response failed")
-        text = (
-            "MC đã nghe câu trả lời nhưng AI chưa phản hồi do lỗi kết nối hoặc cấu hình. "
-            "Mời thầy cô kiểm tra AI trợ giảng rồi thử lại."
-        )
+        text = "MC chưa thể chấm câu này do thiếu dữ liệu đáp án. Mời thầy cô xác nhận giúp nhé."
     st.session_state[f"wheel_ai_response:{session_id}"] = {
         "event_id": event_id,
         "text": text,
