@@ -155,7 +155,9 @@ body.question-selected #wheel-panel .score-zone{display:none}
 #wheel-feedback{
   min-height:3.4em;font-weight:850;color:#0d5688;line-height:1.35;margin:14px 0 0
 }
-.wheel-ai-status{display:inline-block;max-width:260px;color:#21446c;font-size:.9rem;font-weight:750}
+.wheel-ai-status{display:inline-block;max-width:min(100%,560px);color:#f2fbff;background:#123b60;
+  border:1px solid #59c5ff;border-radius:10px;padding:7px 11px;font-size:.94rem;font-weight:800;
+  line-height:1.35;white-space:normal;text-align:left;box-shadow:0 2px 8px #06182b66}
 .wheel-ai-button{border:1px solid #9cc5e3!important;background:#eef8ff!important;color:#12476e!important;
   box-shadow:0 4px 0 #9cc5e3!important;font-size:.88rem!important;padding:8px 10px!important}
 .wheel-ai-button:disabled{opacity:.5;cursor:not-allowed}
@@ -189,7 +191,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
         '<button type="button" id="wheel-home" title="Trở lại vòng quay">'
         '🎡 Vòng quay</button>'
         '<button type="button" class="wheel-ai-button" id="wheel-ai-toggle" aria-pressed="true">'
-        '🔊 MC trợ giảng: Bật</button>'
+        '🔊 MC: ĐANG BẬT · bấm để tắt</button>'
         '<button type="button" class="wheel-ai-button" id="wheel-ai-listen" disabled>'
         '🎙 Nghe câu trả lời</button>'
         '<span class="wheel-ai-status" id="wheel-ai-status" role="status" aria-live="polite">'
@@ -283,6 +285,7 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   let aiEnabled = true;
   let recognition = null;
   let speechGeneration = 0;
+  let aiResponseTimeout = null;
 
   function stopSpeech() {
     speechGeneration += 1;
@@ -382,6 +385,10 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     if (aiBridgeEnabled) {
       const eventId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       aiStatus.textContent = 'Trợ giảng đang nghe và chuẩn bị phản hồi…';
+      clearTimeout(aiResponseTimeout);
+      aiResponseTimeout = setTimeout(() => {
+        aiStatus.textContent = 'Chưa nhận được phản hồi từ máy chủ AI. Hãy thử lại hoặc kiểm tra kết nối AI của ứng dụng.';
+      }, 30000);
       window.parent.postMessage({mathteacherWheel: {
         event_id: eventId, action: 'student_answer', question_index: active,
         transcript: String(transcript || '').slice(0, 1000)
@@ -415,12 +422,14 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
   aiToggle.addEventListener('click', () => {
     aiEnabled = !aiEnabled;
     aiToggle.setAttribute('aria-pressed', String(aiEnabled));
-    aiToggle.textContent = aiEnabled ? '🔊 MC trợ giảng: Bật' : '🔇 MC trợ giảng: Tắt';
+    aiToggle.textContent = aiEnabled ? '🔊 MC: ĐANG BẬT · bấm để tắt' : '🔇 MC: ĐANG TẮT · bấm để bật';
     if (!aiEnabled) {
       stopSpeech();
+      aiStatus.textContent = 'MC đang tắt. Bấm nút này để bật MC tiếng Việt.';
       if (pending !== null && active === null) openQuestion(pending);
     }
     if (aiEnabled && active !== null) askQuestion(active);
+    else if (aiEnabled) aiStatus.textContent = 'MC đã bật. Bấm QUAY rồi DỪNG để chọn câu hỏi.';
   });
 
   aiListen.addEventListener('click', () => {
@@ -436,14 +445,22 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onstart = () => { aiStatus.textContent = 'MC đang nghe câu trả lời…'; };
-    recognition.onresult = event => respondToStudent(event.results[0][0].transcript);
+    recognition.onresult = event => {
+      const transcript = event.results[0][0].transcript;
+      aiStatus.textContent = `MC đã nghe: “${transcript}”. Đang gửi cho trợ giảng phản hồi…`;
+      respondToStudent(transcript);
+    };
     recognition.onerror = event => {
       if (recognition !== currentRecognition) return;
       aiStatus.textContent = event.error === 'not-allowed'
         ? 'Trình duyệt chưa được cấp quyền dùng micro.'
         : 'MC chưa nghe rõ. Hãy bấm nghe và thử lại.';
     };
-    recognition.start();
+    try {
+      recognition.start();
+    } catch (error) {
+      aiStatus.textContent = 'Không khởi động được micro. Hãy tải lại trang và kiểm tra quyền micro của Chrome.';
+    }
   });
 
   let used = [];
@@ -654,6 +671,8 @@ body:fullscreen #wheel-panel{min-height:calc(100vh - 110px)}
     if (event.source !== window.parent || !event.data?.mathteacherAssistantResponse) return;
     const response = event.data.mathteacherAssistantResponse;
     if (!response.event_id || response.event_id === window.__lastMathteacherResponse) return;
+    clearTimeout(aiResponseTimeout);
+    aiResponseTimeout = null;
     window.__lastMathteacherResponse = response.event_id;
     const message = String(response.text || 'Trợ giảng chưa thể phản hồi lúc này.').slice(0, 1200);
     aiStatus.textContent = message;
@@ -884,7 +903,13 @@ def render_ai_integrated_wheel(st, html: bytes, slides: list[tuple[dict, dict]],
         if not text:
             raise RuntimeError("AI chưa tạo được phản hồi.")
     except Exception:
-        text = "MC đã ghi nhận câu trả lời. Mời thầy cô xác nhận đáp án và tiếp tục trò chơi nhé."
+        import logging
+
+        logging.getLogger(__name__).exception("Lucky wheel AI response failed")
+        text = (
+            "MC đã nghe câu trả lời nhưng AI chưa phản hồi do lỗi kết nối hoặc cấu hình. "
+            "Mời thầy cô kiểm tra AI trợ giảng rồi thử lại."
+        )
     st.session_state[f"wheel_ai_response:{session_id}"] = {
         "event_id": event_id,
         "text": text,
