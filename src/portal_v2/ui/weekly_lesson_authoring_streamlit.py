@@ -323,16 +323,17 @@ def render_weekly_lesson_authoring_page(*, client, user_id: str) -> None:
         "system_weekly_week_number": st.session_state.get("system_weekly_week_number"),
         "error": _g1b_ws03_error,
     }
-    st.info(
-        "WORKFLOW-STATE-03 · Chẩn đoán tuần (chỉ đọc): "
-        + "canonical=" + str(_g1b_ws03_snapshot["canonical_week"])
-        + " · soạn-theo-tuần=" + str(_g1b_ws03_snapshot["weekly_lesson_authoring_week_number"])
-        + " · global=" + str(_g1b_ws03_snapshot["global_weekly_active_week_number"])
-        + " · chuẩn-hóa=" + str(_g1b_ws03_snapshot["standardization_authoring_week_number"])
-        + " · LBG=" + str(_g1b_ws03_snapshot["lbg_user_week_number"])
-        + " · system=" + str(_g1b_ws03_snapshot["system_weekly_week_number"])
-        + ((" · diagnostic-error=" + _g1b_ws03_snapshot["error"]) if _g1b_ws03_snapshot["error"] else "")
-    )
+    with st.expander("Thông tin đồng bộ tuần · chỉ đọc", expanded=False):
+        st.info(
+            "WORKFLOW-STATE-03 · Chẩn đoán tuần (chỉ đọc): "
+            + "canonical=" + str(_g1b_ws03_snapshot["canonical_week"])
+            + " · soạn-theo-tuần=" + str(_g1b_ws03_snapshot["weekly_lesson_authoring_week_number"])
+            + " · global=" + str(_g1b_ws03_snapshot["global_weekly_active_week_number"])
+            + " · chuẩn-hóa=" + str(_g1b_ws03_snapshot["standardization_authoring_week_number"])
+            + " · LBG=" + str(_g1b_ws03_snapshot["lbg_user_week_number"])
+            + " · system=" + str(_g1b_ws03_snapshot["system_weekly_week_number"])
+            + ((" · diagnostic-error=" + _g1b_ws03_snapshot["error"]) if _g1b_ws03_snapshot["error"] else "")
+        )
 
     selected_week = int(st.session_state[_WEEK_KEY])
 
