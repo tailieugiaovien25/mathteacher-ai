@@ -613,10 +613,34 @@ def render_teacher_timetable(
             perf_counter() - _perf_step
         ) * 1000
     except Exception as error:
-        st.error(
-            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
-            f"th\u1eddi kh\u00f3a bi\u1ec3u: {error}"
-        )
+        error_text = str(error)
+        if "teacher_timetable_slots" in error_text and (
+            "PGRST205" in error_text
+            or "schema cache" in error_text.lower()
+        ):
+            st.error(
+                "C\u01a1 s\u1edf d\u1eef li\u1ec7u ch\u01b0a "
+                "c\u00f3 b\u1ea3ng th\u1eddi kh\u00f3a bi\u1ec3u. "
+                "H\u00e3y ch\u1ea1y c\u00e1c migration th\u1eddi "
+                "kh\u00f3a bi\u1ec3u trong Supabase r\u1ed3i "
+                "t\u1ea3i l\u1ea1i trang."
+            )
+            st.caption(
+                "Ch\u1ea1y theo th\u1ee9 t\u1ef1: "
+                "202608160004_teacher_timetable_slots.sql, "
+                "sau \u0111\u00f3 "
+                "202609050001_teacher_timetable_component_scope_v14b6k.sql."
+            )
+            with st.expander("Chi ti\u1ebft l\u1ed7i k\u1ebft n\u1ed1i"):
+                st.code(error_text, language="text")
+        else:
+            st.error(
+                "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+                "th\u1eddi kh\u00f3a bi\u1ec3u. Chi ti\u1ebft "
+                "l\u1ed7i \u0111\u01b0\u1ee3c thu g\u1ecdn b\u00ean d\u01b0\u1edbi."
+            )
+            with st.expander("Chi ti\u1ebft l\u1ed7i"):
+                st.code(error_text, language="text")
         return
 
     _perf["total_data_load_ms"] = (
