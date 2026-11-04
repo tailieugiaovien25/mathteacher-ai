@@ -170,32 +170,6 @@ def render_admin_assignment_workspace(
         )
         return
 
-    try:
-        classes = class_repository.list_classes(
-            academic_year=current_year.academic_year,
-            status=ClassCatalogStatus.ACTIVE,
-        )
-    except Exception as error:
-        st.error(
-            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
-            "danh s\u00e1ch l\u1edbp: "
-            f"{error}"
-        )
-        return
-
-    if not classes:
-        st.warning(
-            "Ch\u01b0a c\u00f3 l\u1edbp ACTIVE "
-            "trong n\u0103m h\u1ecdc hi\u1ec7n h\u00e0nh."
-        )
-        return
-
-    class_by_id = {
-        item.class_id: item
-        for item in classes
-    }
-
-
     st.title(
         "B\u1ea3ng ph\u00e2n c\u00f4ng "
         "chuy\u00ean m\u00f4n "
@@ -210,6 +184,52 @@ def render_admin_assignment_workspace(
         "ph\u00e2n m\u00f4n v\u00e0 th\u1eddi gian "
         "c\u00f3 hi\u1ec7u l\u1ef1c."
     )
+
+    try:
+        classes = class_repository.list_classes(
+            academic_year=current_year.academic_year,
+            status=ClassCatalogStatus.ACTIVE,
+        )
+    except Exception as error:
+        error_text = str(error)
+        if "class_catalogs" in error_text and (
+            "PGRST205" in error_text
+            or "schema cache" in error_text.lower()
+        ):
+            st.error(
+                "C\u01a1 s\u1edf d\u1eef li\u1ec7u ch\u01b0a "
+                "s\u1eb5n s\u00e0ng danh s\u00e1ch l\u1edbp. "
+                "H\u00e3y \u00e1p d\u1ee5ng migration l\u1edbp "
+                "trong Supabase r\u1ed3i t\u1ea3i l\u1ea1i trang."
+            )
+            st.caption(
+                "Migration: "
+                "supabase/migrations/202611040001_restore_class_catalogs.sql"
+            )
+            with st.expander("Chi ti\u1ebft l\u1ed7i k\u1ebf n\u1ed1i"):
+                st.code(error_text, language="text")
+        else:
+            st.error(
+                "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+                "danh s\u00e1ch l\u1edbp. Chi ti\u1ebft l\u1ed7i "
+                "\u0111\u01b0\u1ee3c thu g\u1ecdn b\u00ean d\u01b0\u1edbi."
+            )
+            with st.expander("Chi ti\u1ebft l\u1ed7i"):
+                st.code(error_text, language="text")
+        return
+
+    if not classes:
+        st.warning(
+            "Ch\u01b0a c\u00f3 l\u1edbp ACTIVE "
+            "trong n\u0103m h\u1ecdc hi\u1ec7n h\u00e0nh."
+        )
+        return
+
+    class_by_id = {
+        item.class_id: item
+        for item in classes
+    }
+
 
     try:
         assignment_rounds = (
