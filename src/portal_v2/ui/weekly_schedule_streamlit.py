@@ -6070,6 +6070,7 @@ def _render_weekly_schedule_technical_workspace(
                 args=("Năm học",),
             ).strip()
 
+        _bootstrap_error_text = None
         with week_column:
             # WEEKLY_SCHEDULE_SELECTED_WEEK_RESTORE_V2
             _saved_week_key = (
@@ -6578,11 +6579,33 @@ def _render_weekly_schedule_technical_workspace(
                     )
 
             except Exception as error:
-                st.warning(
-                    "Kh?ng th? t?i l?ch b?o gi?ng "
-                    "c?a tu?n ?ang ch?n: "
-                    + str(error)
+                _bootstrap_error_text = str(error)
+
+        if _bootstrap_error_text:
+            if "weekly_teaching_schedules" in _bootstrap_error_text and (
+                "PGRST205" in _bootstrap_error_text
+                or "schema cache" in _bootstrap_error_text.lower()
+            ):
+                st.error(
+                    "Supabase ch\u01b0a c\u00f3 b\u1ea3ng l\u01b0u "
+                    "L\u1ecbch b\u00e1o gi\u1ea3ng. H\u00e3y ch\u1ea1y "
+                    "migration weekly_teaching_schedules trong "
+                    "Supabase SQL Editor, sau \u0111\u00f3 t\u1ea3i l\u1ea1i trang."
                 )
+                st.caption(
+                    "Migration: "
+                    "supabase/migrations/202608140001_weekly_teaching_schedules.sql"
+                )
+                with st.expander("Chi ti\u1ebft l\u1ed7i k\u1ebft n\u1ed1i"):
+                    st.code(_bootstrap_error_text, language="text")
+            else:
+                st.warning(
+                    "Kh\u00f4ng th\u1ec3 t\u1ea3i l\u1ecbch b\u00e1o "
+                    "gi\u1ea3ng c\u1ee7a tu\u1ea7n \u0111ang ch\u1ecdn. "
+                    "Chi ti\u1ebft l\u1ed7i n\u1eb1m b\u00ean d\u01b0\u1edbi."
+                )
+                with st.expander("Chi ti\u1ebft l\u1ed7i"):
+                    st.code(_bootstrap_error_text, language="text")
 
         if st.button(
             "C\u1eadp nh\u1eadt "
