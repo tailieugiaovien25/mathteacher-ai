@@ -240,11 +240,34 @@ def render_admin_assignment_workspace(
             )
         )
     except Exception as error:
-        st.error(
-            "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
-            "c\u00e1c l\u1ea7n ph\u00e2n c\u00f4ng: "
-            f"{error}"
-        )
+        error_text = str(error)
+        if "assignment_rounds" in error_text and (
+            "PGRST205" in error_text
+            or "schema cache" in error_text.lower()
+        ):
+            st.error(
+                "C\u01a1 s\u1edf d\u1eef li\u1ec7u ch\u01b0a "
+                "c\u00f3 b\u1ea3ng \u0111\u1ee3t ph\u00e2n c\u00f4ng. "
+                "H\u00e3y \u00e1p d\u1ee5ng c\u00e1c migration "
+                "ph\u00e2n c\u00f4ng trong Supabase r\u1ed3i "
+                "t\u1ea3i l\u1ea1i trang."
+            )
+            st.caption(
+                "Ch\u1ea1y theo th\u1ee9 t\u1ef1: "
+                "202608190001_assignment_rounds.sql, "
+                "202608190002_teaching_assignment_round_link.sql, "
+                "202608190003_assignment_round_backfill.sql."
+            )
+            with st.expander("Chi ti\u1ebft l\u1ed7i k\u1ebf n\u1ed1i"):
+                st.code(error_text, language="text")
+        else:
+            st.error(
+                "Kh\u00f4ng th\u1ec3 \u0111\u1ecdc "
+                "c\u00e1c l\u1ea7n ph\u00e2n c\u00f4ng. Chi ti\u1ebft "
+                "l\u1ed7i \u0111\u01b0\u1ee3c thu g\u1ecdn b\u00ean d\u01b0\u1edbi."
+            )
+            with st.expander("Chi ti\u1ebft l\u1ed7i"):
+                st.code(error_text, language="text")
         return
 
     if not assignment_rounds:
