@@ -323,20 +323,20 @@ def render_weekly_lesson_authoring_page(*, client, user_id: str) -> None:
         "system_weekly_week_number": st.session_state.get("system_weekly_week_number"),
         "error": _g1b_ws03_error,
     }
-    with st.expander("Thông tin đồng bộ tuần · chỉ đọc", expanded=False):
-        st.info(
-            "WORKFLOW-STATE-03 · Chẩn đoán tuần (chỉ đọc): "
-            + "canonical=" + str(_g1b_ws03_snapshot["canonical_week"])
-            + " · soạn-theo-tuần=" + str(_g1b_ws03_snapshot["weekly_lesson_authoring_week_number"])
-            + " · global=" + str(_g1b_ws03_snapshot["global_weekly_active_week_number"])
-            + " · chuẩn-hóa=" + str(_g1b_ws03_snapshot["standardization_authoring_week_number"])
-            + " · LBG=" + str(_g1b_ws03_snapshot["lbg_user_week_number"])
-            + " · system=" + str(_g1b_ws03_snapshot["system_weekly_week_number"])
-            + ((" · diagnostic-error=" + _g1b_ws03_snapshot["error"]) if _g1b_ws03_snapshot["error"] else "")
-        )
-
     selected_week = int(st.session_state[_WEEK_KEY])
-
+    with st.expander("Trạng thái đồng bộ tuần · chỉ đọc", expanded=False):
+        st.info(f"Tuần đang chọn: Tuần {selected_week}.")
+        with st.expander("Chi tiết kỹ thuật", expanded=False):
+            st.code(
+                "Tuần chuẩn: " + str(_g1b_ws03_snapshot["canonical_week"])
+                + "\nSoạn bài theo tuần: " + str(_g1b_ws03_snapshot["weekly_lesson_authoring_week_number"])
+                + "\nNgữ cảnh tuần chung: " + str(_g1b_ws03_snapshot["global_weekly_active_week_number"])
+                + "\nChuẩn hóa giáo án: " + str(_g1b_ws03_snapshot["standardization_authoring_week_number"])
+                + "\nLịch báo giảng: " + str(_g1b_ws03_snapshot["lbg_user_week_number"])
+                + "\nThời khóa biểu: " + str(_g1b_ws03_snapshot["system_weekly_week_number"])
+                + (("\nLỗi chẩn đoán: " + _g1b_ws03_snapshot["error"]) if _g1b_ws03_snapshot["error"] else ""),
+                language="text",
+            )
     try:
         groups = WeeklyLessonPlanGroupProvider(
             client=client,
@@ -352,15 +352,33 @@ def render_weekly_lesson_authoring_page(*, client, user_id: str) -> None:
                 f"Chưa có Lịch báo giảng đã cập nhật cho Tuần {selected_week}. "
                 "Hãy cập nhật Lịch báo giảng trước."
             )
-        elif "GROUPING_POLICY" in message:
-            st.warning(
-                "Chưa có cấu hình nhóm giáo án phù hợp từ ADMIN cho tuần này."
+        elif message.startswith("GROUPING_POLICY_READ_FAILED"):
+            st.error(
+                "Không đọc được cấu hình nhóm giáo án của ADMIN. "
+                "Kiểm tra bảng cấu hình và quyền đọc trong Supabase."
             )
-            with st.expander("Chi tiết chẩn đoán cấu hình nhóm giáo án"):
-                st.code(message)
+            if "PGRST205" in message or "schema cache" in message.lower():
                 st.caption(
-                    "Chẩn đoán chỉ đọc. Không thay đổi Lịch báo giảng hoặc cấu hình ADMIN."
+                    "Có thể thiếu migration cấu hình nhóm giáo án. "
+                    "Chạy lần lượt các migration 202608300010, "
+                    "202608300011 và 202608310001 trong Supabase."
                 )
+            with st.expander("Chi tiết lỗi kỹ thuật"):
+                st.code(message, language="text")
+        elif message.startswith("ACTIVE_GROUPING_POLICY_REQUIRED"):
+            st.warning(
+                "Chưa có quy tắc nhóm giáo án đang hoạt động cho môn hoặc "
+                "phân môn trong tuần này. ADMIN cần cấu hình quy tắc trước."
+            )
+            st.caption(
+                "Vào ADMIN → Quản trị Bộ mã Canonical → Cấu hình nhóm giáo án."
+            )
+            with st.expander("Chi tiết chẩn đoán"):
+                st.code(message)
+        elif "GROUPING_POLICY" in message:
+            st.error("Không thể áp dụng cấu hình nhóm giáo án cho tuần này.")
+            with st.expander("Chi tiết chẩn đoán"):
+                st.code(message, language="text")
         else:
             st.error(f"Không thể tạo nhóm giáo án từ Lịch báo giảng: {message}")
         return

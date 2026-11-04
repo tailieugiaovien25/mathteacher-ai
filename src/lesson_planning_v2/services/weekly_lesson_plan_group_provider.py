@@ -70,7 +70,11 @@ class WeeklyLessonPlanGroupProvider:
                 SupabaseLessonPlanGroupingPolicyRepository(client=self._client).list_configs()
             )
         except Exception as exc:
-            raise WeeklyLessonPlanGroupProviderError("GROUPING_POLICY_READ_FAILED") from exc
+            error_detail = " ".join(str(exc).split())[:500]
+            raise WeeklyLessonPlanGroupProviderError(
+                "GROUPING_POLICY_READ_FAILED: "
+                f"{type(exc).__name__}: {error_detail}"
+            ) from exc
 
         policies = tuple(
             LessonPlanGroupingPolicy(
