@@ -92,9 +92,6 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
     from lesson_planning_v2.models.lesson_plan_grouping_policy_config import (
         LessonPlanGroupingPolicyConfig,
     )
-    from portal_v2.context.supabase_canonical_code_repository import (
-        SupabaseCanonicalCodeRepository,
-    )
     from educational_planning_v2.adapters.supabase_subject_catalog_repository import (
         SupabaseSubjectCatalogRepository,
     )
@@ -108,7 +105,6 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
     )
 
     policy_repo = SupabaseLessonPlanGroupingPolicyRepository(client)
-    code_repo = SupabaseCanonicalCodeRepository(client)
     subject_repo = SupabaseSubjectCatalogRepository(client=client)
 
     try:
@@ -128,11 +124,13 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
         return
 
     try:
-        component_items = tuple(code_repo.list_codes(namespace="component"))
+        component_items = tuple(
+            subject_repo.list_components(status=CatalogStatus.ACTIVE)
+        )
     except Exception as error:
         component_items = ()
         st.warning(
-            "Chưa đọc được danh mục phân môn canonical; "
+            "Chưa đọc được danh mục phân môn; "
             "cấu hình mặc định theo môn vẫn có thể xem và chỉnh sửa."
         )
         with st.expander("Chi tiết lỗi danh mục phân môn"):
@@ -150,10 +148,10 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
 
     component_name_by_ref = {}
     for item in component_items:
-        code = str(getattr(item, "code", "") or "")
-        label = str(getattr(item, "label", "") or code)
-        if code:
-            component_name_by_ref[code] = label
+        component_id = str(getattr(item, "component_id", "") or "")
+        label = str(getattr(item, "name", "") or component_id)
+        if component_id:
+            component_name_by_ref[component_id] = label
 
     mode_display = {
         LessonPlanGroupingMode.BY_PERIOD: "Soạn theo tiết",
@@ -188,21 +186,16 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
         return
 
     subjects = tuple(item.subject_id for item in subject_items)
-    components = tuple(
-        str(getattr(item, "code", "") or "")
-        for item in component_items
-        if str(getattr(item, "code", "") or "").strip()
-    )
     subject_labels = {
         item.subject_id: f"{item.name} ({item.code})"
         for item in subject_items
     }
     component_labels = {
-        str(getattr(item, "code", "") or ""): (
-            f"{getattr(item, 'label', '')} ({getattr(item, 'code', '')})"
+        str(getattr(item, "component_id", "") or ""): (
+            f"{getattr(item, 'name', '')} ({getattr(item, 'component_id', '')})"
         )
         for item in component_items
-        if str(getattr(item, "code", "") or "").strip()
+        if str(getattr(item, "component_id", "") or "").strip()
     }
 
     mode_labels = {
@@ -224,6 +217,12 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
             "Môn",
             subjects,
             format_func=lambda value: subject_labels.get(value, value),
+        )
+        components = tuple(
+            str(getattr(item, "component_id", "") or "")
+            for item in component_items
+            if str(getattr(item, "subject_id", "") or "") == str(subject_ref)
+            and str(getattr(item, "component_id", "") or "").strip()
         )
         component_ref = st.selectbox(
             "Phạm vi áp dụng",

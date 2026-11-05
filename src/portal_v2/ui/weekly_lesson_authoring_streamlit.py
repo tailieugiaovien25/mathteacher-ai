@@ -375,6 +375,18 @@ def render_weekly_lesson_authoring_page(*, client, user_id: str) -> None:
             )
             with st.expander("Chi tiết chẩn đoán"):
                 st.code(message)
+        elif message.startswith("AUTHORITATIVE_GROUPING_POLICY_REQUIRED"):
+            scope = message.partition(":")[2].strip()
+            st.warning(
+                "Chưa có chính sách nhóm giáo án phù hợp cho môn/phân môn "
+                "trong tuần này."
+            )
+            st.caption(
+                "ADMIN cần đặt chính sách mặc định cho môn hoặc chính sách "
+                "riêng cho đúng phân môn trong Trung tâm điều phối giáo án."
+            )
+            with st.expander("Phạm vi đang thiếu chính sách"):
+                st.code(scope or message, language="text")
         elif "GROUPING_POLICY" in message:
             st.error("Không thể áp dụng cấu hình nhóm giáo án cho tuần này.")
             with st.expander("Chi tiết chẩn đoán"):
