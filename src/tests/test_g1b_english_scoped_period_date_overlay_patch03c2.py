@@ -55,10 +55,12 @@ def test_scoped_overlay_restores_periods_and_updates_only_10_to_12():
     for index, period in enumerate(periods):
         assert f"Period {period} " in texts[index]
         assert f"Lesson for source period {period}" in texts[index]
-    assert "Date of planning:11/09/2026" in texts[1]
-    assert "Date of teaching: 14/09/2026" in texts[1]
-    assert "Date of teaching: 15/09/2026" in texts[2]
-    assert "Date of teaching: 16/09/2026" in texts[3]
+    assert "Date of planning: 11/09/2026" in texts[1]
+    assert "Date of planning: 11/09/2026" in texts[2]
+    assert "Date of planning: 11/09/2026" in texts[3]
+    assert "Date of teaching: 6A1 - 14/09/2026; 6A2 - 14/09/2026" in texts[1]
+    assert "Date of teaching: 6A1 - 15/09/2026; 6A2 - 15/09/2026" in texts[2]
+    assert "Date of teaching: 6A1 - 16/09/2026; 6A2 - 16/09/2026" in texts[3]
     for index in (0, 4, 5, 6):
         assert "Date of planning:.........." in texts[index]
         assert "Date of teaching: .........." in texts[index]
@@ -77,12 +79,9 @@ def test_conflicting_dates_fail_closed_for_that_period():
         scope=scope,
         drafting_date=date(2026, 9, 11),
     )
-    assert result.applied_periods == (10, 12)
-    assert any(
-        warning.code == "AMBIGUOUS_PERIOD_TEACHING_DATE"
-        and warning.curriculum_period == 11
-        for warning in result.warnings
-    )
+    assert result.applied_periods == (10, 11, 12)
+    text = table_texts(result.content)[2]
+    assert "6A1 - 15/09/2026; 6A2 - 15/09/2026; 6A3 - 16/09/2026" in text
 
 
 def test_distinct_class_dates_are_written_as_class_date_pairs():
@@ -115,3 +114,46 @@ def test_distinct_class_dates_are_written_as_class_date_pairs():
     assert "Date of teaching: 6A1 - 14/09/2026; 6A2 - 15/09/2026" in texts[0]
     assert "Period 11" in texts[1]
     assert "Date of teaching: .........." in texts[1]
+
+
+def test_separate_class_specific_teaching_fields_are_filled_independently():
+    document = Document()
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = (
+        "Date of planning:..........\n"
+        "Date of teaching: .......... (for 6A1)\n"
+        "Ngày dạy: .......... (đối với 6A2)\n"
+        "WEEK: 4"
+    )
+    table.cell(0, 1).text = "Period 28: UNIT 4"
+    source = BytesIO()
+    document.save(source)
+    context_value = {
+        "curriculum_periods": [28],
+        "occurrences": [
+            {
+                "curriculum_period": 28,
+                "teaching_date": "2026-11-09",
+                "class_id": "6A1",
+                "class_display": "6A1",
+            },
+            {
+                "curriculum_period": 28,
+                "teaching_date": "2026-11-10",
+                "class_id": "6A2",
+                "class_display": "6A2",
+            },
+        ],
+    }
+    scope = resolve_multi_period_scope(group_context=context_value, document_periods=(28,))
+    result = apply_scoped_english_period_dates(
+        source_content=source.getvalue(),
+        output_content=source.getvalue(),
+        scope=scope,
+        drafting_date=date(2026, 11, 6),
+    )
+    cell_text = table_texts(result.content)[0]
+
+    assert "Date of planning: 06/11/2026" in cell_text
+    assert "Date of teaching: 09/11/2026 (for 6A1)" in cell_text
+    assert "Ngày dạy: 10/11/2026 (đối với 6A2)" in cell_text

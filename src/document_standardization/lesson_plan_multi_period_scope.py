@@ -229,17 +229,58 @@ def _copy_table_paragraph_text(*, source_table, output_table) -> None:
             _replace_paragraph_text_preserve_runs(output_paragraph, source_paragraph.text)
 
 
-def _replace_english_date_field(paragraph, *, label: str, value) -> bool:
+def _replace_english_date_field(
+    paragraph, *, label: str, value, class_name: str | None = None
+) -> bool:
     import re
-    pattern = re.compile(
-        rf"(?i)(?P<prefix>\b{re.escape(label)}\s*:\s*)"
-        r"(?P<value>(?:(?:\d{1,2}[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|(?:[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|[.\u2026\u00b7_\- \t]+)(?:[ \t]*(?:;|,|\n)[ \t]*(?:[A-Za-z0-9-]+[ \t]*[-\u2013\u2014:][ \t]*)?(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}))*?)"
-    )
-    match = pattern.search(paragraph.text)
-    if not match:
+    label_patterns = {
+        "Date of planning": r"(?:Date\s+of\s+planning|Ngày\s+soạn)",
+        "Date of teaching": r"(?:Date\s+of\s+teaching|Ngày\s+dạy)",
+    }
+    label_pattern = label_patterns.get(label, re.escape(label))
+    text = paragraph.text
+    label_matches = tuple(re.finditer(rf"(?i)(?<![A-Za-z]){label_pattern}\s*:\s*", text))
+    if not label_matches:
         return False
+    match = label_matches[0]
+    if class_name:
+        for candidate in label_matches:
+            candidate_start = candidate.end()
+            candidate_end = len(text)
+            boundary = re.search(
+                r"(?i)\n|\bWEEK\s*:|\b(?:Date\s+of\s+(?:planning|teaching))\s*:|\b(?:Period|Peroid)\s+\d+",
+                text[candidate_start:],
+            )
+            if boundary:
+                candidate_end = candidate_start + boundary.start()
+            if re.search(
+                rf"(?i)(?<![A-Za-z0-9]){re.escape(class_name)}(?![A-Za-z0-9])",
+                text[candidate_start:candidate_end],
+            ):
+                match = candidate
+                break
+    start = match.end()
+    end = len(text)
+    for boundary in re.finditer(
+        r"(?i)\n|\bWEEK\s*:|\b(?:Date\s+of\s+(?:planning|teaching))\s*:|\b(?:Period|Peroid)\s+\d+",
+        text[start:],
+    ):
+        end = min(end, start + boundary.start())
+    if class_name:
+        class_match = re.search(rf"(?i)(?<![A-Za-z0-9]){re.escape(class_name)}(?![A-Za-z0-9])", text[start:end])
+        if class_match:
+            before_class = text[start : start + class_match.start()]
+            suffix_start = before_class.rfind("(")
+            if suffix_start >= 0:
+                end = start + suffix_start
+            else:
+                end = start + class_match.start()
     replacement = value.strftime("%d/%m/%Y") if isinstance(value, date) else str(value)
-    updated = paragraph.text[:match.start("value")] + replacement + paragraph.text[match.end("value"):]
+    prefix = text[: match.start()] + text[match.start() : match.end()].rstrip() + " "
+    suffix = text[end:]
+    if suffix.startswith("("):
+        suffix = " " + suffix
+    updated = prefix + replacement + suffix
     _replace_paragraph_text_preserve_runs(paragraph, updated)
     return True
 
@@ -248,7 +289,7 @@ def _remove_english_planning_field(paragraph) -> bool:
     import re
 
     pattern = re.compile(
-        r"(?i)\bDate\s+of\s+planning\s*:\s*"
+        r"(?i)(?:\bDate\s+of\s+planning|Ngày\s+soạn)\s*:\s*"
         r"(?:(?:\d{1,2}[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|[.\u2026\u00b7_\- \t]+)?"
     )
     updated, count = pattern.subn("", paragraph.text, count=1)
@@ -267,6 +308,7 @@ def apply_scoped_english_period_dates(
 ) -> ScopedPeriodDateOverlayResult:
     from io import BytesIO
     from docx import Document
+    import re
 
     source_document = Document(BytesIO(source_content))
     output_document = Document(BytesIO(output_content))
@@ -275,7 +317,6 @@ def apply_scoped_english_period_dates(
 
     occurrence_map = scope.occurrence_map()
     selected = set(scope.selected_periods)
-    planning_owner_period = min(selected) if selected else None
     warnings = list(scope.warnings)
     applied = []
 
@@ -287,18 +328,6 @@ def apply_scoped_english_period_dates(
         # Restore the source header first. The legacy single-value overlay may
         # have changed every Period/date/title in the document.
         _copy_table_paragraph_text(source_table=source_table, output_table=output_table)
-
-        # Keep Date of planning only in the first selected period header.
-        if period in selected and period != planning_owner_period:
-            visited_planning_cells = set()
-            for planning_row in output_table.rows:
-                for planning_cell in planning_row.cells:
-                    planning_identity = id(planning_cell._tc)
-                    if planning_identity in visited_planning_cells:
-                        continue
-                    visited_planning_cells.add(planning_identity)
-                    for planning_paragraph in planning_cell.paragraphs:
-                        _remove_english_planning_field(planning_paragraph)
 
         if period not in selected:
             continue
@@ -312,28 +341,40 @@ def apply_scoped_english_period_dates(
             ))
             continue
 
-        if len(unique_dates) == 1:
-            teaching_value = unique_dates[0]
-        else:
-            class_date_pairs = tuple(dict.fromkeys(
-                (item.class_display.strip(), item.teaching_date)
-                for item in occurrences
-                if item.class_display.strip()
+        class_dates: dict[str, set[date]] = {}
+        for item in occurrences:
+            class_name = item.class_display.strip() or item.class_id.strip()
+            if class_name:
+                class_dates.setdefault(class_name, set()).add(item.teaching_date)
+        if any(len(dates) != 1 for dates in class_dates.values()):
+            warnings.append(PeriodScopeWarning(
+                code="AMBIGUOUS_PERIOD_TEACHING_DATE",
+                curriculum_period=period,
+                message=f"Period {period} has multiple teaching dates for the same class.",
             ))
-            if len(class_date_pairs) < 2 or len(class_date_pairs) != len({
-                (item.class_display.strip(), item.teaching_date)
-                for item in occurrences
-            }):
-                warnings.append(PeriodScopeWarning(
-                    code="AMBIGUOUS_PERIOD_TEACHING_DATE",
-                    curriculum_period=period,
-                    message=f"Period {period} has conflicting dates without a complete class/date mapping.",
-                ))
-                continue
+            continue
+        class_date_pairs = tuple(
+            (class_name, next(iter(dates)))
+            for class_name, dates in sorted(class_dates.items())
+        )
+        if len(class_date_pairs) > 1:
             teaching_value = "; ".join(
                 f"{class_name} - {teaching_day.strftime('%d/%m/%Y')}"
                 for class_name, teaching_day in class_date_pairs
             )
+        elif len(class_date_pairs) == 1:
+            teaching_value = class_date_pairs[0][1]
+        elif len(unique_dates) == 1:
+            teaching_value = unique_dates[0]
+        else:
+            if len(unique_dates) > 1:
+                warnings.append(PeriodScopeWarning(
+                    code="AMBIGUOUS_PERIOD_TEACHING_DATE",
+                    curriculum_period=period,
+                    message=f"Period {period} has conflicting dates without class labels.",
+                ))
+                continue
+            teaching_value = unique_dates[0]
 
         teaching_replaced = False
         visited = set()
@@ -345,15 +386,33 @@ def apply_scoped_english_period_dates(
                 visited.add(identity)
                 for paragraph in cell.paragraphs:
 
-                    if period == planning_owner_period:
-                        _replace_english_date_field(
-                            paragraph,
-                            label="Date of planning",
-                            value=drafting_date,
+                    _replace_english_date_field(
+                        paragraph,
+                        label="Date of planning",
+                        value=drafting_date,
+                    )
+                    paragraph_text = paragraph.text
+                    class_matches = tuple(
+                        class_name
+                        for class_name, _ in class_date_pairs
+                        if class_name and re.search(
+                            rf"(?i)(?<![A-Za-z0-9]){re.escape(class_name)}(?![A-Za-z0-9])",
+                            paragraph_text,
                         )
-                    teaching_replaced = _replace_english_date_field(
-                        paragraph, label="Date of teaching", value=teaching_value
-                    ) or teaching_replaced
+                    )
+                    if class_matches:
+                        for class_name in class_matches:
+                            class_date = dict(class_date_pairs)[class_name]
+                            teaching_replaced = _replace_english_date_field(
+                                paragraph,
+                                label="Date of teaching",
+                                value=class_date,
+                                class_name=class_name,
+                            ) or teaching_replaced
+                    else:
+                        teaching_replaced = _replace_english_date_field(
+                            paragraph, label="Date of teaching", value=teaching_value
+                        ) or teaching_replaced
 
         if teaching_replaced:
             applied.append(period)
