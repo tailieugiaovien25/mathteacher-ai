@@ -472,6 +472,7 @@ class LessonPlanMetadataOverlay:
         changes = []
 
         resolved_fields = set()
+        failed_fields = set()
         skipped_low_confidence = set()
 
         for field in MetadataField:
@@ -517,13 +518,6 @@ class LessonPlanMetadataOverlay:
                 if not location.value_text:
                     continue
 
-                paragraph = (
-                    self._resolve_target_paragraph(
-                        document=document,
-                        location=location,
-                    )
-                )
-
                 replacement = (
                     canonical_value
                 )
@@ -545,29 +539,36 @@ class LessonPlanMetadataOverlay:
                         )
                     )
 
-                # Matching the target is sufficient
-                # to resolve the field even if the
-                # value is already canonical.
-                resolved_fields.add(
-                    field
-                )
+                try:
+                    paragraph = self._resolve_target_paragraph(
+                        document=document,
+                        location=location,
+                    )
+                    if location.value_text == replacement:
+                        # Matching the target is sufficient to resolve the
+                        # field even if the value is already canonical.
+                        resolved_fields.add(field)
+                        continue
 
-                if (
-                    location.value_text
-                    == replacement
-                ):
+                    _replace_text_nodes(
+                        paragraph=paragraph,
+                        old_value=(
+                            location
+                            .value_text
+                        ),
+                        new_value=(
+                            replacement
+                        ),
+                    )
+                except MetadataOverlayError:
+                    # A stale or structurally unusual location must not
+                    # abort formatting of the entire lesson plan. Leave
+                    # this source value untouched and report the field as
+                    # unresolved so the quality gate can require review.
+                    failed_fields.add(field)
                     continue
 
-                _replace_text_nodes(
-                    paragraph=paragraph,
-                    old_value=(
-                        location
-                        .value_text
-                    ),
-                    new_value=(
-                        replacement
-                    ),
-                )
+                resolved_fields.add(field)
 
                 changes.append(
                     MetadataOverlayChange(
@@ -629,8 +630,8 @@ class LessonPlanMetadataOverlay:
         }
 
         unresolved = (
-            requested_fields
-            - resolved_fields
+            (requested_fields - resolved_fields)
+            | failed_fields
         )
 
         return MetadataOverlayResult(
@@ -675,9 +676,25 @@ class LessonPlanMetadataOverlay:
                     "paragraph target is missing"
                 )
 
-            return document.paragraphs[
-                index
-            ]
+            paragraphs = tuple(document.paragraphs)
+            if index < len(paragraphs):
+                target = paragraphs[index]
+                if location.value_text in target.text:
+                    return target
+
+            # Paragraph coordinates can become stale when a DOCX contains
+            # nested structures that python-docx exposes differently from
+            # the locator. Rebind only to the same source paragraph text.
+            for paragraph in paragraphs:
+                if (
+                    paragraph.text == location.text
+                    and location.value_text in paragraph.text
+                ):
+                    return paragraph
+
+            raise MetadataOverlayError(
+                "paragraph target does not contain located metadata"
+            )
 
         table_index = (
             location
@@ -712,17 +729,25 @@ class LessonPlanMetadataOverlay:
                 "table target coordinates are incomplete"
             )
 
-        return (
-            document.tables[
-                table_index
-            ]
-            .rows[
-                row_index
-            ]
-            .cells[
-                cell_index
-            ]
-            .paragraphs[
-                paragraph_index
-            ]
+        paragraphs = tuple(
+            document.tables[table_index]
+            .rows[row_index]
+            .cells[cell_index]
+            .paragraphs
+        )
+
+        if paragraph_index < len(paragraphs):
+            target = paragraphs[paragraph_index]
+            if location.value_text in target.text:
+                return target
+
+        # Some DOCX producers place a cell's value in a later paragraph.
+        # Search within the already identified cell, never across unrelated
+        # cells, to keep the overlay's target scope safe.
+        for paragraph in paragraphs:
+            if location.value_text in paragraph.text:
+                return paragraph
+
+        raise MetadataOverlayError(
+            "table cell does not contain located metadata"
         )

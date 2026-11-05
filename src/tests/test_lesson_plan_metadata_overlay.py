@@ -8,6 +8,9 @@ from document_standardization.lesson_plan_metadata import (
 )
 from document_standardization.lesson_plan_metadata_locator import (
     MetadataField,
+    MetadataLocation,
+    MetadataLocationKind,
+    MetadataMatchStrategy,
 )
 from document_standardization.lesson_plan_metadata_overlay import (
     LessonPlanMetadataOverlay,
@@ -134,6 +137,65 @@ def test_paired_cell_overlay_targets_value_paragraph_not_first_paragraph():
 
     assert table.cell(0, 1).paragraphs[1].text == "21/09/2026"
     assert result.change_count == 1
+
+
+def test_stale_metadata_location_is_reported_without_aborting_overlay():
+    class StaleLocator:
+        def locate(self, document):
+            return (
+                MetadataLocation(
+                    field=MetadataField.CLASS_NAME,
+                    kind=MetadataLocationKind.PARAGRAPH,
+                    text="Lop: 7A1",
+                    value_text="7A1",
+                    strategy=MetadataMatchStrategy.INLINE_EXPLICIT,
+                    confidence=1.0,
+                    paragraph_index=0,
+                    value_paragraph_index=0,
+                ),
+            )
+
+    document = Document()
+    paragraph = document.add_paragraph(_u("L\\u1edbp: 7A2"))
+
+    result = LessonPlanMetadataOverlay(locator=StaleLocator()).apply(
+        document=document,
+        metadata=LessonPlanMetadata(class_name="7A3"),
+    )
+
+    assert paragraph.text == _u("L\\u1edbp: 7A2")
+    assert result.change_count == 0
+    assert result.unresolved_fields == (MetadataField.CLASS_NAME,)
+
+
+def test_overlay_rebinds_stale_paragraph_index_by_source_text():
+    class StaleLocator:
+        def locate(self, document):
+            return (
+                MetadataLocation(
+                    field=MetadataField.CLASS_NAME,
+                    kind=MetadataLocationKind.PARAGRAPH,
+                    text=_u("L\\u1edbp: 7A1"),
+                    value_text="7A1",
+                    strategy=MetadataMatchStrategy.INLINE_EXPLICIT,
+                    confidence=1.0,
+                    paragraph_index=0,
+                    value_paragraph_index=0,
+                ),
+            )
+
+    document = Document()
+    document.add_paragraph("Tiết học")
+    paragraph = document.add_paragraph(_u("L\\u1edbp: 7A1"))
+
+    result = LessonPlanMetadataOverlay(locator=StaleLocator()).apply(
+        document=document,
+        metadata=LessonPlanMetadata(class_name="7A3"),
+    )
+
+    assert paragraph.text == _u("L\\u1edbp: 7A3")
+    assert result.change_count == 1
+    assert not result.unresolved_fields
 
 
 def test_paired_cell_overlay_changes_value_cell_only():
