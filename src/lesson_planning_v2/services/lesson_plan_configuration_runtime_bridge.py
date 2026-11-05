@@ -169,6 +169,9 @@ def _project_active_standardizer_tool_configuration(*, client, subject_ref, sess
         StandardizerToolConfigurationService,
     )
 
+    # Clear the last subject's policy before resolving. A failed lookup must
+    # never leave stale permissions or instructions active in this session.
+    session_state.pop(STANDARDIZER_TOOL_RUNTIME_PAYLOAD_KEY, None)
     repository = SupabaseLessonPlanConfigurationAdminRepository(client)
     resolved = StandardizerToolConfigurationService(repository).resolve(
         subject_ref=subject_ref
@@ -190,7 +193,7 @@ def apply_active_admin_lesson_plan_configuration(
     subject_ref = _runtime_subject_ref(session_state)
     component_ref = _runtime_component_ref(session_state)
 
-    if client is None or not subject_ref:
+    if client is None:
         session_state.pop(ADMIN_RUNTIME_ERROR_KEY, None)
         return AdminRuntimeProjectionResult(
             applied=False,
@@ -203,8 +206,17 @@ def apply_active_admin_lesson_plan_configuration(
             client=client, subject_ref=subject_ref, session_state=session_state
         )
     except Exception as error:
+        session_state.pop(STANDARDIZER_TOOL_RUNTIME_PAYLOAD_KEY, None)
         session_state[STANDARDIZER_TOOL_RUNTIME_SOURCE_KEY] = (
             "existing_tool_default:" + type(error).__name__
+        )
+
+    if not subject_ref:
+        session_state.pop(ADMIN_RUNTIME_ERROR_KEY, None)
+        return AdminRuntimeProjectionResult(
+            applied=False,
+            source="existing_runtime_default",
+            payload={},
         )
 
     try:

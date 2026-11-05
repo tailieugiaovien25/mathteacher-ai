@@ -1719,6 +1719,28 @@ def _v14b6n_build_standardization_document_analyzer():
             payload
         )
     )
+    tool_payload = st.session_state.get(
+        "standardizer_tool_admin_runtime_configuration"
+    )
+    if isinstance(tool_payload, dict):
+        tool_common = tool_payload.get("tool_common")
+        subject_controls = tool_payload.get("subject_controls")
+        if not isinstance(tool_common, dict):
+            tool_common = {}
+        if not isinstance(subject_controls, dict):
+            subject_controls = {}
+        tool_ai_allowed = (
+            bool(tool_common.get("enabled", True))
+            and bool(tool_common.get("ai_enabled", True))
+            and bool(subject_controls.get("enabled", True))
+            and "Đề xuất bằng AI" in tool_common.get("allowed_actions", ())
+            and "Đề xuất bằng AI" in subject_controls.get(
+                "allowed_actions", tool_common.get("allowed_actions", ())
+            )
+        )
+        if not tool_ai_allowed and runtime_config.ai_enabled:
+            from dataclasses import replace
+            runtime_config = replace(runtime_config, ai_enabled=False)
 
     _PROVIDER_SECRET_NAMES = {
         "gemini": "GEMINI_API_KEY",
@@ -5418,8 +5440,42 @@ text_input(
             "Ch\u01b0a c\u00f3 c\u1ea5u h\u00ecnh chu\u1ea9n h\u00f3a \u0111\u00e3 x\u00e1c nh\u1eadn."
         )
 
+    _tool_policy = st.session_state.get(
+        "standardizer_tool_admin_runtime_configuration"
+    )
+    _tool_common = (
+        _tool_policy.get("tool_common", {})
+        if isinstance(_tool_policy, dict) else {}
+    )
+    _tool_subject = (
+        _tool_policy.get("subject_controls", {})
+        if isinstance(_tool_policy, dict) else {}
+    )
+    _tool_actions = _tool_common.get("allowed_actions")
+    _subject_actions = _tool_subject.get("allowed_actions", _tool_actions)
+    _common_standardize_allowed = (
+        "allowed_actions" not in _tool_common
+        or (isinstance(_tool_actions, list) and "Chuẩn hóa định dạng" in _tool_actions)
+    )
+    _subject_standardize_allowed = (
+        "allowed_actions" not in _tool_subject
+        or (isinstance(_subject_actions, list) and "Chuẩn hóa định dạng" in _subject_actions)
+    )
+    _standardization_permitted = (
+        not isinstance(_tool_policy, dict)
+        or (
+            bool(_tool_common.get("enabled", True))
+            and bool(_tool_subject.get("enabled", True))
+            and _common_standardize_allowed
+            and _subject_standardize_allowed
+        )
+    )
+    if process_clicked and not _standardization_permitted:
+        st.error("Công cụ chuẩn hóa hoặc chức năng Chuẩn hóa định dạng đang bị ADMIN tắt.")
+
     if (
         process_clicked
+        and _standardization_permitted
         and processing_ready
         and isinstance(
             confirmed_options,
@@ -5655,6 +5711,32 @@ text_input(
         "tr\u00ean h\u1ec7 th\u1ed1ng ho\u1eb7c t\u1ea3i xu\u1ed1ng m\u00e1y."
     )
 
+    _tool_common_output = (
+        _tool_policy.get("tool_common", {})
+        if isinstance(_tool_policy, dict) else {}
+    )
+    _tool_subject_output = (
+        _tool_policy.get("subject_controls", {})
+        if isinstance(_tool_policy, dict) else {}
+    )
+    _output_actions = _tool_common_output.get("allowed_actions")
+    if isinstance(_tool_policy, dict):
+        _output_actions = set(
+            item for item in _output_actions if isinstance(item, str)
+        ) if isinstance(_output_actions, (list, tuple, set)) else set()
+        _subject_output_actions = _tool_subject_output.get(
+            "allowed_actions", _output_actions
+        )
+        if not isinstance(_subject_output_actions, (list, tuple, set)):
+            _subject_output_actions = ()
+        _output_actions.intersection_update(
+            item for item in _subject_output_actions if isinstance(item, str)
+        )
+        if not _tool_common_output.get("enabled", True) or not _tool_subject_output.get("enabled", True):
+            _output_actions.clear()
+    else:
+        _output_actions = None
+
     save_standardized_clicked = st.button(
         "L\u01b0u v\u00e0o Kho gi\u00e1o \u00e1n",
         type="secondary",
@@ -5665,6 +5747,7 @@ text_input(
             + str(selected_index)
         ),
         width="stretch",
+        disabled=_output_actions is not None and "Lưu hệ thống" not in _output_actions,
     )
 
     def _save_standardized_artifact_to_library(
@@ -5825,10 +5908,11 @@ text_input(
 
 
     if save_standardized_clicked:
-        _save_standardized_artifact_to_library(
-            artifact_file_name=output_name,
-            artifact_content=output_bytes,
-        )
+        if _output_actions is None or "Lưu hệ thống" in _output_actions:
+            _save_standardized_artifact_to_library(
+                artifact_file_name=output_name,
+                artifact_content=output_bytes,
+            )
 
     st.markdown(
         '<div id="download-standardized-lesson-plan"></div>',
@@ -5851,6 +5935,10 @@ text_input(
             + "_"
             + str(selected_index)
         ),
+        **(
+            {"disabled": "Tải xuống" not in _output_actions}
+            if _output_actions is not None else {}
+        ),
     )
 
     from portal_v2.ui.standardized_lesson_plan_management_streamlit import (
@@ -5862,6 +5950,7 @@ text_input(
         current_content=output_bytes,
         preview_html_builder=build_document_html,
         save_handler=_save_standardized_artifact_to_library,
+        allowed_actions=_output_actions,
     )
 
 

@@ -104,8 +104,10 @@ def _move(record_id: str, delta: int) -> None:
 def _render_merge_workspace(
     preview_html_builder: Callable[[bytes], str] | None,
     save_handler: Callable[..., None] | None,
+    allowed_actions: set[str] | None = None,
 ) -> None:
     ordered = _ordered_selected_records()
+    merge_allowed = allowed_actions is None or "Gộp giáo án" in allowed_actions
     st.markdown("---")
     st.subheader("Gộp giáo án")
 
@@ -135,7 +137,7 @@ def _render_merge_workspace(
         help="Có: đúng một phần duyệt ở cuối. Không: không có phần duyệt.",
     )
 
-    if st.button("GỘP FILE", key="standardized_lesson_plan_merge_v4", type="primary", width="stretch"):
+    if st.button("GỘP FILE", key="standardized_lesson_plan_merge_v4", type="primary", width="stretch", disabled=not merge_allowed):
         try:
             result = LessonPlanMergeService().merge(
                 [
@@ -185,7 +187,7 @@ def _render_merge_workspace(
     actions = st.columns([1.2, 1.3, 1.3])
     if actions[0].button(
         "Xem trước", key="standardized_merge_preview_button_v4",
-        disabled=preview_html_builder is None,
+        disabled=preview_html_builder is None or (allowed_actions is not None and "Xem trước" not in allowed_actions),
     ):
         st.session_state[_MERGE_PREVIEW_KEY] = not bool(
             st.session_state.get(_MERGE_PREVIEW_KEY, False)
@@ -194,7 +196,7 @@ def _render_merge_workspace(
     if actions[1].button(
         "Lưu hệ thống",
         key="standardized_merge_save_v5",
-        disabled=save_handler is None,
+        disabled=save_handler is None or (allowed_actions is not None and "Lưu hệ thống" not in allowed_actions),
         help="Lưu file gộp vào Kho giáo án của USER.",
     ):
         if save_handler is not None:
@@ -211,6 +213,10 @@ def _render_merge_workspace(
         file_name=str(merged["file_name"]),
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         key="standardized_merge_download_v4",
+        **(
+            {"disabled": "Tải xuống" not in allowed_actions}
+            if allowed_actions is not None else {}
+        ),
     )
     st.caption("Nguồn gộp: " + " → ".join(str(x) for x in merged.get("source_file_names", ())))
 
@@ -230,6 +236,7 @@ def render_standardized_lesson_plan_management(
     current_content: bytes,
     preview_html_builder: Callable[[bytes], str] | None = None,
     save_handler: Callable[..., None] | None = None,
+    allowed_actions: set[str] | None = None,
 ) -> None:
     if not current_file_name or not current_content:
         return
@@ -255,6 +262,9 @@ def render_standardized_lesson_plan_management(
     )
 
     records = list(_registry())
+    preview_allowed = allowed_actions is None or "Xem trước" in allowed_actions
+    save_allowed = allowed_actions is None or "Lưu hệ thống" in allowed_actions
+    download_allowed = allowed_actions is None or "Tải xuống" in allowed_actions
     if not records:
         st.info("Chưa có giáo án đã chuẩn hóa trong danh sách.")
         return
@@ -284,7 +294,7 @@ def render_standardized_lesson_plan_management(
         if row[1].button(
             "Xem trước" if not preview_open else "Đóng xem trước",
             key=f"standardized_lesson_plan_preview_v3_{rid}",
-            disabled=preview_html_builder is None,
+            disabled=preview_html_builder is None or not preview_allowed,
         ):
             if preview_open:
                 st.session_state.pop(_PREVIEW_KEY, None)
@@ -302,7 +312,7 @@ def render_standardized_lesson_plan_management(
         if row[3].button(
             "Lưu",
             key=f"standardized_lesson_plan_save_v3_{rid}",
-            disabled=save_handler is None,
+            disabled=save_handler is None or not save_allowed,
             help="Lưu vào kho tài liệu của USER.",
         ):
             if save_handler is not None:
@@ -320,6 +330,10 @@ def render_standardized_lesson_plan_management(
                 "wordprocessingml.document"
             ),
             key=f"standardized_lesson_plan_download_v3_{rid}",
+            **(
+                {"disabled": not download_allowed}
+                if allowed_actions is not None else {}
+            ),
         )
 
         selected_now = bool(
@@ -356,4 +370,4 @@ def render_standardized_lesson_plan_management(
     else:
         st.caption("Chưa lựa chọn giáo án nào để chuẩn bị gộp.")
 
-    _render_merge_workspace(preview_html_builder, save_handler)
+    _render_merge_workspace(preview_html_builder, save_handler, allowed_actions)
