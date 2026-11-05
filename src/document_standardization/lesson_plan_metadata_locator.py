@@ -1176,27 +1176,25 @@ class LessonPlanMetadataLocator:
                             next_position
                         ]
 
-                        target_text = (
-                            target_cell.text
-                            .strip()
+                        target_value = next(
+                            (
+                                (target_paragraph_index, target_text)
+                                for target_paragraph_index, target_paragraph
+                                in enumerate(target_cell.paragraphs)
+                                for target_text in (target_paragraph.text.strip(),)
+                                if (
+                                    target_text
+                                    and not _extract_candidates(target_text)
+                                    and _looks_like_value(
+                                        candidate.field,
+                                        target_text,
+                                    )
+                                )
+                            ),
+                            None,
                         )
 
-                        # Do not pair with a cell that
-                        # itself contains metadata labels.
-                        target_candidates = (
-                            _extract_candidates(
-                                target_text
-                            )
-                        )
-
-                        if (
-                            not target_text
-                            or target_candidates
-                            or not _looks_like_value(
-                                candidate.field,
-                                target_text,
-                            )
-                        ):
+                        if target_value is None:
                             locations.append(
                                 MetadataLocation(
                                     field=(
@@ -1230,6 +1228,11 @@ class LessonPlanMetadataLocator:
                             )
 
                             continue
+
+                        (
+                            target_paragraph_index,
+                            target_text,
+                        ) = target_value
 
                         locations.append(
                             MetadataLocation(
@@ -1272,6 +1275,8 @@ class LessonPlanMetadataLocator:
                                 value_cell_index=(
                                     target_cell_index
                                 ),
-                                value_cell_paragraph_index=0,
+                                value_cell_paragraph_index=(
+                                    target_paragraph_index
+                                ),
                             )
                         )

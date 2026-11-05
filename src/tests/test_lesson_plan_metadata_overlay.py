@@ -1,6 +1,7 @@
 ﻿from datetime import date
 
 from docx import Document
+from docx.oxml import OxmlElement
 
 from document_standardization.lesson_plan_metadata import (
     LessonPlanMetadata,
@@ -86,6 +87,53 @@ def test_inline_overlay_preserves_run_formatting():
         ].field
         == MetadataField.TEACHING_DATE
     )
+
+
+def test_overlay_updates_value_inside_hyperlink_run():
+    document = Document()
+    paragraph = document.add_paragraph()
+    paragraph.add_run(
+        _u("Ng\\u00e0y so\\u1ea1n: ")
+    )
+
+    hyperlink = OxmlElement("w:hyperlink")
+    run = OxmlElement("w:r")
+    text = OxmlElement("w:t")
+    text.text = "11/09/2026"
+    run.append(text)
+    hyperlink.append(run)
+    paragraph._p.append(hyperlink)
+
+    result = LessonPlanMetadataOverlay().apply(
+        document=document,
+        metadata=LessonPlanMetadata(
+            drafting_date=date(2026, 9, 12)
+        ),
+    )
+
+    assert paragraph.text == _u(
+        "Ng\\u00e0y so\\u1ea1n: 12/09/2026"
+    )
+    assert result.change_count == 1
+
+
+def test_paired_cell_overlay_targets_value_paragraph_not_first_paragraph():
+    document = Document()
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).paragraphs[0].add_run(
+        _u("Ng\\u00e0y d\\u1ea1y:")
+    )
+    table.cell(0, 1).add_paragraph("01/09/2026")
+
+    result = LessonPlanMetadataOverlay().apply(
+        document=document,
+        metadata=LessonPlanMetadata(
+            teaching_date=date(2026, 9, 21)
+        ),
+    )
+
+    assert table.cell(0, 1).paragraphs[1].text == "21/09/2026"
+    assert result.change_count == 1
 
 
 def test_paired_cell_overlay_changes_value_cell_only():

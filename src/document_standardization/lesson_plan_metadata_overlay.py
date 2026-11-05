@@ -228,7 +228,7 @@ def _text_nodes(
     paragraph: Paragraph,
 ):
     """
-    Return ordinary w:t nodes inside paragraph runs.
+    Return editable w:t nodes anywhere inside the paragraph.
 
     We edit the text nodes directly rather than
     assigning paragraph.text or run.text.
@@ -238,18 +238,12 @@ def _text_nodes(
       - bold/italic/font
       - surrounding XML
       - non-text children
+
+    Using the paragraph XML also includes text in
+    hyperlinks and other nested Word structures,
+    which Paragraph.runs does not expose.
     """
-
-    nodes = []
-
-    for run in paragraph.runs:
-        nodes.extend(
-            run._r.xpath(
-                ".//w:t"
-            )
-        )
-
-    return nodes
+    return paragraph._p.xpath(".//w:t")
 
 
 def _replace_text_nodes(
