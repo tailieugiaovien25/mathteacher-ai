@@ -58,9 +58,18 @@ def test_scoped_overlay_restores_periods_and_updates_only_10_to_12():
     assert "Date of planning: 11/09/2026" in texts[1]
     assert "Date of planning: 11/09/2026" in texts[2]
     assert "Date of planning: 11/09/2026" in texts[3]
-    assert "Date of teaching: 6A1 - 14/09/2026; 6A2 - 14/09/2026" in texts[1]
-    assert "Date of teaching: 6A1 - 15/09/2026; 6A2 - 15/09/2026" in texts[2]
-    assert "Date of teaching: 6A1 - 16/09/2026; 6A2 - 16/09/2026" in texts[3]
+    assert (
+        "Date of teaching: 14/09/2026 (đối với 6A1)\n"
+        "Date of teaching: 14/09/2026 (đối với 6A2)"
+    ) in texts[1]
+    assert (
+        "Date of teaching: 15/09/2026 (đối với 6A1)\n"
+        "Date of teaching: 15/09/2026 (đối với 6A2)"
+    ) in texts[2]
+    assert (
+        "Date of teaching: 16/09/2026 (đối với 6A1)\n"
+        "Date of teaching: 16/09/2026 (đối với 6A2)"
+    ) in texts[3]
     for index in (0, 4, 5, 6):
         assert "Date of planning:.........." in texts[index]
         assert "Date of teaching: .........." in texts[index]
@@ -81,7 +90,11 @@ def test_conflicting_dates_fail_closed_for_that_period():
     )
     assert result.applied_periods == (10, 11, 12)
     text = table_texts(result.content)[2]
-    assert "6A1 - 15/09/2026; 6A2 - 15/09/2026; 6A3 - 16/09/2026" in text
+    assert (
+        "Date of teaching: 15/09/2026 (đối với 6A1)\n"
+        "Date of teaching: 15/09/2026 (đối với 6A2)\n"
+        "Date of teaching: 16/09/2026 (đối với 6A3)"
+    ) in text
 
 
 def test_distinct_class_dates_are_written_as_class_date_pairs():
@@ -111,7 +124,10 @@ def test_distinct_class_dates_are_written_as_class_date_pairs():
 
     texts = table_texts(result.content)
     assert result.applied_periods == (10,)
-    assert "Date of teaching: 6A1 - 14/09/2026; 6A2 - 15/09/2026" in texts[0]
+    assert (
+        "Date of teaching: 14/09/2026 (đối với 6A1)\n"
+        "Date of teaching: 15/09/2026 (đối với 6A2)"
+    ) in texts[0]
     assert "Period 11" in texts[1]
     assert "Date of teaching: .........." in texts[1]
 

@@ -275,7 +275,27 @@ def _replace_english_date_field(
                 end = start + suffix_start
             else:
                 end = start + class_match.start()
-    replacement = value.strftime("%d/%m/%Y") if isinstance(value, date) else str(value)
+    if isinstance(value, date):
+        replacement = value.strftime("%d/%m/%Y")
+    elif isinstance(value, tuple):
+        if not value:
+            return False
+        first_class, first_date = value[0]
+        replacement = (
+            first_date.strftime("%d/%m/%Y")
+            + f" (đối với {first_class})"
+        )
+        label_for_next_line = match.group(0).strip()
+        for class_name_value, class_date in value[1:]:
+            replacement += (
+                "\n"
+                + label_for_next_line
+                + " "
+                + class_date.strftime("%d/%m/%Y")
+                + f" (đối với {class_name_value})"
+            )
+    else:
+        replacement = str(value)
     prefix = text[: match.start()] + text[match.start() : match.end()].rstrip() + " "
     suffix = text[end:]
     if suffix.startswith("("):
@@ -358,10 +378,7 @@ def apply_scoped_english_period_dates(
             for class_name, dates in sorted(class_dates.items())
         )
         if len(class_date_pairs) > 1:
-            teaching_value = "; ".join(
-                f"{class_name} - {teaching_day.strftime('%d/%m/%Y')}"
-                for class_name, teaching_day in class_date_pairs
-            )
+            teaching_value = class_date_pairs
         elif len(class_date_pairs) == 1:
             teaching_value = class_date_pairs[0][1]
         elif len(unique_dates) == 1:

@@ -11146,6 +11146,7 @@ def standardize_lesson_plan_v2_document(
 
     # G1B_ENGLISH_PATCH03C2_RUNTIME_WIRE
     selected_periods_03c2 = tuple(context.get("curriculum_periods", ()) or ())
+    period_scope_ran_03c2 = False
     if selected_periods_03c2:
         from document_standardization.lesson_plan_multi_period_scope import (
             apply_scoped_english_period_dates,
@@ -11164,6 +11165,7 @@ def standardize_lesson_plan_v2_document(
             )
             if match_03c2:
                 document_periods_03c2.append(int(match_03c2.group(1)))
+        period_scope_ran_03c2 = bool(document_periods_03c2)
 
         scope_03c2 = resolve_multi_period_scope(
             group_context=context,
@@ -11226,7 +11228,7 @@ def standardize_lesson_plan_v2_document(
         if str(class_name or "").strip()
         and class_teaching_date is not None
     )
-    if selected_class_date_pairs:
+    if selected_class_date_pairs and not period_scope_ran_03c2:
         # G1B_P6B_R3R4B_RUNTIME_MULTICLASS_DIAGNOSTIC
         print(
             "[G1B-P6B-R3R4B] selected_class_date_pairs=",
