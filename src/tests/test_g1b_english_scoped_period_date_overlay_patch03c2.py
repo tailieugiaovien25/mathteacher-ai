@@ -59,16 +59,19 @@ def test_scoped_overlay_restores_periods_and_updates_only_10_to_12():
     assert "Date of planning: 11/09/2026" in texts[2]
     assert "Date of planning: 11/09/2026" in texts[3]
     assert (
-        "Date of teaching: 14/09/2026 (đối với 6A1)\n"
-        "Date of teaching: 14/09/2026 (đối với 6A2)"
+        "Date of teaching: 14/09/2026 (6A1)\n"
+        + (" " * 30)
+        + "14/09/2026 (6A2)"
     ) in texts[1]
     assert (
-        "Date of teaching: 15/09/2026 (đối với 6A1)\n"
-        "Date of teaching: 15/09/2026 (đối với 6A2)"
+        "Date of teaching: 15/09/2026 (6A1)\n"
+        + (" " * 30)
+        + "15/09/2026 (6A2)"
     ) in texts[2]
     assert (
-        "Date of teaching: 16/09/2026 (đối với 6A1)\n"
-        "Date of teaching: 16/09/2026 (đối với 6A2)"
+        "Date of teaching: 16/09/2026 (6A1)\n"
+        + (" " * 30)
+        + "16/09/2026 (6A2)"
     ) in texts[3]
     for index in (0, 4, 5, 6):
         assert "Date of planning:.........." in texts[index]
@@ -91,9 +94,11 @@ def test_conflicting_dates_fail_closed_for_that_period():
     assert result.applied_periods == (10, 11, 12)
     text = table_texts(result.content)[2]
     assert (
-        "Date of teaching: 15/09/2026 (đối với 6A1)\n"
-        "Date of teaching: 15/09/2026 (đối với 6A2)\n"
-        "Date of teaching: 16/09/2026 (đối với 6A3)"
+        "Date of teaching: 15/09/2026 (6A1)\n"
+        + (" " * 30)
+        + "15/09/2026 (6A2)\n"
+        + (" " * 30)
+        + "16/09/2026 (6A3)"
     ) in text
 
 
@@ -125,8 +130,9 @@ def test_distinct_class_dates_are_written_as_class_date_pairs():
     texts = table_texts(result.content)
     assert result.applied_periods == (10,)
     assert (
-        "Date of teaching: 14/09/2026 (đối với 6A1)\n"
-        "Date of teaching: 15/09/2026 (đối với 6A2)"
+        "Date of teaching: 14/09/2026 (6A1)\n"
+        + (" " * 30)
+        + "15/09/2026 (6A2)"
     ) in texts[0]
     assert "Period 11" in texts[1]
     assert "Date of teaching: .........." in texts[1]
@@ -173,3 +179,53 @@ def test_separate_class_specific_teaching_fields_are_filled_independently():
     assert "Date of planning: 06/11/2026" in cell_text
     assert "Date of teaching: 09/11/2026 (for 6A1)" in cell_text
     assert "Ngày dạy: 10/11/2026 (đối với 6A2)" in cell_text
+
+
+def test_week10_source_gets_each_periods_own_two_class_schedule_dates():
+    periods = (28, 29, 30)
+    source = build(periods)
+    occurrences = []
+    for period, date_a, date_b in (
+        (28, "2026-11-10", "2026-11-10"),
+        (29, "2026-11-11", "2026-11-12"),
+        (30, "2026-11-13", "2026-11-13"),
+    ):
+        occurrences.extend((
+            {
+                "curriculum_period": period,
+                "teaching_date": date_a,
+                "class_id": "6A1",
+                "class_display": "6A1",
+            },
+            {
+                "curriculum_period": period,
+                "teaching_date": date_b,
+                "class_id": "6A2",
+                "class_display": "6A2",
+            },
+        ))
+    scope = resolve_multi_period_scope(
+        group_context={
+            "curriculum_periods": periods,
+            "occurrences": occurrences,
+        },
+        document_periods=periods,
+    )
+
+    result = apply_scoped_english_period_dates(
+        source_content=source,
+        output_content=source,
+        scope=scope,
+        drafting_date=date(2026, 11, 6),
+    )
+    texts = table_texts(result.content)
+
+    assert result.applied_periods == periods
+    for text in texts:
+        assert "Date of planning: 06/11/2026" in text
+    assert "Date of teaching: 10/11/2026 (6A1)" in texts[0]
+    assert "10/11/2026 (6A2)" in texts[0]
+    assert "Date of teaching: 11/11/2026 (6A1)" in texts[1]
+    assert "12/11/2026 (6A2)" in texts[1]
+    assert "Date of teaching: 13/11/2026 (6A1)" in texts[2]
+    assert "13/11/2026 (6A2)" in texts[2]

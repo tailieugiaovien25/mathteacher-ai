@@ -281,18 +281,12 @@ def _replace_english_date_field(
         if not value:
             return False
         first_class, first_date = value[0]
-        replacement = (
-            first_date.strftime("%d/%m/%Y")
-            + f" (đối với {first_class})"
-        )
-        label_for_next_line = match.group(0).strip()
+        replacement = first_date.strftime("%d/%m/%Y") + f" ({first_class})"
         for class_name_value, class_date in value[1:]:
             replacement += (
-                "\n"
-                + label_for_next_line
-                + " "
+                "\n" + (" " * 30)
                 + class_date.strftime("%d/%m/%Y")
-                + f" (đối với {class_name_value})"
+                + f" ({class_name_value})"
             )
     else:
         replacement = str(value)
