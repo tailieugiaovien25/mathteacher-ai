@@ -175,14 +175,11 @@ def _load_admin_user_directory(*, client) -> tuple[dict[str, str], ...]:
                 "school_name": str((profile or {}).get("school_name", "") or ""),
                 "registered_at": str(role_row.get("created_at", "") or ""),
                 "is_active": role_row.get("is_active", True) is True,
+                "profile_complete": profile is not None,
                 "status": (
-                    "Mới đăng ký"
-                    if profile is None
-                    else (
-                        "Đang có hiệu lực"
-                        if role_row.get("is_active", True) is True
-                        else "Ngừng hoạt động"
-                    )
+                    "Đang có hiệu lực"
+                    if role_row.get("is_active", True) is True
+                    else "Ngừng hoạt động"
                 ),
             }
         )
@@ -191,11 +188,7 @@ def _load_admin_user_directory(*, client) -> tuple[dict[str, str], ...]:
         sorted(
             result,
             key=lambda item: (
-                {
-                    "Mới đăng ký": 0,
-                    "Đang có hiệu lực": 1,
-                    "Ngừng hoạt động": 2,
-                }.get(item["status"], 3),
+                {"Ngừng hoạt động": 1, "Đang có hiệu lực": 0}.get(item["status"], 2),
                 item["full_name"].casefold(),
                 item["registered_at"],
             ),
@@ -222,10 +215,7 @@ def _render_admin_dashboard(st, *, client=None) -> None:
         st.error(f"Không thể tải danh sách USER: {error}")
         return
 
-    new_count = sum(
-        item["status"] == "Mới đăng ký"
-        for item in user_rows
-    )
+    incomplete_profile_count = sum(not item["profile_complete"] for item in user_rows)
     active_count = sum(
         item["status"] == "Đang có hiệu lực"
         for item in user_rows
@@ -233,14 +223,14 @@ def _render_admin_dashboard(st, *, client=None) -> None:
 
     metric_columns = st.columns(3)
     metric_columns[0].metric("Tổng USER", len(user_rows))
-    metric_columns[1].metric("Mới đăng ký", new_count)
+    metric_columns[1].metric("Thiếu hồ sơ", incomplete_profile_count)
     metric_columns[2].metric("Đang có hiệu lực", active_count)
 
     status_filter = st.segmented_control(
         "Trạng thái USER",
         options=(
             "Tất cả",
-            "Mới đăng ký",
+            "Thiếu hồ sơ",
             "Đang có hiệu lực",
             "Ngừng hoạt động",
         ),
@@ -251,6 +241,7 @@ def _render_admin_dashboard(st, *, client=None) -> None:
         item
         for item in user_rows
         if status_filter in (None, "Tất cả")
+        or (status_filter == "Thiếu hồ sơ" and not item["profile_complete"])
         or item["status"] == status_filter
     )
 
@@ -354,23 +345,25 @@ def _render_users(st, *, client=None) -> None:
 
     active_count = sum(item["status"] == "Đang có hiệu lực" for item in user_rows)
     stopped_count = sum(item["status"] == "Ngừng hoạt động" for item in user_rows)
-    new_count = sum(item["status"] == "Mới đăng ký" for item in user_rows)
+    incomplete_profile_count = sum(not item["profile_complete"] for item in user_rows)
 
     metrics = st.columns(4)
     metrics[0].metric("Tổng USER", len(user_rows))
-    metrics[1].metric("Mới đăng ký", new_count)
+    metrics[1].metric("Thiếu hồ sơ", incomplete_profile_count)
     metrics[2].metric("Đang có hiệu lực", active_count)
     metrics[3].metric("Ngừng hoạt động", stopped_count)
 
     status_filter = st.segmented_control(
         "Trạng thái USER",
-        options=("Tất cả", "Mới đăng ký", "Đang có hiệu lực", "Ngừng hoạt động"),
+        options=("Tất cả", "Thiếu hồ sơ", "Đang có hiệu lực", "Ngừng hoạt động"),
         default="Tất cả",
         key="admin_users_status_filter",
     )
     visible_rows = tuple(
         item for item in user_rows
-        if status_filter in (None, "Tất cả") or item["status"] == status_filter
+        if status_filter in (None, "Tất cả")
+        or (status_filter == "Thiếu hồ sơ" and not item["profile_complete"])
+        or item["status"] == status_filter
     )
 
     headers = st.columns([1.35, 1.8, 1.0, 2.2, 1.1, 2.6])
