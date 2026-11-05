@@ -75,6 +75,17 @@ def make_subject():
     )
 
 
+def make_english_subject():
+    return Subject(
+        subject_id="subject-foreign-language-1",
+        code="FOREIGN_LANGUAGE_1",
+        name="Ngoại ngữ 1",
+        component_policy=SubjectComponentPolicy.NONE,
+        status=CatalogStatus.ACTIVE,
+        display_order=30,
+    )
+
+
 def test_resolves_subject_without_component():
     result = (
         AutoPPCTScopeMappingService()
@@ -137,6 +148,34 @@ def test_resolves_component_scope():
         result.rule.sub_subject
         == "Số học"
     )
+
+
+def test_resolves_foreign_language_one_to_english_ppct_scope():
+    assignment = TeachingAssignment(
+        assignment_id="A-EN-6",
+        owner_id="teacher-1",
+        academic_year="2026-2027",
+        class_id="class-6a1",
+        role=TeachingAssignmentRole.TEACHING,
+        subject_ref="subject-foreign-language-1",
+        effective_from=date(2026, 9, 1),
+        effective_to=date(2027, 5, 31),
+        status=TeachingAssignmentStatus.ACTIVE,
+    )
+
+    result = AutoPPCTScopeMappingService().resolve(
+        assignment=assignment,
+        class_item=make_class(),
+        subject=make_english_subject(),
+        component=None,
+        options=(
+            PPCTScopeOption(subject_grade="Tiếng Anh 6"),
+            PPCTScopeOption(subject_grade="Tiếng Anh 7"),
+        ),
+    )
+
+    assert result.rule.subject_grade == "Tiếng Anh 6"
+    assert result.rule.sub_subject is None
 
 
 def test_rejects_missing_scope():

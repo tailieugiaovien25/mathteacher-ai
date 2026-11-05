@@ -141,11 +141,30 @@ class AutoPPCTScopeMappingService:
             f"{class_item.grade_level.strip()}"
         ).strip()
 
+        # The canonical subject catalog uses the administrative label
+        # "Ngoại ngữ 1", while the official PPCT and curriculum source use
+        # "Tiếng Anh" for subject-foreign-language-1. Resolve this known
+        # catalog/source naming difference by canonical subject identity.
+        # Keep grade and sub-subject matching exact so unrelated PPCT scopes
+        # can never be selected by a loose text match.
+        expected_subject_grades = {
+            expected_subject_grade,
+        }
+        if subject.subject_id == "subject-foreign-language-1":
+            expected_subject_grades.add(
+                f"Tiếng Anh {class_item.grade_level.strip()}"
+            )
+
         expected_sub_subject = (
             component.name.strip()
             if component is not None
             else None
         )
+
+        normalized_expected_subject_grades = {
+            self._normalized(value)
+            for value in expected_subject_grades
+        }
 
         matches = tuple(
             option
@@ -154,9 +173,7 @@ class AutoPPCTScopeMappingService:
                 self._normalized(
                     option.subject_grade
                 )
-                == self._normalized(
-                    expected_subject_grade
-                )
+                in normalized_expected_subject_grades
                 and self._normalized_optional(
                     option.sub_subject
                 )
