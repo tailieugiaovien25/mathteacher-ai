@@ -24,7 +24,6 @@ def test_drafting_date_before_monday_any_days():
         9,
         30,
     )
-
     assert (
         module._mt_date_before_teaching_week(
             teaching_date,
@@ -48,6 +47,23 @@ def test_drafting_date_before_monday_any_days():
             20,
         )
     )
+
+
+def test_drafting_date_is_inserted_when_template_has_no_date_field():
+    document = Document()
+    document.add_paragraph("Lớp: 8A1, 8A2")
+    source = BytesIO()
+    document.save(source)
+
+    result = module._mt_overlay_drafting_date_bytes(
+        source.getvalue(),
+        date(2026, 9, 7),
+    )
+
+    processed = Document(BytesIO(result))
+    text = "\n".join(paragraph.text for paragraph in processed.paragraphs)
+    assert "Ngày soạn: 07/09/2026" in text
+    assert text.index("Ngày soạn:") < text.index("Lớp:")
 
 
 def test_approval_date_is_overwritten_in_word():

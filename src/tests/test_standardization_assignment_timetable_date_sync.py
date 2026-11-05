@@ -456,6 +456,51 @@ def test_word_block_removes_old_dates_stored_in_following_paragraphs():
     assert "Nội dung bài dạy giữ nguyên." in text
 
 
+def test_word_block_fills_blank_teaching_date_with_both_classes():
+    document = Document()
+    document.add_paragraph("Ngày soạn:")
+    document.add_paragraph("Ngày dạy:")
+    document.add_paragraph("Lớp: 8A1, 8A2")
+    document.add_paragraph("Nội dung bài dạy giữ nguyên.")
+    source = BytesIO()
+    document.save(source)
+
+    result = module._mt_sync_teaching_date_bytes(
+        source.getvalue(),
+        pairs=(
+            ("8A1", date(2026, 9, 10)),
+            ("8A2", date(2026, 9, 9)),
+        ),
+    )
+
+    processed = Document(BytesIO(result))
+    text = "\n".join(p.text for p in processed.paragraphs)
+    assert "8A1 - 10/09/2026" in text
+    assert "8A2 - 09/09/2026" in text
+    assert "Nội dung bài dạy giữ nguyên." in text
+
+
+def test_word_block_inserts_missing_teaching_date_before_class_metadata():
+    document = Document()
+    document.add_paragraph("Ngày soạn: 07/09/2026")
+    document.add_paragraph("Lớp: 8A1, 8A2")
+    source = BytesIO()
+    document.save(source)
+
+    result = module._mt_sync_teaching_date_bytes(
+        source.getvalue(),
+        pairs=(
+            ("8A1", date(2026, 9, 10)),
+            ("8A2", date(2026, 9, 9)),
+        ),
+    )
+
+    processed = Document(BytesIO(result))
+    text = "\n".join(p.text for p in processed.paragraphs)
+    assert "Ngày dạy:\n8A1 - 10/09/2026\n8A2 - 09/09/2026" in text
+    assert text.index("Ngày dạy:") < text.index("Lớp: 8A1, 8A2")
+
+
 def test_processor_prefers_selected_display_class_date_pairs(monkeypatch):
     current = row("internal-class-id", date(2026, 9, 10))
 

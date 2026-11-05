@@ -8697,9 +8697,8 @@ def _mt_overlay_drafting_date_bytes(
             drafting_label_found = True
             changed = True
 
-    # If the source has a teaching date but no drafting field, place the
-    # drafting date immediately before the first teaching-date paragraph.
-    # This keeps the date block local and avoids appending metadata elsewhere.
+    # If the source has no drafting field, place it beside the canonical date
+    # block (before teaching date, or before class metadata as a fallback).
     if not drafting_label_found:
         teaching_pattern = re.compile(r"(?i)Ng\s*ày\s+d\s*ạy\s*:")
         for paragraph in paragraphs:
@@ -8708,6 +8707,28 @@ def _mt_overlay_drafting_date_bytes(
                 drafting_label_found = True
                 changed = True
                 break
+
+    if not drafting_label_found:
+        metadata_pattern = re.compile(
+            r"(?i)^\s*(?:Lớp|Tiết(?:\s+PPCT)?|Bài|Tên\s+bài)\s*:"
+        )
+        for paragraph in paragraphs:
+            if metadata_pattern.search(paragraph.text):
+                paragraph.insert_paragraph_before(f"Ngày soạn: {formatted}")
+                drafting_label_found = True
+                changed = True
+                break
+
+    if not drafting_label_found:
+        from docx.oxml import OxmlElement
+        from docx.text.paragraph import Paragraph
+
+        paragraph_element = OxmlElement("w:p")
+        document.element.body.insert(0, paragraph_element)
+        Paragraph(paragraph_element, document._body).add_run(
+            f"Ngày soạn: {formatted}"
+        )
+        changed = True
 
     if not changed:
         return content
@@ -9422,12 +9443,17 @@ def _mt_sync_teaching_date_bytes(
             )
         )
 
-        # Replace only a recognized teaching-date value.
-        # Do not overwrite unrelated text accidentally.
-        if (
-            not pairs_found
-            and plain_found is None
-        ):
+        # Replace a recognized date block or fill a genuinely blank/date
+        # placeholder. Never replace free-form notes accidentally.
+        blank_value = value_text.strip() in {
+            "",
+            "-",
+            "–",
+            "—",
+            "...",
+            "…",
+        }
+        if not pairs_found and plain_found is None and not blank_value:
             continue
 
         new_value = (
@@ -9438,7 +9464,10 @@ def _mt_sync_teaching_date_bytes(
         if value_end < len(text):
             new_value += "    "
 
-        if _mt_replace_text_span_preserve_runs(
+        if value_start == value_end or not value_text:
+            paragraph.add_run(new_value)
+            changed = True
+        elif _mt_replace_text_span_preserve_runs(
             paragraph,
             value_start,
             value_end,
@@ -9446,6 +9475,7 @@ def _mt_sync_teaching_date_bytes(
         ):
             changed = True
 
+        if changed:
             # Some school templates store each additional class/date on its
             # own paragraph.  Remove those obsolete continuation paragraphs;
             # the complete authoritative block is now in the label paragraph.
@@ -9467,7 +9497,29 @@ def _mt_sync_teaching_date_bytes(
             break
 
     if not changed:
-        return content
+        # Templates sometimes omit the date row entirely. Add the authoritative
+        # class/date block beside the lesson metadata instead of silently
+        # leaving every date out of the standardized document.
+        metadata_pattern = re.compile(
+            r"(?i)^\s*(?:Lớp|Tiết(?:\s+PPCT)?|Bài|Tên\s+bài)\s*:"
+        )
+        for paragraph in paragraphs:
+            if metadata_pattern.search(paragraph.text):
+                paragraph.insert_paragraph_before(
+                    "Ngày dạy:\n" + replacement
+                )
+                changed = True
+                break
+
+    if not changed:
+        from docx.oxml import OxmlElement
+        from docx.text.paragraph import Paragraph
+
+        paragraph_element = OxmlElement("w:p")
+        document.element.body.insert(0, paragraph_element)
+        paragraph = Paragraph(paragraph_element, document._body)
+        paragraph.add_run("Ngày dạy:\n" + replacement)
+        changed = True
 
     output = _mt_sync_bytesio()
 
