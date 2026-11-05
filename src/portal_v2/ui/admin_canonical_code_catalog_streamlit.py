@@ -6,17 +6,33 @@ def _canonical_code_value(item, field_name: str, default=None):
         return item.get(field_name, default)
     return getattr(item, field_name, default)
 
+
+def _show_catalog_error(st, message: str) -> None:
+    normalized = message.lower()
+    if "pgrst205" in normalized or "canonical_code_registry" in normalized:
+        st.error("Chưa thể tải Bộ mã Canonical vì bảng dữ liệu chưa sẵn sàng.")
+        st.caption(
+            "Quản trị viên cần áp dụng migration "
+            "202608290002_canonical_code_registry_v58b2.sql và "
+            "202608290003_canonical_code_registry_privileges_v58b6c1.sql "
+            "trong Supabase, sau đó làm mới schema cache."
+        )
+    else:
+        st.error("Không thể tải Bộ mã Canonical do lỗi kết nối dữ liệu.")
+    with st.expander("Chi tiết kỹ thuật"):
+        st.code(message, language="text")
+
 def render_admin_canonical_code_catalog(st, *, client) -> None:
     st.title("Quản trị Bộ mã Canonical")
     st.caption("Management plane cho Bộ mã Canonical; không tạo authority nghiệp vụ thứ hai.")
     if client is None:
         st.warning("Chưa có kết nối dữ liệu.")
         return
-    repo=SupabaseCanonicalCodeRepository(client)
+    repo = SupabaseCanonicalCodeRepository(client)
     try:
         rows=repo.list_codes()
     except Exception as error:
-        st.error(f"Không thể tải Bộ mã Canonical: {error}")
+        _show_catalog_error(st, str(error))
         return
     namespaces=("Tất cả",)+tuple(sorted({str(_canonical_code_value(r, "namespace", "")) for r in rows if _canonical_code_value(r, "namespace")}))
     ns=st.selectbox("Nhóm mã",namespaces,key="admin_canonical_code_namespace_filter")
@@ -101,8 +117,26 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
         st.warning("Chưa đọc được cấu hình nhóm giáo án: " + str(error))
         return
 
-    subject_items = tuple(subject_repo.list_subjects(status=CatalogStatus.ACTIVE))
-    component_items = tuple(code_repo.list_codes(namespace="component"))
+    try:
+        subject_items = tuple(
+            subject_repo.list_subjects(status=CatalogStatus.ACTIVE)
+        )
+    except Exception as error:
+        st.warning("Chưa đọc được danh mục môn học canonical.")
+        with st.expander("Chi tiết lỗi danh mục môn học"):
+            st.code(str(error), language="text")
+        return
+
+    try:
+        component_items = tuple(code_repo.list_codes(namespace="component"))
+    except Exception as error:
+        component_items = ()
+        st.warning(
+            "Chưa đọc được danh mục phân môn canonical; "
+            "cấu hình mặc định theo môn vẫn có thể xem và chỉnh sửa."
+        )
+        with st.expander("Chi tiết lỗi danh mục phân môn"):
+            st.code(str(error), language="text")
 
     subject_name_by_ref = {}
     for item in subject_items:
