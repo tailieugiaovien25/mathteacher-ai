@@ -12,6 +12,7 @@ ASSESSMENT_PRIMARY_DESTINATIONS = (
     ("Phạm vi & thiết đặt", "Thiết đặt đề kiểm tra", "Chọn lớp, SGK, PPCT, YCCĐ và cấu trúc bài kiểm tra."),
     ("Ma trận & bản đặc tả", "Ma trận & bản đặc tả", "Xem và hoàn thiện cấu trúc đề trước khi ráp câu."),
     ("Tạo đề theo ma trận", "Tạo đề kiểm tra", "Ráp bản nháp từ ma trận đã duyệt và câu hỏi phù hợp."),
+    ("Thư viện đề kiểm tra", "Thư viện đề kiểm tra", "Tra cứu các phiên bản đề của bạn và tải bộ Word bản nháp khi đủ điều kiện."),
     ("Xuất đề", "Xuất đề kiểm tra", "Xem trước và xuất đề theo trạng thái, chính sách hiện hành."),
 )
 
@@ -45,7 +46,7 @@ def render_assessment_workspace_hub(st, *, navigate) -> None:
     sections = (
         ("1 · Câu hỏi", ASSESSMENT_PRIMARY_DESTINATIONS[:2]),
         ("2 · Thiết kế đề", ASSESSMENT_PRIMARY_DESTINATIONS[2:4]),
-        ("3 · Tạo và xuất đề", ASSESSMENT_PRIMARY_DESTINATIONS[4:]),
+        ("3 · Tạo, lưu và xuất đề", ASSESSMENT_PRIMARY_DESTINATIONS[4:]),
     )
     for heading, destinations in sections:
         st.subheader(heading)

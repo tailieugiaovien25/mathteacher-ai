@@ -53,6 +53,7 @@ PORTAL_PAGES = (
     'T\u1ea1o \u0111\u1ec1 ki\u1ec3m tra To\xe1n 6',
     'Xu\u1ea5t \u0111\u1ec1 ki\u1ec3m tra',
     'Thi\u1ebft \u0111\u1eb7t gi\xe1o vi\xean',
+    'Thư viện đề kiểm tra',
     'Tạo đề kiểm tra Toán 6–9',
     "Xưởng câu hỏi",
 )
@@ -2197,6 +2198,17 @@ def main() -> None:
         )
 
         render_assessment_exam_generation_page(
+            st=st,
+            client=client,
+            user_id=str(user_id),
+        )
+
+    elif selected == "Thư viện đề kiểm tra":
+        from portal_v2.ui.assessment_exam_library_streamlit import (
+            render_assessment_exam_library_page,
+        )
+
+        render_assessment_exam_library_page(
             st=st,
             client=client,
             user_id=str(user_id),

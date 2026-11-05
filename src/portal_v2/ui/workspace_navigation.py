@@ -43,6 +43,7 @@ _TEACHER_ROUTES = (
     ("assessment_math6", "Tạo đề kiểm tra Toán 6", "Đề kiểm tra"),
     ("assessment_export", "Xuất đề kiểm tra", "Đề kiểm tra"),
     ("teacher_settings", "Thiết đặt giáo viên", "Hồ sơ & dữ liệu"),
+    ("assessment_library", "Thư viện đề kiểm tra", "Đề kiểm tra"),
     ("assessment_math69", "Tạo đề kiểm tra Toán 6–9", "Đề kiểm tra"),
     ("question_studio", "Xưởng câu hỏi", "Đề kiểm tra"),
 )
