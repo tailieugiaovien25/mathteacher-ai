@@ -83,3 +83,35 @@ def test_conflicting_dates_fail_closed_for_that_period():
         and warning.curriculum_period == 11
         for warning in result.warnings
     )
+
+
+def test_distinct_class_dates_are_written_as_class_date_pairs():
+    value = context()
+    value["curriculum_periods"] = [10]
+    value["occurrences"] = [
+        {
+            "curriculum_period": 10,
+            "teaching_date": "2026-09-14",
+            "class_id": "6A1",
+            "class_display": "6A1",
+        },
+        {
+            "curriculum_period": 10,
+            "teaching_date": "2026-09-15",
+            "class_id": "6A2",
+            "class_display": "6A2",
+        },
+    ]
+    scope = resolve_multi_period_scope(group_context=value, document_periods=(10, 11))
+    result = apply_scoped_english_period_dates(
+        source_content=build((10, 11)),
+        output_content=build((10, 11)),
+        scope=scope,
+        drafting_date=date(2026, 9, 11),
+    )
+
+    texts = table_texts(result.content)
+    assert result.applied_periods == (10,)
+    assert "Date of teaching: 6A1 - 14/09/2026; 6A2 - 15/09/2026" in texts[0]
+    assert "Period 11" in texts[1]
+    assert "Date of teaching: .........." in texts[1]

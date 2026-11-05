@@ -229,16 +229,16 @@ def _copy_table_paragraph_text(*, source_table, output_table) -> None:
             _replace_paragraph_text_preserve_runs(output_paragraph, source_paragraph.text)
 
 
-def _replace_english_date_field(paragraph, *, label: str, value: date) -> bool:
+def _replace_english_date_field(paragraph, *, label: str, value) -> bool:
     import re
     pattern = re.compile(
         rf"(?i)(?P<prefix>\b{re.escape(label)}\s*:\s*)"
-        r"(?P<value>(?:\d{1,2}[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|(?:[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|[.\u2026\u00b7_\- \t]+)"
+        r"(?P<value>(?:(?:\d{1,2}[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|(?:[ \t]*[/.-][ \t]*\d{1,2}[ \t]*[/.-][ \t]*\d{2,4})|[.\u2026\u00b7_\- \t]+)(?:[ \t]*(?:;|,|\n)[ \t]*(?:[A-Za-z0-9-]+[ \t]*[-\u2013\u2014:][ \t]*)?(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}))*?)"
     )
     match = pattern.search(paragraph.text)
     if not match:
         return False
-    replacement = value.strftime("%d/%m/%Y")
+    replacement = value.strftime("%d/%m/%Y") if isinstance(value, date) else str(value)
     updated = paragraph.text[:match.start("value")] + replacement + paragraph.text[match.end("value"):]
     _replace_paragraph_text_preserve_runs(paragraph, updated)
     return True
@@ -304,13 +304,36 @@ def apply_scoped_english_period_dates(
             continue
         occurrences = tuple(occurrence_map.get(period, ()))
         unique_dates = tuple(sorted({item.teaching_date for item in occurrences}))
-        if len(unique_dates) != 1:
+        if not unique_dates:
             warnings.append(PeriodScopeWarning(
                 code="AMBIGUOUS_PERIOD_TEACHING_DATE",
                 curriculum_period=period,
-                message=f"Period {period} does not have exactly one teaching date.",
+                message=f"Period {period} has no unambiguous teaching date.",
             ))
             continue
+
+        if len(unique_dates) == 1:
+            teaching_value = unique_dates[0]
+        else:
+            class_date_pairs = tuple(dict.fromkeys(
+                (item.class_display.strip(), item.teaching_date)
+                for item in occurrences
+                if item.class_display.strip()
+            ))
+            if len(class_date_pairs) < 2 or len(class_date_pairs) != len({
+                (item.class_display.strip(), item.teaching_date)
+                for item in occurrences
+            }):
+                warnings.append(PeriodScopeWarning(
+                    code="AMBIGUOUS_PERIOD_TEACHING_DATE",
+                    curriculum_period=period,
+                    message=f"Period {period} has conflicting dates without a complete class/date mapping.",
+                ))
+                continue
+            teaching_value = "; ".join(
+                f"{class_name} - {teaching_day.strftime('%d/%m/%Y')}"
+                for class_name, teaching_day in class_date_pairs
+            )
 
         teaching_replaced = False
         visited = set()
@@ -329,7 +352,7 @@ def apply_scoped_english_period_dates(
                             value=drafting_date,
                         )
                     teaching_replaced = _replace_english_date_field(
-                        paragraph, label="Date of teaching", value=unique_dates[0]
+                        paragraph, label="Date of teaching", value=teaching_value
                     ) or teaching_replaced
 
         if teaching_replaced:

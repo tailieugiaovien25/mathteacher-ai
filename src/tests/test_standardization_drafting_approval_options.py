@@ -315,6 +315,29 @@ def test_drafting_date_is_overwritten_from_monday_rule():
     assert processed.paragraphs[0].text == "Ngày soạn: 11/09/2026"
 
 
+def test_english_drafting_placeholders_are_filled_without_adding_duplicate_label():
+    document = Document()
+    first = document.add_table(rows=1, cols=1)
+    first.cell(0, 0).text = "Date of planning:………….."
+    second = document.add_table(rows=1, cols=1)
+    second.cell(0, 0).text = "Date of planning: ………..…"
+    source = BytesIO()
+    document.save(source)
+
+    result = module._mt_overlay_drafting_date_bytes(
+        source.getvalue(),
+        date(2026, 11, 6),
+    )
+    processed = Document(BytesIO(result))
+    texts = [table.cell(0, 0).text for table in processed.tables]
+
+    assert texts == [
+        "Date of planning:06/11/2026",
+        "Date of planning: 06/11/2026",
+    ]
+    assert not any("Ngày soạn" in paragraph.text for paragraph in processed.paragraphs)
+
+
 def test_week_one_drafting_date_three_days_before_monday():
     assert module._mt_date_before_teaching_week(
         date(2026, 9, 11),

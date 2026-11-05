@@ -8665,11 +8665,11 @@ def _mt_overlay_drafting_date_bytes(
     document = Document(_mt_date_bytesio(content))
     paragraphs = list(_mt_iter_date_paragraphs(document))
     pattern = re.compile(
-        r"(?i)(?P<label>Ng\s*ày\s+so\s*ạn\s*:\s*)"
-        r"(?P<date>\d{1,2}[/-]\d{1,2}[/-]\d{4})"
+        r"(?i)(?P<label>(?:Ng\s*ày\s+so\s*ạn|Date\s+of\s+planning)\s*:\s*)"
+        r"(?P<date>\d{1,2}[/-]\d{1,2}[/-]\d{4}|[.\u2026\u00b7_\- \t]+)"
     )
     label_pattern = re.compile(
-        r"(?i)Ng\s*ày\s+so\s*ạn\s*:\s*$"
+        r"(?i)(?:Ng\s*ày\s+so\s*ạn|Date\s+of\s+planning)\s*:\s*$"
     )
     changed = False
     drafting_label_found = False
@@ -8700,7 +8700,7 @@ def _mt_overlay_drafting_date_bytes(
     # If the source has no drafting field, place it beside the canonical date
     # block (before teaching date, or before class metadata as a fallback).
     if not drafting_label_found:
-        teaching_pattern = re.compile(r"(?i)Ng\s*ày\s+d\s*ạy\s*:")
+        teaching_pattern = re.compile(r"(?i)(?:Ng\s*ày\s+d\s*ạy|Date\s+of\s+teaching)\s*:")
         for paragraph in paragraphs:
             if teaching_pattern.search(paragraph.text):
                 paragraph.insert_paragraph_before(f"Ngày soạn: {formatted}")
@@ -11146,7 +11146,7 @@ def standardize_lesson_plan_v2_document(
 
     # G1B_ENGLISH_PATCH03C2_RUNTIME_WIRE
     selected_periods_03c2 = tuple(context.get("curriculum_periods", ()) or ())
-    if len(selected_periods_03c2) > 1:
+    if selected_periods_03c2:
         from document_standardization.lesson_plan_multi_period_scope import (
             apply_scoped_english_period_dates,
             resolve_multi_period_scope,
