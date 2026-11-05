@@ -1,5 +1,8 @@
 from pathlib import Path
 
+from portal_v2.ui.admin_standardizer_tool_configuration_streamlit import (
+    render_admin_standardizer_tool_configuration,
+)
 from lesson_planning_v2.services.standardizer_tool_configuration_service import (
     COMMON_PROFILE_CODE,
     StandardizerToolConfigurationService,
@@ -45,3 +48,57 @@ def test_runtime_projects_tool_tree_separately_from_lesson_tree():
     bridge = Path("src/lesson_planning_v2/services/lesson_plan_configuration_runtime_bridge.py").read_text(encoding="utf-8")
     assert 'STANDARDIZER_TOOL_RUNTIME_PAYLOAD_KEY = "standardizer_tool_admin_runtime_configuration"' in bridge
     assert "_project_active_standardizer_tool_configuration" in bridge
+
+
+def test_admin_tool_panel_reports_missing_migration_without_crashing():
+    class Query:
+        def select(self, *_args, **_kwargs):
+            return self
+
+        def order(self, *_args, **_kwargs):
+            return self
+
+        def execute(self):
+            raise RuntimeError(
+                "PGRST205: Could not find table "
+                "'public.lesson_plan_configuration_profiles' in the schema cache"
+            )
+
+    class Client:
+        def table(self, name):
+            assert name == "lesson_plan_configuration_profiles"
+            return Query()
+
+    class StreamlitStub:
+        def __init__(self):
+            self.errors = []
+            self.captions = []
+
+        def markdown(self, *_args, **_kwargs):
+            pass
+
+        def error(self, message):
+            self.errors.append(message)
+
+        def caption(self, message):
+            self.captions.append(message)
+
+        def expander(self, *_args, **_kwargs):
+            return self
+
+        def code(self, *_args, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+    st = StreamlitStub()
+    render_admin_standardizer_tool_configuration(st, client=Client())
+
+    assert st.errors == [
+        "Cơ sở dữ liệu chưa sẵn sàng cho cấu hình công cụ chuẩn hóa."
+    ]
+    assert any("202608300012" in message for message in st.captions)

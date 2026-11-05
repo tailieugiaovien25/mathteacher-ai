@@ -18,6 +18,27 @@ ACTIONS = (
 )
 
 
+def _show_configuration_storage_error(st, error: Exception) -> None:
+    message = str(error)
+    normalized = message.lower()
+    if (
+        "pgrst205" in normalized
+        or "lesson_plan_configuration_profiles" in normalized
+        or "lesson_plan_configuration_versions" in normalized
+    ):
+        st.error("Cơ sở dữ liệu chưa sẵn sàng cho cấu hình công cụ chuẩn hóa.")
+        st.caption(
+            "Áp dụng lần lượt migration "
+            "202608300012_admin_lesson_plan_configuration_foundation_v58c6a4.sql "
+            "và 202608300013_protect_active_lesson_plan_configuration_version_v58c6a9.sql "
+            "trong Supabase."
+        )
+    else:
+        st.error("Không thể tải cấu hình công cụ chuẩn hóa.")
+    with st.expander("Chi tiết kỹ thuật"):
+        st.code(message, language="text")
+
+
 def _save_draft(*, admin, service, profile, code, name, subject_ref, payload):
     if profile is None:
         return service.create_profile_with_initial_draft(
@@ -66,9 +87,22 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
     resolver = StandardizerToolConfigurationService(admin)
 
     st.markdown("### III-A. Cấu hình Công cụ chuẩn giáo án chung")
-    common = resolver.resolve().common_payload
+    try:
+        profiles = admin.list_profiles()
+        common = resolver.resolve().common_payload
+    except Exception as error:
+        _show_configuration_storage_error(st, error)
+        return
+
     common_settings = dict(common.get("tool_common") or {})
-    common_profile = next((row for row in admin.list_profiles() if row.get("profile_code") == COMMON_PROFILE_CODE), None)
+    common_profile = next(
+        (
+            row
+            for row in profiles
+            if row.get("profile_code") == COMMON_PROFILE_CODE
+        ),
+        None,
+    )
     with st.form("standardizer_tool_common_form"):
         enabled = st.checkbox("Kích hoạt công cụ", value=bool(common_settings.get("enabled", True)))
         ai_enabled = st.checkbox("Cho phép AI hỗ trợ", value=bool(common_settings.get("ai_enabled", True)))
@@ -98,14 +132,25 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
 
     st.markdown("### III-B. Cấu hình Công cụ chuẩn giáo án theo môn")
     subject_ref = st.text_input("Mã môn áp dụng", key="standardizer_tool_subject_ref").strip().upper()
-    resolved = resolver.resolve(subject_ref=subject_ref)
+    try:
+        resolved = resolver.resolve(subject_ref=subject_ref)
+    except Exception as error:
+        _show_configuration_storage_error(st, error)
+        return
     st.caption("Giá trị kế thừa từ Công cụ chung — chỉ đọc")
     st.json(dict(resolved.common_payload.get("tool_common") or {}))
     if not subject_ref:
         st.info("Nhập mã môn để mở bảng điều khiển chức năng riêng.")
         return
     subject_code = resolver.profile_code(subject_ref)
-    subject_profile = next((row for row in admin.list_profiles() if row.get("profile_code") == subject_code), None)
+    subject_profile = next(
+        (
+            row
+            for row in profiles
+            if row.get("profile_code") == subject_code
+        ),
+        None,
+    )
     controls = dict(resolved.subject_payload.get("subject_controls") or {})
     common_actions = list((resolved.common_payload.get("tool_common") or {}).get("allowed_actions") or ACTIONS)
     with st.form("standardizer_tool_subject_form"):

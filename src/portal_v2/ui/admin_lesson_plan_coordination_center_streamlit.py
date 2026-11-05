@@ -23,6 +23,27 @@ from educational_planning_v2.models.subject_catalog import (
 )
 
 
+def _show_configuration_storage_error(st, error: Exception, *, action: str) -> None:
+    message = str(error)
+    normalized = message.lower()
+    if (
+        "pgrst205" in normalized
+        or "lesson_plan_configuration_profiles" in normalized
+        or "lesson_plan_configuration_versions" in normalized
+    ):
+        st.error("Chưa thể " + action + ": Supabase thiếu bảng cấu hình giáo án.")
+        st.caption(
+            "Áp dụng lần lượt migration "
+            "202608300012_admin_lesson_plan_configuration_foundation_v58c6a4.sql "
+            "và 202608300013_protect_active_lesson_plan_configuration_version_v58c6a9.sql "
+            "trong Supabase."
+        )
+    else:
+        st.error("Không thể " + action + ".")
+    with st.expander("Chi tiết kỹ thuật"):
+        st.code(message, language="text")
+
+
 def _render_coordination_center_visual_system(st) -> None:
     st.markdown(
         """
@@ -668,7 +689,16 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
     try:
         profiles = repository.list_profiles()
     except Exception as error:
-        st.error("Không thể tải danh sách cấu hình: " + str(error))
+        _show_configuration_storage_error(
+            st,
+            error,
+            action="tải danh sách cấu hình",
+        )
+        if (
+            "pgrst205" in str(error).lower()
+            or "lesson_plan_configuration_profiles" in str(error).lower()
+        ):
+            return
         profiles = []
 
     with st.expander("Thiết lập cấu hình Chuẩn hóa giáo án mới", expanded=not profiles):
@@ -1078,7 +1108,11 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
             try:
                 resolved = service.resolve(subject_ref="", component_ref=None)
             except Exception as error:
-                st.error("Không thể đọc cấu hình toàn hệ thống: " + str(error))
+                _show_configuration_storage_error(
+                    st,
+                    error,
+                    action="đọc cấu hình toàn hệ thống",
+                )
             else:
                 if resolved.snapshot is None:
                     st.info("Chưa có cấu hình ADMIN toàn hệ thống đang hoạt động.")
