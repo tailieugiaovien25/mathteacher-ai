@@ -1157,7 +1157,6 @@ def main() -> None:
         if st.session_state.get("portal_navigation") != current_page:
             st.session_state["portal_navigation"] = current_page
         selected = st.sidebar.radio(
-<<<<<<< HEAD
             "Công cụ", menu_pages,
             key="portal_navigation",
             label_visibility="collapsed",
