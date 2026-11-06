@@ -15,7 +15,7 @@ def test_transform_preserves_source_text_and_media(tmp_path):
     transform_docx(source, output)
     result = Document(output)
     assert result.tables[0].cell(0, 1).text == "Period 28: Unit 4\nLesson 3"
-    assert source.exists()
+    assert source.exists()\n    assert "WEEK:" not in result.tables[0].cell(0, 0).text
 
 
 def test_date_fields_are_italic_not_bold(tmp_path):
@@ -34,4 +34,4 @@ def test_date_fields_are_italic_not_bold(tmp_path):
     date_runs = [run for para in result.tables[0].cell(0, 0).paragraphs[:3] for run in para.runs]
     assert all(run.italic is True and run.bold is False for run in date_runs)
     assert all(run.font.name == "Times New Roman" and run.font.size == Pt(14) for run in date_runs)
-    assert result.tables[0].cell(0, 0).paragraphs[3].text == "WEEK: 11"
+    assert "WEEK:" not in result.tables[0].cell(0, 0).text\n    assert len(result.tables[0].cell(0, 0).paragraphs) == 3
