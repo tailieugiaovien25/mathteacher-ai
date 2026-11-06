@@ -6,7 +6,6 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import streamlit as st
 
 from mathteacher_ai.document_transformation.docx_transformer import transform_docx
 
@@ -43,6 +42,7 @@ def _validate_docx_payload(payload: bytes) -> None:
 
 def render_docx_formatting_tool() -> None:
     """Render the formatting-only workflow inside the authenticated teacher portal."""
+    import streamlit as st
     st.subheader("Chuẩn hóa định dạng giáo án Word")
     st.caption(
         "Chuẩn hóa hình thức DOCX; không dùng AI để viết lại nội dung. "
