@@ -138,7 +138,7 @@ def _remove_week_lines_from_date_cells(document):
             continue
         row = table.rows[0]
         row_text = " ".join(cell.text for cell in row.cells)
-        if not re.search(r"\\bPeriod\\s*\\d+\\b", row_text, re.IGNORECASE):
+        if not re.search(r"\bPeriod\s*\d+\b", row_text, re.IGNORECASE):
             continue
         cell = row.cells[0]
         for paragraph in list(cell.paragraphs):
@@ -146,7 +146,7 @@ def _remove_week_lines_from_date_cells(document):
             kept = [line for line in lines if not line.strip().upper().startswith("WEEK:")]
             if len(kept) != len(lines):
                 if kept and any(line.strip() for line in kept):
-                    paragraph.text = "\\n".join(kept)
+                    paragraph.text = "\n".join(kept)
                 else:
                     paragraph._element.getparent().remove(paragraph._element)
         if not cell.paragraphs:
