@@ -7,7 +7,6 @@ on:
       - "tests/document_transformation/**"
       - ".github/workflows/docx-transformation.yml"
   push:
-    branches: [main]
     paths:
       - "mathteacher_ai/document_transformation/**"
       - "tests/document_transformation/**"
