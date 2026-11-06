@@ -7,13 +7,13 @@ on:
       - "tests/document_transformation/**"
       - "src/portal_v2/ui/docx_formatting_streamlit.py"
       - "src/portal_v2/ui/standardized_lesson_plan_authoring_v2_streamlit.py"
-      - "src/portal_v2/ui/docx_formatting_streamlit.py"
-      - "src/portal_v2/ui/standardized_lesson_plan_authoring_v2_streamlit.py"
       - ".github/workflows/docx-transformation.yml"
   push:
     paths:
       - "mathteacher_ai/document_transformation/**"
       - "tests/document_transformation/**"
+      - "src/portal_v2/ui/docx_formatting_streamlit.py"
+      - "src/portal_v2/ui/standardized_lesson_plan_authoring_v2_streamlit.py"
 
 jobs:
   docx-transformer:
