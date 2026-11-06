@@ -7,10 +7,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from docx import Document
 import pytest
 
-from portal_v2.ui.docx_formatting_streamlit import (
-    _safe_output_name,
-    _validate_docx_payload,
-)
+import importlib.util
+
+_ui_path = Path(__file__).resolve().parents[2] / "src" / "portal_v2" / "ui" / "docx_formatting_streamlit.py"
+_spec = importlib.util.spec_from_file_location("docx_formatting_streamlit_test", _ui_path)
+_ui = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_ui)
+_safe_output_name = _ui._safe_output_name
+_validate_docx_payload = _ui._validate_docx_payload
 
 
 def _docx_bytes():
