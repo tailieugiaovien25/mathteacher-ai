@@ -2102,6 +2102,11 @@ def render_standardized_lesson_plan_authoring_v2(
             save_handler=save_handler,
         )
 
+    # DOCX_FORMATTING_UI_V1: formatting-only utility, separate from AI content standardization.
+    with st.expander("Công cụ bổ sung: Chuẩn hóa định dạng DOCX", expanded=False):
+        from portal_v2.ui.docx_formatting_streamlit import render_docx_formatting_tool
+        render_docx_formatting_tool()
+
     # G1B_13H1R4B4J_SAVE_AND_BACK_NAV
     st.markdown("---")
     if back_handler is not None:
