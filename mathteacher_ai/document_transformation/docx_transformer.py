@@ -20,7 +20,7 @@ from docx.oxml.ns import qn
 from lxml import etree
 
 _NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-_DATE_RE = re.compile(r"^\\d{2}/\\d{2}/\\d{4}\\s+\\(6A[12]\\)$")
+_DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}\s+\(6A[12]\)$")
 
 
 def _visible_paragraphs(path: Path) -> list[str]:
@@ -134,7 +134,7 @@ def _apply_date_map(document, date_map):
             continue
         row = table.rows[0]
         text = " ".join(cell.text for cell in row.cells)
-        match = re.search(r"\\bPeriod\\s*(\\d+)\\b", text, re.IGNORECASE)
+        match = re.search(r"\bPeriod\s*(\d+)\b", text, re.IGNORECASE)
         if match and match.group(1) in date_map:
             _replace_date_cell(row.cells[0], date_map[match.group(1)])
 
