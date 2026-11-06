@@ -42,7 +42,7 @@ def _expected_without_week_lines(paragraphs: list[str]) -> list[str]:
             line for line in paragraph.splitlines()
             if not line.strip().upper().startswith("WEEK:")
         ]
-        value = "\\n".join(kept_lines).strip()
+        value = "\n".join(kept_lines).strip()
         if value:
             expected.append(value)
     return expected
