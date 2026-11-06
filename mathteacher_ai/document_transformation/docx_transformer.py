@@ -34,9 +34,9 @@ def _visible_paragraphs(path: Path) -> list[str]:
             if node.tag == qn("w:t"):
                 parts.append(node.text or "")
             elif node.tag in (qn("w:br"), qn("w:cr")):
-                parts.append("\\n")
+                parts.append("\n")
             elif node.tag == qn("w:tab"):
-                parts.append("\\t")
+                parts.append("\t")
         value = "".join(parts)
         if value.strip():
             result.append(value)
