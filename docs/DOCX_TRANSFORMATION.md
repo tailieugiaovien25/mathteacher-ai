@@ -26,7 +26,7 @@ transform_docx("source.docx", "formatted.docx", date_map=date_map)
 ```
 
 Date labels and values are Times New Roman 14 pt, black, italic and not bold. The 6A2
-line is placed on its own paragraph with a paragraph indent. Existing WEEK text is retained.
+line is placed on its own paragraph with a paragraph indent. The WEEK line is intentionally removed from the lesson header date cell.
 
 ## Formatting contract
 
