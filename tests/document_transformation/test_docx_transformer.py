@@ -7,8 +7,8 @@ from mathteacher_ai.document_transformation.docx_transformer import transform_do
 def _make_source(path):
     doc = Document()
     table = doc.add_table(rows=1, cols=2)
-    table.cell(0, 0).text = "Date of planning:……\\nDate of teaching:……\\nWEEK: 11"
-    table.cell(0, 1).text = "Period 28: Unit 4\\nLesson 3"
+    table.cell(0, 0).text = "Date of planning:……\nDate of teaching:……\nWEEK: 11"
+    table.cell(0, 1).text = "Period 28: Unit 4\nLesson 3"
     doc.save(path)
 
 
@@ -21,7 +21,7 @@ def test_transform_removes_week_and_preserves_source(tmp_path):
     result = Document(output)
     assert source.exists()
     assert "WEEK:" not in result.tables[0].cell(0, 0).text
-    assert result.tables[0].cell(0, 1).text == "Period 28: Unit 4\\nLesson 3"
+    assert result.tables[0].cell(0, 1).text == "Period 28: Unit 4\nLesson 3"
 
 
 def test_date_fields_are_italic_not_bold_and_week_is_removed(tmp_path):
