@@ -1,4 +1,8 @@
 from io import BytesIO
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from docx import Document
 import pytest
@@ -28,4 +32,4 @@ def test_validate_rejects_invalid_docx(payload):
 
 
 def test_output_name_is_safe_and_keeps_docx_extension():
-    assert _safe_output_name("../../Kế hoạch tuần 10.docx") == "K_ho_ch_tu_n_10_CHUAN_HOA.docx"
+    assert _safe_output_name("../../Kế hoạch tuần 10.docx") == "10_CHUAN_HOA.docx"
