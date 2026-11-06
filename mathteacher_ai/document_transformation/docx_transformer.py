@@ -130,6 +130,28 @@ def _apply_date_map(document, date_map):
 
 
 
+
+def _remove_week_lines_from_date_cells(document):
+    """Remove WEEK lines from lesson header date cells."""
+    for table in document.tables:
+        if not table.rows:
+            continue
+        row = table.rows[0]
+        row_text = " ".join(cell.text for cell in row.cells)
+        if not re.search(r"\\bPeriod\\s*\\d+\\b", row_text, re.IGNORECASE):
+            continue
+        cell = row.cells[0]
+        for paragraph in list(cell.paragraphs):
+            lines = paragraph.text.splitlines()
+            kept = [line for line in lines if not line.strip().upper().startswith("WEEK:")]
+            if len(kept) != len(lines):
+                if kept and any(line.strip() for line in kept):
+                    paragraph.text = "\\n".join(kept)
+                else:
+                    paragraph._element.getparent().remove(paragraph._element)
+        if not cell.paragraphs:
+            cell.add_paragraph()
+
 def transform_docx(source, output, *, date_map=None):
     """Create a formatted DOCX at output and return its Path.
 
@@ -185,6 +207,7 @@ def transform_docx(source, output, *, date_map=None):
                         _compact_paragraph(paragraph)
 
     _apply_date_map(document, date_map)
+    _remove_week_lines_from_date_cells(document)
 
     for section in document.sections:
         for part in (section.header, section.footer):
