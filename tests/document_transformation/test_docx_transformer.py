@@ -46,3 +46,39 @@ def test_date_fields_are_italic_not_bold_and_week_is_removed(tmp_path):
     assert cell.paragraphs[0].text == "Date of planning: 06/11/2026"
     assert cell.paragraphs[1].text == "Date of teaching: 10/11/2026 (6A1)"
     assert cell.paragraphs[2].text == "10/11/2026 (6A2)"
+
+def test_existing_output_is_never_overwritten(tmp_path):
+    source = tmp_path / "source.docx"
+    output = tmp_path / "output.docx"
+    _make_source(source)
+    sentinel = b"keep-existing-output"
+    output.write_bytes(sentinel)
+
+    try:
+        transform_docx(source, output)
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("Expected FileExistsError for an existing output path")
+
+    assert output.read_bytes() == sentinel
+    assert source.exists()
+
+
+def test_date_mapping_does_not_change_other_table_cells(tmp_path):
+    source = tmp_path / "source.docx"
+    output = tmp_path / "output.docx"
+    _make_source(source)
+    original = Document(source).tables[0].cell(0, 1).text
+
+    transform_docx(source, output, date_map={
+        "28": {
+            "planning": "06/11/2026",
+            "6A1": "10/11/2026",
+            "6A2": "10/11/2026",
+        }
+    })
+
+    result = Document(output)
+    assert result.tables[0].cell(0, 1).text == original
+    assert source.exists()
