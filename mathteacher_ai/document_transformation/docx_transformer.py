@@ -95,10 +95,11 @@ def _clear_fill_properties(root):
 
 
 def _replace_date_cell(cell, dates: Mapping[str, str]):
+    """Replace date-cell contents; the WEEK line is intentionally omitted."""
     required = {"planning", "6A1", "6A2"}
     if not required.issubset(dates):
         raise ValueError(f"Date entry must include: {', '.join(sorted(required))}")
-    # WEEK line is intentionally omitted from the normalized date cell.\n    for paragraph in list(cell.paragraphs):
+    for paragraph in list(cell.paragraphs):
         paragraph._element.getparent().remove(paragraph._element)
 
     lines = [
@@ -114,13 +115,6 @@ def _replace_date_cell(cell, dates: Mapping[str, str]):
         paragraph.paragraph_format.line_spacing = 1.0
         _set_run_font(paragraph.add_run(text), italic=True, bold=False)
 
-    if week:
-        paragraph = cell.add_paragraph()
-        paragraph.paragraph_format.space_before = Pt(0)
-        paragraph.paragraph_format.space_after = Pt(0)
-        paragraph.paragraph_format.line_spacing = 1.0
-        _set_run_font(paragraph.add_run(week), italic=False, bold=True)
-
 
 def _apply_date_map(document, date_map):
     if not date_map:
@@ -135,22 +129,6 @@ def _apply_date_map(document, date_map):
             _replace_date_cell(row.cells[0], date_map[match.group(1)])
 
 
-
-def _remove_week_lines_from_date_cells(document):
-    """Remove WEEK-only paragraphs from lesson header date cells."""
-    for table in document.tables:
-        if not table.rows:
-            continue
-        row = table.rows[0]
-        row_text = " ".join(cell.text for cell in row.cells)
-        if not re.search(r"\bPeriod\s*\d+\b", row_text, re.IGNORECASE):
-            continue
-        cell = row.cells[0]
-        for paragraph in list(cell.paragraphs):
-            if any(line.strip().upper().startswith("WEEK:") for line in paragraph.text.splitlines()):
-                paragraph._element.getparent().remove(paragraph._element)
-        if not cell.paragraphs:
-            cell.add_paragraph()
 
 def transform_docx(source, output, *, date_map=None):
     """Create a formatted DOCX at output and return its Path.
