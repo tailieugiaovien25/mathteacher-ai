@@ -24,15 +24,23 @@ _DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}\s+\(6A[12]\)$")
 
 
 def _visible_paragraphs(path: Path) -> list[str]:
+    """Read visible paragraph text, including explicit Word line breaks and tabs."""
     with zipfile.ZipFile(path) as archive:
         root = etree.fromstring(archive.read("word/document.xml"))
     result = []
     for para in root.xpath(".//w:body//w:p", namespaces=_NS):
-        value = "".join(para.xpath(".//w:t/text()", namespaces=_NS))
+        parts = []
+        for node in para.xpath(".//w:t | .//w:br | .//w:cr | .//w:tab", namespaces=_NS):
+            if node.tag == qn("w:t"):
+                parts.append(node.text or "")
+            elif node.tag in (qn("w:br"), qn("w:cr")):
+                parts.append("\\n")
+            elif node.tag == qn("w:tab"):
+                parts.append("\\t")
+        value = "".join(parts)
         if value.strip():
             result.append(value)
     return result
-
 
 def _expected_without_week_lines(paragraphs: list[str]) -> list[str]:
     """Expected visible text after the explicitly requested WEEK-line removal."""
