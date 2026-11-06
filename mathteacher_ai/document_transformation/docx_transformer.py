@@ -99,7 +99,12 @@ def _replace_date_cell(cell, dates: Mapping[str, str]):
     if not required.issubset(dates):
         raise ValueError(f"Date entry must include: {', '.join(sorted(required))}")
     week = next(
-        (p.text.strip() for p in cell.paragraphs if p.text.strip().startswith("WEEK:")),
+        (
+            line.strip()
+            for paragraph in cell.paragraphs
+            for line in paragraph.text.splitlines()
+            if line.strip().startswith("WEEK:")
+        ),
         None,
     )
     for paragraph in list(cell.paragraphs):
