@@ -34,6 +34,20 @@ def _visible_paragraphs(path: Path) -> list[str]:
     return result
 
 
+def _expected_without_week_lines(paragraphs: list[str]) -> list[str]:
+    """Expected visible text after the explicitly requested WEEK-line removal."""
+    expected = []
+    for paragraph in paragraphs:
+        kept_lines = [
+            line for line in paragraph.splitlines()
+            if not line.strip().upper().startswith("WEEK:")
+        ]
+        value = "\\n".join(kept_lines).strip()
+        if value:
+            expected.append(value)
+    return expected
+
+
 def _media_hashes(path: Path) -> list[tuple[str, str]]:
     with zipfile.ZipFile(path) as archive:
         return sorted(
@@ -224,7 +238,7 @@ def transform_docx(source, output, *, date_map=None):
     _clear_fill_properties(document.element.body)
     document.save(output)
 
-    if not date_map and _visible_paragraphs(output) != original_text:
+    if not date_map and _visible_paragraphs(output) != _expected_without_week_lines(original_text):
         output.unlink(missing_ok=True)
         raise RuntimeError("Text integrity check failed; generated output removed.")
     if _media_hashes(output) != original_media:
