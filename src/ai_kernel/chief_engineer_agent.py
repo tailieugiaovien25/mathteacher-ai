@@ -1,11 +1,16 @@
 """Chief Engineer Agent V1: repository inspection and selected test runner."""
 from __future__ import annotations
 import argparse
+import ast
+import hashlib
 import json
 import os
+import re
 import subprocess
+import tempfile
 import sys
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 from uuid import uuid4
@@ -15,7 +20,7 @@ from .agent_runtime import AIToolCall, AIToolRegistry, AIToolSpec, JSONAgentRunS
 from .approval_queue import ApprovalQueue, JSONApprovalQueueStore
 from .autonomous_orchestrator import AutonomousOrchestrator, JSONAutonomousRunStore
 from .contracts import AIActionClass, AIOwnership
-from .skills import default_ai_skills
+from .skills import AISkillDomain, AISkillSpec, default_ai_skills
 
 EXCLUDED = frozenset({".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", ".mathteacher_ai", "secrets", "credentials", "private", "keys"})
 READABLE = frozenset({".py", ".md", ".toml", ".yml", ".yaml"})
