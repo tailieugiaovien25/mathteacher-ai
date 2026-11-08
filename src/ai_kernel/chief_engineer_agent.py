@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import ast
+import difflib
 import hashlib
 import hmac
 import getpass
@@ -85,6 +86,19 @@ def resolve_repository_file(root: Path, relative: object) -> Path:
     return resolved
 
 
+def _safe_child_environment() -> dict[str, str]:
+    """Pass only runtime necessities to subprocesses, never inherited credentials."""
+    allowed = (
+        "PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT",
+        "TEMP", "TMP", "TMPDIR", "HOME", "USERPROFILE",
+        "LOCALAPPDATA", "APPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)",
+        "PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "LANG", "LC_ALL",
+    )
+    result = {name: os.environ[name] for name in allowed if os.environ.get(name)}
+    result["PYTHONDONTWRITEBYTECODE"] = "1"
+    return result
+
+
 def _command(argv: list[str], root: Path, timeout: int) -> dict[str, Any]:
     try:
         result = subprocess.run(
@@ -92,7 +106,7 @@ def _command(argv: list[str], root: Path, timeout: int) -> dict[str, Any]:
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, encoding="utf-8", errors="replace",
             timeout=timeout, shell=False,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}, check=False,
+            env=_safe_child_environment(), check=False,
         )
         return {"returncode": result.returncode, "output": redact_sensitive_text(result.stdout), "timed_out": False}
     except subprocess.TimeoutExpired as exc:
@@ -510,6 +524,27 @@ class ChiefEngineerAgent:
             "backups": backups,
         }
 
+    def patch_preview(self, patch_id: str) -> str:
+        """Render a bounded unified diff for explicit human review before approval."""
+        manifest = self._load_patch_manifest(patch_id)
+        if manifest.get("status") != "awaiting_approval":
+            raise ValueError("Bản vá không còn ở trạng thái chờ phê duyệt.")
+        chunks: list[str] = []
+        for item in manifest.get("changes", []):
+            source_path = _resolve_patch_target(self.root, item["path"])
+            original = source_path.read_text(encoding="utf-8")
+            if _sha256_bytes(source_path.read_bytes()) != item["expected_sha256"]:
+                raise ValueError("Tệp nguồn đã thay đổi; cần tạo đề xuất mới.")
+            diff = difflib.unified_diff(
+                original.splitlines(keepends=True),
+                item["content"].splitlines(keepends=True),
+                fromfile="a/" + item["path"],
+                tofile="b/" + item["path"],
+            )
+            chunks.extend(diff)
+        preview = redact_sensitive_text("".join(chunks))
+        return preview[:30000] or "(Bản vá không tạo ra khác biệt.)"
+
     def approve_and_apply_patch(
         self,
         approval_id: str,
@@ -634,8 +669,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.approve_patch_id:
             if not args.admin_actor.strip():
                 raise ValueError("--admin-actor là bắt buộc khi áp dụng patch.")
+            print(agent.patch_preview(args.approve_patch_id))
             expected = "APPLY PATCH " + args.approve_patch_id.strip()
-            confirmation = input("Để phê duyệt và áp dụng, hãy nhập chính xác: " + expected + "\n> ")
+            confirmation = input("Đã xem diff. Để phê duyệt và áp dụng, nhập chính xác: " + expected + "\n> ")
             admin_token = getpass.getpass("ADMIN token (không hiển thị): ")
             run = agent.approve_and_apply_patch(
                 args.approve_patch_id,
