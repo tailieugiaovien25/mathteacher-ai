@@ -10,6 +10,9 @@ on:
       - "src/tests/test_ai_agent_planner_v9.py"
       - "src/tests/test_ai_agent_runtime_v8.py"
       - ".github/workflows/chief-engineer-agent.yml"
+      - "scripts/chief_engineer/**"
+      - "docs/chief-engineer-agent-v1.md"
+      - ".gitignore"
   pull_request:
     paths:
       - "src/ai_kernel/chief_engineer_agent.py"
@@ -17,6 +20,9 @@ on:
       - "src/tests/test_ai_agent_planner_v9.py"
       - "src/tests/test_ai_agent_runtime_v8.py"
       - ".github/workflows/chief-engineer-agent.yml"
+      - "scripts/chief_engineer/**"
+      - "docs/chief-engineer-agent-v1.md"
+      - ".gitignore"
 
 permissions:
   contents: read
