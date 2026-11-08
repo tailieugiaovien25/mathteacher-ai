@@ -74,6 +74,36 @@ def test_planner_json_is_parsed_and_bounded():
         parse_tool_plan(too_many)
 
 
+def test_planner_normalizes_cycle_planned_tools_wrapper_for_small_models():
+    calls = parse_tool_plan(
+        '{"tool_calls":[{"cycle":1,"planned_tools":['
+        '"engineer.git.status","engineer.repo.inventory"]}]}'
+    )
+    assert [call.tool_id for call in calls] == [
+        "engineer.git.status",
+        "engineer.repo.inventory",
+    ]
+    assert all(call.arguments == {} for call in calls)
+
+    object_calls = parse_tool_plan(
+        '{"tool_calls":[{"cycle":2,"planned_tools":['
+        '{"tool_id":"engineer.git.status","arguments":{}}]}]}'
+    )
+    assert len(object_calls) == 1
+    assert object_calls[0].tool_id == "engineer.git.status"
+
+
+def test_planner_rejects_malformed_cycle_planned_tools_wrapper():
+    with pytest.raises(ValueError, match="cycle.*số nguyên dương"):
+        parse_tool_plan(
+            '{"tool_calls":[{"cycle":"1","planned_tools":[]}]}'
+        )
+    with pytest.raises(ValueError, match="planned_tools.*danh sách"):
+        parse_tool_plan(
+            '{"tool_calls":[{"cycle":1,"planned_tools":"engineer.git.status"}]}'
+        )
+
+
 def test_planner_parser_explains_unexpected_json_shapes():
     with pytest.raises(ValueError, match="thiếu trường 'tool_calls'"):
         parse_tool_plan('{"actions":[]}')
