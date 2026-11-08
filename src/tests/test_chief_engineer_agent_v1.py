@@ -204,6 +204,25 @@ def test_patch_rejects_stale_hash_path_escape_and_invalid_python(tmp_path: Path)
         }], rationale="Syntax validation.")
 
 
+def test_patch_rejects_src_parent_traversal_outside_allowed_directory(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    outside = root / "outside.py"
+    outside.write_text("VALUE = 1\\n", encoding="utf-8")
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+    original = outside.read_bytes()
+
+    with pytest.raises(ValueError, match="đường dẫn chuẩn|bên trong src"):
+        agent.prepare_patch([{
+            "path": "src/../outside.py",
+            "content": "VALUE = 2\\n",
+            "expected_sha256": hashlib.sha256(original).hexdigest(),
+        }], rationale="Reject parent traversal outside src.")
+
+    assert outside.read_bytes() == original
+
+
 def test_patch_rejects_secret_like_content_and_does_not_change_source(tmp_path: Path):
     from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
 
