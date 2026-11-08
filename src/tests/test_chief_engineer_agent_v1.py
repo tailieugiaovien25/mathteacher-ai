@@ -63,6 +63,7 @@ def test_planner_json_is_parsed_and_bounded():
     calls = parse_tool_plan('{"tool_calls":[{"tool_id":"engineer.git.status","arguments":{}}]}')
     assert len(calls) == 1
     assert calls[0].tool_id == "engineer.git.status"
+    assert parse_tool_plan("```json\n{\"tool_calls\": []}\n```") == ()
     with pytest.raises(ValueError):
         parse_tool_plan('{"tool_calls":' + str([{}] * 7) + '}')
 
