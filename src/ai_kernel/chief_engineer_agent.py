@@ -157,18 +157,44 @@ def validate_test_targets(root: Path, paths: object) -> list[str]:
 
 
 def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
-    source = str(raw or "").strip()
-    if source.startswith("```"):
-        lines = source.splitlines()
-        if lines and lines[0].lstrip().startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        source = "\n".join(lines).strip()
-    payload = json.loads(source)
-    if not isinstance(payload, dict) or not isinstance(payload.get("tool_calls", []), list):
-        raise ValueError("Kế hoạch AI không đúng cấu trúc JSON.")
-    rows = payload.get("tool_calls", [])
+    """Parse the bounded planner contract from object or direct-list JSON."""
+    if isinstance(raw, (dict, list)):
+        payload = raw
+    else:
+        source = str(raw or "").strip()
+        if source.startswith("```"):
+            lines = source.splitlines()
+            if lines and lines[0].lstrip().startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            source = "\n".join(lines).strip()
+        payload = json.loads(source)
+        # Some small local models double-encode a JSON response as a string.
+        if isinstance(payload, str):
+            payload = json.loads(payload.strip())
+
+    if isinstance(payload, list):
+        # Accept the equivalent compact form: [{tool_id, arguments}, ...].
+        rows = payload
+    elif isinstance(payload, dict):
+        if "tool_calls" not in payload:
+            keys = ", ".join(sorted(str(key) for key in payload.keys())[:8]) or "(không có)"
+            raise ValueError(
+                "AI trả JSON object nhưng thiếu trường 'tool_calls'. "
+                f"Các trường nhận được: {keys}. Hãy kiểm tra model/prompt."
+            )
+        rows = payload["tool_calls"]
+        if not isinstance(rows, list):
+            raise ValueError(
+                "Trường 'tool_calls' phải là danh sách; "
+                f"AI trả kiểu {type(rows).__name__}."
+            )
+    else:
+        raise ValueError(
+            "AI phải trả JSON object có 'tool_calls' hoặc JSON array các tool call; "
+            f"kiểu dữ liệu nhận được: {type(payload).__name__}."
+        )
     if len(rows) > max_calls:
         raise ValueError("Kế hoạch vượt giới hạn số bước.")
     calls = []
@@ -730,8 +756,10 @@ class ChiefEngineerAgent:
         prompt = (
             "Bạn là Chief Engineer của MathTeacher AI. Chỉ dùng tool trong allow-list. "
             "Không đề xuất shell command, sửa/xóa tệp, commit/push/merge/deploy hoặc đọc khóa bí mật. "
-            "Trả về JSON thuần theo schema {tool_calls:[{tool_id,arguments}]}; "
-            "khi đủ bằng chứng trả tool_calls rỗng.\n"
+            "Chỉ trả về JSON hợp lệ, không Markdown, không lời dẫn, không giải thích. "
+            "Schema bắt buộc: {\"tool_calls\":[{\"tool_id\":\"engineer.git.status\",\"arguments\":{}}]}. "
+            "Nếu không cần gọi tool, trả chính xác {\"tool_calls\":[]}. "
+            "Không trả JSON array ở cấp cao nhất, không đổi tên trường, không trả arguments dạng chuỗi.\n"
             f"Mục tiêu: {context.objective}\nChu kỳ: {context.cycle}\n"
             f"Allow-list: {json.dumps(available, ensure_ascii=False)}\n"
             f"Kết quả: {json.dumps(self.observations[-8:], ensure_ascii=False)}"
@@ -741,7 +769,17 @@ class ChiefEngineerAgent:
             owner=AIOwnership.SYSTEM, action=AIActionClass.ADVISORY,
             metadata={"interface": "chief_engineer_agent", "mutating": "false"},
             skill_id=self.SKILL_ID)
-        return parse_tool_plan(getattr(response, "text", response), self.max_steps)
+        try:
+            return parse_tool_plan(getattr(response, "text", response), self.max_steps)
+        except (ValueError, json.JSONDecodeError) as exc:
+            provider = str(getattr(response, "provider", "unknown") or "unknown")
+            model = str(getattr(response, "model", "unknown") or "unknown")
+            profile = str(getattr(response, "profile_id", "unknown") or "unknown")
+            fallback = bool(getattr(response, "used_fallback", False))
+            raise ValueError(
+                f"{exc} [provider={provider}; model={model}; profile={profile}; "
+                f"used_fallback={fallback}]"
+            ) from exc
 
     def run(self, objective: str, *, task_id: str | None = None):
         objective = str(objective or "").strip()
