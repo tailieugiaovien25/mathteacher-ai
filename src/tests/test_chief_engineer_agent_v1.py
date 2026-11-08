@@ -271,3 +271,46 @@ def test_test_subprocess_does_not_inherit_admin_or_provider_secrets(monkeypatch)
     assert "OLLAMA_API_KEY" not in env
     assert "MATH_TEACHER_AI_CHIEF_ENGINEER_ADMIN_TOKEN" not in env
     assert env["PYTHONDONTWRITEBYTECODE"] == "1"
+
+
+
+def test_patch_failure_rolls_back_already_written_files(tmp_path: Path, monkeypatch):
+    from ai_kernel import chief_engineer_agent as module
+
+    root = _repo(tmp_path)
+    first = root / "src" / "first.py"
+    second = root / "src" / "second.py"
+    first.write_text("FIRST = 1\n", encoding="utf-8")
+    second.write_text("SECOND = 1\n", encoding="utf-8")
+    originals = {first: first.read_bytes(), second: second.read_bytes()}
+    agent = module.ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+    prepared = agent.prepare_patch([
+        {"path": "src/first.py", "content": "FIRST = 2\n",
+         "expected_sha256": hashlib.sha256(originals[first]).hexdigest()},
+        {"path": "src/second.py", "content": "SECOND = 2\n",
+         "expected_sha256": hashlib.sha256(originals[second]).hexdigest()},
+    ], rationale="Rollback test.")
+
+    monkeypatch.setenv("MATH_TEACHER_AI_CHIEF_ENGINEER_ADMIN_TOKEN", "B" * 40)
+    atomic_write = module._atomic_write_bytes
+    failed_once = {"value": False}
+
+    def fail_second_source_once(path, value, *, mode=None):
+        if Path(path) == second and not failed_once["value"]:
+            failed_once["value"] = True
+            raise OSError("simulated second-file write failure")
+        return atomic_write(path, value, mode=mode)
+
+    monkeypatch.setattr(module, "_atomic_write_bytes", fail_second_source_once)
+    with pytest.raises(RuntimeError):
+        agent.approve_and_apply_patch(
+            prepared["approval_id"],
+            admin_actor="local-admin",
+            admin_token="B" * 40,
+            confirmation="APPLY PATCH " + prepared["approval_id"],
+        )
+
+    assert first.read_bytes() == originals[first]
+    assert second.read_bytes() == originals[second]
+    assert agent.patch_status(prepared["patch_id"])["status"] == "rolled_back"
+    assert agent.approvals.get(prepared["approval_id"]).status.value == "failed"
