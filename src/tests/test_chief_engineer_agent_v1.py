@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 
 import pytest
 
@@ -116,3 +117,107 @@ def test_chief_engineer_agent_completes_a_bounded_read_only_cycle(tmp_path: Path
     assert (state_dir / "agent_runs.json").is_file()
     assert (state_dir / "autonomous_runs.json").is_file()
     assert (root / "README.md").read_text(encoding="utf-8") == "safe docs\n"
+
+
+def test_patch_requires_confirmation_and_admin_token_then_backs_up(tmp_path: Path, monkeypatch):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "engine.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    original = source.read_bytes()
+    agent = ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=tmp_path / "chief-state",
+        service=object(),
+    )
+    prepared = agent.prepare_patch(
+        [{
+            "path": "src/engine.py",
+            "content": "VALUE = 2\n",
+            "expected_sha256": hashlib.sha256(original).hexdigest(),
+        }],
+        rationale="Sửa lỗi giá trị trong mô-đun thử nghiệm.",
+    )
+    assert source.read_bytes() == original
+    assert prepared["source_changed"] is False
+
+    monkeypatch.setenv("MATH_TEACHER_AI_CHIEF_ENGINEER_ADMIN_TOKEN", "A" * 40)
+    with pytest.raises(ValueError):
+        agent.approve_and_apply_patch(
+            prepared["approval_id"],
+            admin_actor="local-admin",
+            admin_token="A" * 40,
+            confirmation="wrong confirmation",
+        )
+    with pytest.raises(PermissionError):
+        agent.approve_and_apply_patch(
+            prepared["approval_id"],
+            admin_actor="local-admin",
+            admin_token="wrong-token",
+            confirmation="APPLY PATCH " + prepared["approval_id"],
+        )
+    assert source.read_bytes() == original
+    assert agent.approvals.get(prepared["approval_id"]).status.value == "pending"
+
+    run = agent.approve_and_apply_patch(
+        prepared["approval_id"],
+        admin_actor="local-admin",
+        admin_token="A" * 40,
+        confirmation="APPLY PATCH " + prepared["approval_id"],
+    )
+    assert run.status.value == "completed"
+    assert source.read_text(encoding="utf-8") == "VALUE = 2\n"
+    patch_status = agent.patch_status(prepared["patch_id"])
+    assert patch_status["status"] == "applied"
+    backup = tmp_path / "chief-state" / patch_status["backups"][0]["backup_path"]
+    assert backup.read_bytes() == original
+    assert agent.approvals.get(prepared["approval_id"]).status.value == "executed"
+
+
+def test_patch_rejects_stale_hash_path_escape_and_invalid_python(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "engine.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+    actual = hashlib.sha256(source.read_bytes()).hexdigest()
+
+    with pytest.raises(ValueError):
+        agent.prepare_patch([{
+            "path": "src/engine.py",
+            "content": "VALUE = 2\n",
+            "expected_sha256": "0" * 64,
+        }], rationale="Stale hash.")
+    with pytest.raises(ValueError):
+        agent.prepare_patch([{
+            "path": "../outside.py",
+            "content": "VALUE = 2\n",
+            "expected_sha256": actual,
+        }], rationale="Path traversal.")
+    with pytest.raises(ValueError):
+        agent.prepare_patch([{
+            "path": "src/engine.py",
+            "content": "def broken(:\n",
+            "expected_sha256": actual,
+        }], rationale="Syntax validation.")
+
+
+def test_patch_rejects_secret_like_content_and_does_not_change_source(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "engine.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    original = source.read_bytes()
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+
+    with pytest.raises(ValueError):
+        agent.prepare_patch([{
+            "path": "src/engine.py",
+            "content": 'API_KEY = "example-secret-value-12345"\n',
+            "expected_sha256": hashlib.sha256(original).hexdigest(),
+        }], rationale="Must not persist credentials.")
+
+    assert source.read_bytes() == original
