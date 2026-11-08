@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import hmac
+import getpass
 import json
 import os
 import re
@@ -513,12 +515,16 @@ class ChiefEngineerAgent:
         approval_id: str,
         *,
         admin_actor: str,
+        admin_token: str,
         confirmation: str,
     ):
         """Approve and consume a pending patch exactly once after explicit confirmation."""
         expected_confirmation = "APPLY PATCH " + str(approval_id or "").strip()
         if confirmation != expected_confirmation:
             raise ValueError("Xác nhận không khớp; bản vá chưa được phê duyệt hoặc áp dụng.")
+        configured_token = os.getenv("MATH_TEACHER_AI_CHIEF_ENGINEER_ADMIN_TOKEN", "")
+        if len(configured_token) < 32 or not hmac.compare_digest(str(admin_token or ""), configured_token):
+            raise PermissionError("Không xác thực được ADMIN token cục bộ; chưa có thay đổi mã nguồn.")
         if not str(admin_actor or "").strip():
             raise ValueError("ADMIN actor là bắt buộc.")
         approval = self.approvals.get(approval_id)
@@ -630,9 +636,11 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("--admin-actor là bắt buộc khi áp dụng patch.")
             expected = "APPLY PATCH " + args.approve_patch_id.strip()
             confirmation = input("Để phê duyệt và áp dụng, hãy nhập chính xác: " + expected + "\n> ")
+            admin_token = getpass.getpass("ADMIN token (không hiển thị): ")
             run = agent.approve_and_apply_patch(
                 args.approve_patch_id,
                 admin_actor=args.admin_actor,
+                admin_token=admin_token,
                 confirmation=confirmation,
             )
             print(json.dumps({
