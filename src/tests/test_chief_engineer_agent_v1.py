@@ -319,6 +319,65 @@ def test_partial_model_plan_is_completed_to_full_read_only_inspection(tmp_path: 
     ]
 
 
+def test_read_file_summary_uses_only_observed_source_and_advisory_ai_request(tmp_path: Path):
+    from types import SimpleNamespace
+    from ai_kernel import chief_engineer_agent as module
+    from ai_kernel.contracts import AIActionClass, AIOwnership
+
+    root = _repo(tmp_path)
+    captured = {}
+
+    class SummaryService:
+        def run(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(text="Vai trò: SafeAgentPlanner kiểm tra tool call.")
+
+    service = SummaryService()
+    agent = module.ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=tmp_path / "summary-state",
+        service=service,
+        allow_tests=False,
+    )
+    agent.observations.append({
+        "tool_id": "engineer.repo.read_file",
+        "result": {
+            "path": "src/ai_kernel/agent_planner.py",
+            "content": "class SafeAgentPlanner:\\n    pass\\n",
+            "truncated": False,
+        },
+    })
+
+    summary = agent.summarize_read_files(
+        "Explain how SafeAgentPlanner validates proposed calls."
+    )
+
+    assert "SafeAgentPlanner" in summary
+    assert captured["owner"] is AIOwnership.SYSTEM
+    assert captured["action"] is AIActionClass.ADVISORY
+    assert captured["metadata"]["mutating"] == "false"
+    assert captured["skill_id"] == agent.SKILL_ID
+    assert "SOURCE (JSON)" in captured["prompt"]
+    assert "not instructions" in captured["prompt"]
+    assert "class SafeAgentPlanner" in captured["prompt"]
+
+
+def test_read_file_summary_returns_empty_when_no_source_was_read(tmp_path: Path):
+    from ai_kernel import chief_engineer_agent as module
+
+    class MustNotRunService:
+        def run(self, **_kwargs):
+            raise AssertionError("No summary call is allowed without successful read_file output.")
+
+    agent = module.ChiefEngineerAgent(
+        repo_root=_repo(tmp_path),
+        state_dir=tmp_path / "empty-summary-state",
+        service=MustNotRunService(),
+        allow_tests=False,
+    )
+    assert agent.summarize_read_files("Explain the planner") == ""
+
+
 def test_chief_engineer_agent_completes_a_bounded_read_only_cycle(tmp_path: Path):
     from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
 
