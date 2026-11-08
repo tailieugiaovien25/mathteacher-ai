@@ -198,6 +198,35 @@ def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
             "AI phải trả JSON object có 'tool_calls' hoặc JSON array các tool call; "
             f"kiểu dữ liệu nhận được: {type(payload).__name__}."
         )
+    # Some small local models echo the orchestration observation schema
+    # ({cycle, planned_tools}) instead of emitting each tool call directly.
+    # Normalize only this exact wrapper; every resulting call still passes
+    # strict field validation and the runtime's registered-tool allow-list.
+    normalized_rows = []
+    for index, row in enumerate(rows, start=1):
+        if isinstance(row, dict) and set(row) == {"cycle", "planned_tools"}:
+            cycle = row["cycle"]
+            planned_tools = row["planned_tools"]
+            if isinstance(cycle, bool) or not isinstance(cycle, int) or cycle < 1:
+                raise ValueError(
+                    f"Planner wrapper #{index}: 'cycle' phải là số nguyên dương."
+                )
+            if not isinstance(planned_tools, list):
+                raise ValueError(
+                    f"Planner wrapper #{index}: 'planned_tools' phải là danh sách."
+                )
+            for item in planned_tools:
+                if isinstance(item, str):
+                    normalized_rows.append({
+                        "tool_id": item.strip(),
+                        "arguments": {},
+                    })
+                else:
+                    normalized_rows.append(item)
+        else:
+            normalized_rows.append(row)
+    rows = normalized_rows
+
     if len(rows) > max_calls:
         raise ValueError("Kế hoạch vượt giới hạn số bước.")
     calls = []
@@ -784,7 +813,8 @@ class ChiefEngineerAgent:
             "Schema bắt buộc: {\"tool_calls\":[{\"tool_id\":\"engineer.git.status\",\"arguments\":{}}]}. "
             "Mỗi phần tử tool_calls phải là object và chỉ có đúng hai khóa tool_id (chuỗi) "
             "và arguments (object JSON; dùng {} nếu không có tham số). "
-            "Không thêm khóa id, name, type, function, reason, rationale, thought hoặc description. "
+            "Không thêm khóa id, name, type, function, reason, rationale, thought, description, cycle hoặc planned_tools. "
+            "Không nhúng object nhật ký {cycle, planned_tools} vào tool_calls. "
             "tool_id phải được sao chép chính xác từ allow-list; không tự nghĩ tên tool. "
             "Nếu không cần gọi tool, trả chính xác {\"tool_calls\":[]}. "
             "Không trả JSON array ở cấp cao nhất, không đổi tên trường, không trả arguments dạng chuỗi.\n"
