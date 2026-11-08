@@ -182,15 +182,16 @@ def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
     return tuple(calls)
 
 
-def chief_engineer_tool_specs() -> tuple[AIToolSpec, ...]:
+def chief_engineer_tool_specs(*, include_tests: bool = True) -> tuple[AIToolSpec, ...]:
     safe = frozenset({AIActionClass.READ_ONLY, AIActionClass.ADVISORY})
-    return (
+    specs = (
         AIToolSpec("engineer.git.status", "Git status", "Đọc trạng thái Git.", safe, ("coding", "repository")),
         AIToolSpec("engineer.git.diff_summary", "Git diff summary", "Đọc thống kê thay đổi.", safe, ("coding", "repository")),
         AIToolSpec("engineer.repo.inventory", "Repository inventory", "Thống kê cấu trúc tệp; loại trừ vùng bí mật.", safe, ("coding", "repository")),
         AIToolSpec("engineer.repo.read_file", "Read source file", "Đọc mã nguồn/tài liệu trong allow-list.", safe, ("coding", "repository")),
         AIToolSpec("engineer.tests.run_pytest", "Run selected tests", "Chạy tối đa 5 test file cụ thể.", safe, ("coding", "testing")),
     )
+    return tuple(spec for spec in specs if include_tests or spec.tool_id != "engineer.tests.run_pytest")
 
 
 PATCH_MAX_FILES = 5
@@ -308,13 +309,14 @@ class ChiefEngineerAgent:
 
     def __init__(self, *, repo_root: str | os.PathLike[str], service: Any | None = None,
                  state_dir: str | os.PathLike[str] | None = None, timeout: int = 90,
-                 max_cycles: int = 4, max_steps: int = 6):
+                 max_cycles: int = 4, max_steps: int = 6, allow_tests: bool = True):
         self.root = Path(repo_root).expanduser().resolve()
         if not self.root.is_dir() or not (self.root / ".git").exists():
             raise ValueError("repo_root phải là Git repository.")
         self.timeout = min(max(int(timeout), 5), 300)
         self.max_cycles = min(max(int(max_cycles), 1), 8)
         self.max_steps = min(max(int(max_steps), 1), 12)
+        self.allow_tests = bool(allow_tests)
         self.state_dir = Path(state_dir).resolve() if state_dir else self.root / ".mathteacher_ai" / "chief_engineer"
         if self.state_dir == self.root or (self.root in self.state_dir.parents and self.state_dir != self.root / ".mathteacher_ai" / "chief_engineer"):
             raise ValueError("state_dir trong repo chỉ được phép là .mathteacher_ai/chief_engineer.")
@@ -363,7 +365,8 @@ class ChiefEngineerAgent:
         self.tools.bind("engineer.git.diff_summary", self._record("engineer.git.diff_summary", lambda _a: _command(["git", "diff", "--stat"], root, timeout)))
         self.tools.bind("engineer.repo.inventory", self._record("engineer.repo.inventory", lambda a: repository_inventory(root, min(max(int(a.get("limit", 5000)), 100), 10000))))
         self.tools.bind("engineer.repo.read_file", self._record("engineer.repo.read_file", self._read_file))
-        self.tools.bind("engineer.tests.run_pytest", self._record("engineer.tests.run_pytest", self._run_pytest))
+        if self.allow_tests:
+            self.tools.bind("engineer.tests.run_pytest", self._record("engineer.tests.run_pytest", self._run_pytest))
         self.tools.bind(PATCH_APPLY_TOOL, self._apply_patch_tool)
     def _read_file(self, args: Mapping[str, Any]):
         path = resolve_repository_file(self.root, args.get("path"))
@@ -751,12 +754,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--admin-actor", default="", help="Mã định danh ADMIN trong nhật ký phê duyệt.")
     parser.add_argument("--max-cycles", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=90)
+    parser.add_argument("--no-tests", action="store_true", help="Không đăng ký hoặc chạy công cụ pytest.")
     args = parser.parse_args(argv)
     try:
         agent = ChiefEngineerAgent(
             repo_root=args.repo_root,
             max_cycles=args.max_cycles,
             timeout=args.timeout,
+            allow_tests=not args.no_tests,
         )
         if args.prepare_patch_file:
             proposal_path = Path(args.prepare_patch_file).expanduser().resolve()
