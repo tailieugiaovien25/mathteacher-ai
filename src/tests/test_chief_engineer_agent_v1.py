@@ -82,3 +82,37 @@ def test_secret_scrubber_does_not_emit_common_credentials():
     assert "abcdefghijklmnopqrstuvwxyz012345" not in cleaned
     assert "ghp_" not in cleaned
     assert "[REDACTED]" in cleaned
+
+
+def test_chief_engineer_agent_completes_a_bounded_read_only_cycle(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+
+    class FakeKernelService:
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, **_kwargs):
+            from types import SimpleNamespace
+
+            self.calls += 1
+            if self.calls == 1:
+                return SimpleNamespace(text='{"tool_calls":[{"tool_id":"engineer.repo.inventory","arguments":{}}]}')
+            return SimpleNamespace(text='{"tool_calls":[]}')
+
+    state_dir = tmp_path / "agent-state"
+    agent = ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=state_dir,
+        service=FakeKernelService(),
+        max_cycles=3,
+    )
+    run = agent.run("Kiểm tra cấu trúc repository trong môi trường thử nghiệm.")
+
+    assert run.status.value == "completed"
+    assert run.cycle_count == 2
+    assert any(row.get("tool_id") == "engineer.repo.inventory" for row in agent.observations)
+    assert (state_dir / "agent_runs.json").is_file()
+    assert (state_dir / "autonomous_runs.json").is_file()
+    assert (root / "README.md").read_text(encoding="utf-8") == "safe docs\n"
