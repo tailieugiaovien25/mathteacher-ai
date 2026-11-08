@@ -177,6 +177,114 @@ def chief_engineer_tool_specs() -> tuple[AIToolSpec, ...]:
     )
 
 
+PATCH_MAX_FILES = 5
+PATCH_MAX_BYTES = 262144
+PATCH_APPLY_TOOL = "engineer.patch.apply"
+PATCH_SKILL_ID = "system_admin.maintenance"
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _atomic_write_bytes(path: Path, value: bytes, *, mode: int | None = None) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix="mathteacher-safe-write-", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(value)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if mode is not None:
+            os.chmod(temporary, mode)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
+    encoded = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
+    _atomic_write_bytes(path, encoded)
+
+
+def _patch_manifest_digest(manifest: Mapping[str, Any]) -> str:
+    stable = {
+        "patch_id": manifest["patch_id"],
+        "rationale": manifest["rationale"],
+        "changes": manifest["changes"],
+    }
+    encoded = json.dumps(stable, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return _sha256_bytes(encoded)
+
+
+def _reject_secret_payload(content: str) -> None:
+    patterns = (
+        r"(?im)^\s*[A-Za-z0-9_]*(?:API[_-]?KEY|CLIENT[_-]?SECRET|PASSWORD|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN)\s*[:=]\s*['""]?[^'""\s#]{8,}",
+        r"\b(?:ghp|gho|ghs|ghu|ghr)_[A-Za-z0-9_]{20,}\b",
+        r"\bsk-[A-Za-z0-9_-]{20,}\b",
+        r"(?i)\bBearer\s+[A-Za-z0-9._~+/-]{20,}",
+    )
+    if any(re.search(pattern, content) for pattern in patterns):
+        raise ValueError("Bản vá có dấu hiệu chứa khóa bí mật; đã từ chối lưu đề xuất.")
+
+
+def _resolve_patch_target(root: Path, raw_path: object) -> Path:
+    raw = str(raw_path or "").strip()
+    if not raw or chr(0) in raw or "\\" in raw:
+        raise ValueError("Đường dẫn bản vá không hợp lệ.")
+    candidate = Path(raw)
+    if candidate.is_absolute() or not raw.startswith("src/") or candidate.suffix.casefold() != ".py":
+        raise ValueError("Bản vá V2 chỉ được nhắm tới tệp Python hiện có bên trong src/.")
+    root = root.resolve()
+    cursor = root
+    for part in candidate.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise ValueError("Không cho phép bản vá đi qua symbolic link.")
+    resolved = cursor.resolve()
+    try:
+        relative = resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("Đường dẫn bản vá vượt ra ngoài repository.") from exc
+    if _sensitive(relative) or not resolved.is_file():
+        raise ValueError("Tệp bản vá không tồn tại hoặc thuộc vùng bị bảo vệ.")
+    if resolved.stat().st_size > PATCH_MAX_BYTES:
+        raise ValueError("Tệp nguồn hiện tại vượt giới hạn bản vá.")
+    return resolved
+
+
+def _validate_patch_changes(root: Path, changes: object) -> list[dict[str, str]]:
+    if not isinstance(changes, list) or not changes or len(changes) > PATCH_MAX_FILES:
+        raise ValueError(f"Một bản vá cần từ 1 đến {PATCH_MAX_FILES} tệp.")
+    normalized: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for change in changes:
+        if not isinstance(change, dict) or set(change) != {"path", "content", "expected_sha256"}:
+            raise ValueError("Mỗi thay đổi phải có đúng path, content và expected_sha256.")
+        path = _resolve_patch_target(root, change["path"])
+        relative = path.relative_to(root).as_posix()
+        if relative in seen:
+            raise ValueError("Bản vá chứa đường dẫn trùng lặp.")
+        seen.add(relative)
+        content = change["content"]
+        expected = str(change["expected_sha256"] or "").strip().lower()
+        if not isinstance(content, str) or not content or len(content.encode("utf-8")) > PATCH_MAX_BYTES:
+            raise ValueError("Nội dung mới rỗng hoặc vượt giới hạn kích thước.")
+        if not re.fullmatch(r"[0-9a-f]{64}", expected):
+            raise ValueError("expected_sha256 phải là SHA-256 hợp lệ.")
+        current = path.read_bytes()
+        if _sha256_bytes(current) != expected:
+            raise ValueError(f"Tệp nguồn đã thay đổi kể từ lúc phân tích: {relative}")
+        _reject_secret_payload(content)
+        try:
+            ast.parse(content, filename=relative)
+        except SyntaxError as exc:
+            raise ValueError(f"Bản vá Python không hợp lệ tại {relative}: dòng {exc.lineno}.") from exc
+        normalized.append({"path": relative, "expected_sha256": expected, "content": content})
+    return normalized
+
+
 class ChiefEngineerAgent:
     """Model-planned repo observer built on SafeAgentPlanner/Runtime/Orchestrator."""
     SKILL_ID = "system_admin.observer"
