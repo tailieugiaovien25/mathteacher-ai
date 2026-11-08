@@ -765,7 +765,10 @@ def main(argv: list[str] | None = None) -> int:
     command.add_argument("--objective", help="Chạy kiểm tra repository bằng AI Planner.")
     command.add_argument("--prepare-patch-file", help="Đọc JSON patch proposal và tạo yêu cầu ADMIN approval.")
     command.add_argument("--draft-patch-for", help="Danh sách đường dẫn src/*.py, phân tách bằng dấu phẩy; AI sẽ tạo bản vá nháp.")
-    command.add_argument("--approve-patch-id", help="Phê duyệt và áp dụng patch ID sau khi xác nhận tương tác.")
+    command.add_argument(
+        "--approve-patch-id", "--approve-approval-id", dest="approve_approval_id",
+        help="Approval ID của bản vá cần phê duyệt và áp dụng sau khi xác nhận tương tác."
+    )
     parser.add_argument("--rationale", default="", help="Mục tiêu sửa lỗi khi dùng --draft-patch-for.")
     parser.add_argument("--admin-actor", default="", help="Mã định danh ADMIN trong nhật ký phê duyệt.")
     parser.add_argument("--max-cycles", type=int, default=4)
@@ -793,15 +796,23 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=False, indent=2))
             print(agent.patch_preview(result["patch_id"]))
             return 0
-        if args.approve_patch_id:
+        if args.approve_approval_id:
+            approval_id = args.approve_approval_id.strip()
             if not args.admin_actor.strip():
                 raise ValueError("--admin-actor là bắt buộc khi áp dụng patch.")
-            print(agent.patch_preview(args.approve_patch_id))
-            expected = "APPLY PATCH " + args.approve_patch_id.strip()
+            approval = agent.approvals.get(approval_id)
+            if approval.tool_id != PATCH_APPLY_TOOL or approval.skill_id != PATCH_SKILL_ID:
+                raise ValueError("Approval này không phải yêu cầu áp dụng bản vá.")
+            patch_id = str(approval.arguments.get("patch_id") or "")
+            manifest = agent._load_patch_manifest(patch_id)
+            if manifest.get("approval_id") != approval_id:
+                raise ValueError("Approval không khớp đề xuất bản vá.")
+            print(agent.patch_preview(patch_id))
+            expected = "APPLY PATCH " + approval_id
             confirmation = input("Đã xem diff. Để phê duyệt và áp dụng, nhập chính xác: " + expected + "\n> ")
             admin_token = getpass.getpass("ADMIN token (không hiển thị): ")
             run = agent.approve_and_apply_patch(
-                args.approve_patch_id,
+                approval_id,
                 admin_actor=args.admin_actor,
                 admin_token=admin_token,
                 confirmation=confirmation,
@@ -809,8 +820,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({
                 "run_id": run.run_id,
                 "status": run.status.value,
-                "approval_id": args.approve_patch_id,
-                "patch": agent.patch_status(agent.approvals.get(args.approve_patch_id).arguments["patch_id"]),
+                "approval_id": approval_id,
+                "patch": agent.patch_status(patch_id),
                 "execution_token": "[NOT DISPLAYED]",
             }, ensure_ascii=False, indent=2))
             return 0
