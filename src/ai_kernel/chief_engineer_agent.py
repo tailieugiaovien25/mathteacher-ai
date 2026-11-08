@@ -395,6 +395,90 @@ class ChiefEngineerAgent:
             raise ValueError("Nội dung đề xuất đã thay đổi sau khi phê duyệt; từ chối áp dụng.")
         return payload
 
+    def draft_patch(self, paths, *, rationale):
+        """Generate a bounded source patch proposal using the configured AI Kernel."""
+        reason = str(rationale or "").strip()
+        if not reason or len(reason) > 1200:
+            raise ValueError("Lý do bản vá phải từ 1 đến 1200 ký tự.")
+        if not isinstance(paths, (list, tuple)) or not paths or len(paths) > 3:
+            raise ValueError("Mỗi đề xuất AI chỉ nhận từ 1 đến 3 tệp Python.")
+        sources = []
+        allowed = set()
+        total = 0
+        for raw_path in paths:
+            source_path = _resolve_patch_target(self.root, raw_path)
+            relative = source_path.relative_to(self.root).as_posix()
+            if relative in allowed:
+                raise ValueError("Danh sách tệp bị trùng.")
+            allowed.add(relative)
+            content = source_path.read_text(encoding="utf-8")
+            _reject_secret_payload(content)
+            total += len(content)
+            if total > 24000:
+                raise ValueError("Tổng mã nguồn gửi tới AI vượt 24.000 ký tự.")
+            sources.append({
+                "path": relative,
+                "expected_sha256": _sha256_bytes(source_path.read_bytes()),
+                "content": content,
+            })
+        if self.service is None:
+            from .service import AIKernelService
+            self.service = AIKernelService()
+        prompt = (
+            "Bạn là kỹ sư phần mềm MathTeacher AI. Tạo bản vá tối thiểu theo mục tiêu. "
+            "Chỉ sửa đúng các tệp được cung cấp; không thêm, xóa, đổi tên tệp; không dùng shell; "
+            "không sửa khóa bí mật; giữ nguyên hành vi ngoài phạm vi. "
+            "Trả JSON thuần có khóa changes là danh sách các object chỉ gồm path và content. "
+            "content phải là TOÀN BỘ mã Python mới của tệp. Không dùng Markdown fence. "
+            "Nếu không cần sửa, trả danh sách changes rỗng.\n"
+            f"Mục tiêu: {reason}\n"
+            f"Mã nguồn: {json.dumps(sources, ensure_ascii=False)}"
+        )
+        response = self.service.run(
+            task_id="chief-engineer-draft-" + uuid4().hex[:12],
+            prompt=prompt,
+            capabilities=("coding", "reasoning", "general"),
+            owner=AIOwnership.SYSTEM,
+            action=AIActionClass.ADVISORY,
+            metadata={"interface": "chief_engineer_patch_drafter", "mutating": "false"},
+            skill_id=self.SKILL_ID,
+        )
+        raw = str(getattr(response, "text", response) or "").strip()
+        if raw.startswith("```"):
+            lines = raw.splitlines()
+            if lines and lines[0].lstrip().startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw = "\n".join(lines).strip()
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError("AI không trả về JSON bản vá hợp lệ.") from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("changes"), list):
+            raise ValueError("Cấu trúc bản vá AI không hợp lệ.")
+        proposed = payload["changes"]
+        if not proposed:
+            raise ValueError("AI đề xuất không cần thay đổi; không tạo approval.")
+        if len(proposed) != len(sources):
+            raise ValueError("AI phải trả đủ nội dung cho tất cả tệp đã chọn.")
+        by_path = {}
+        for row in proposed:
+            if not isinstance(row, dict) or set(row) != {"path", "content"}:
+                raise ValueError("Mỗi thay đổi phải có đúng path và content.")
+            name = str(row["path"] or "")
+            if name not in allowed or name in by_path or not isinstance(row["content"], str):
+                raise ValueError("AI đề xuất đường dẫn ngoài phạm vi hoặc trùng lặp.")
+            by_path[name] = row["content"]
+        staged = [{
+            "path": item["path"],
+            "content": by_path[item["path"]],
+            "expected_sha256": item["expected_sha256"],
+        } for item in sources]
+        result = self.prepare_patch(staged, rationale=reason)
+        result["generated_by_ai"] = True
+        return result
+
     def prepare_patch(self, changes: object, *, rationale: str) -> dict[str, Any]:
         """Store a proposed source patch and create a pending ADMIN approval.
 
