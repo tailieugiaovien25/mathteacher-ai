@@ -422,6 +422,56 @@ def test_agent_resumes_approved_but_unclaimed_patch(tmp_path: Path, monkeypatch)
 
 
 
+def test_cli_approval_id_resolves_patch_id_for_preview_and_apply(tmp_path: Path, monkeypatch, capsys):
+    from types import SimpleNamespace
+    from ai_kernel import chief_engineer_agent as module
+
+    approval_id = "approval-123"
+    patch_id = "a" * 32
+    calls = {}
+
+    class FakeAgent:
+        def __init__(self, **_kwargs):
+            self.approvals = SimpleNamespace(get=lambda _approval_id: SimpleNamespace(
+                tool_id=module.PATCH_APPLY_TOOL,
+                skill_id=module.PATCH_SKILL_ID,
+                arguments={"patch_id": patch_id},
+            ))
+
+        def _load_patch_manifest(self, selected_patch_id):
+            assert selected_patch_id == patch_id
+            return {"approval_id": approval_id}
+
+        def patch_preview(self, selected_patch_id):
+            calls["preview"] = selected_patch_id
+            return "FULL DIFF"
+
+        def approve_and_apply_patch(self, selected_approval_id, **kwargs):
+            calls["apply"] = (selected_approval_id, kwargs)
+            return SimpleNamespace(run_id="run-1", status=SimpleNamespace(value="completed"))
+
+        def patch_status(self, selected_patch_id):
+            calls["status"] = selected_patch_id
+            return {"patch_id": selected_patch_id, "status": "applied"}
+
+    monkeypatch.setattr(module, "ChiefEngineerAgent", FakeAgent)
+    monkeypatch.setattr(module, "input", lambda _prompt: "APPLY PATCH " + approval_id, raising=False)
+    monkeypatch.setattr(module.getpass, "getpass", lambda _prompt: "local-admin-token")
+
+    result = module.main([
+        "--repo-root", str(tmp_path),
+        "--approve-approval-id", approval_id,
+        "--admin-actor", "local-admin",
+    ])
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert "FULL DIFF" in output
+    assert calls["preview"] == patch_id
+    assert calls["apply"][0] == approval_id
+    assert calls["status"] == patch_id
+
+
 def test_no_tests_mode_removes_pytest_tool_from_registry(tmp_path: Path):
     from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
 
