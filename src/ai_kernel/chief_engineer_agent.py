@@ -653,8 +653,8 @@ class ChiefEngineerAgent:
         approval = self.approvals.get(approval_id)
         if approval.tool_id != PATCH_APPLY_TOOL or approval.skill_id != PATCH_SKILL_ID:
             raise ValueError("Approval này không phải yêu cầu áp dụng bản vá.")
-        if approval.status.value != "pending":
-            raise ValueError("Approval không còn ở trạng thái chờ.")
+        if approval.status.value not in {"pending", "approved"}:
+            raise ValueError("Approval không còn ở trạng thái có thể thực thi.")
         manifest = self._load_patch_manifest(approval.arguments.get("patch_id"))
         if (
             manifest.get("approval_id") != approval_id
@@ -662,11 +662,15 @@ class ChiefEngineerAgent:
             or manifest.get("proposal_sha256") != approval.arguments.get("proposal_sha256")
         ):
             raise ValueError("Approval không khớp đề xuất bản vá.")
-        approved = self.approvals.approve(
-            approval_id,
-            admin_actor=admin_actor,
-            actor_owner=AIOwnership.ADMIN,
-        )
+        approved = approval
+        if approval.status.value == "pending":
+            approved = self.approvals.approve(
+                approval_id,
+                admin_actor=admin_actor,
+                actor_owner=AIOwnership.ADMIN,
+            )
+        # An APPROVED but unclaimed request can be resumed after an interrupted
+        # CLI session. EXECUTING requests are never replayed automatically.
         run = self.runtime.run(
             task_id=approved.task_id,
             skill_id=PATCH_SKILL_ID,
