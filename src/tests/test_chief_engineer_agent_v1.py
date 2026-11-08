@@ -368,3 +368,35 @@ def test_ai_draft_cannot_escape_selected_source_files(tmp_path: Path):
     with pytest.raises(ValueError):
         agent.draft_patch(["src/engine.py"], rationale="Path allowlist.")
     assert source.read_text(encoding="utf-8") == "VALUE = 1\n"
+
+
+
+def test_agent_resumes_approved_but_unclaimed_patch(tmp_path: Path, monkeypatch):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+    from ai_kernel.contracts import AIOwnership
+
+    root = _repo(tmp_path)
+    source = root / "src" / "engine.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    original = source.read_bytes()
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+    prepared = agent.prepare_patch([{
+        "path": "src/engine.py",
+        "content": "VALUE = 2\n",
+        "expected_sha256": hashlib.sha256(original).hexdigest(),
+    }], rationale="Resume approved patch test.")
+
+    agent.approvals.approve(
+        prepared["approval_id"],
+        admin_actor="local-admin",
+        actor_owner=AIOwnership.ADMIN,
+    )
+    monkeypatch.setenv("MATH_TEACHER_AI_CHIEF_ENGINEER_ADMIN_TOKEN", "C" * 40)
+    run = agent.approve_and_apply_patch(
+        prepared["approval_id"],
+        admin_actor="local-admin",
+        admin_token="C" * 40,
+        confirmation="APPLY PATCH " + prepared["approval_id"],
+    )
+    assert run.status.value == "completed"
+    assert source.read_text(encoding="utf-8") == "VALUE = 2\n"
