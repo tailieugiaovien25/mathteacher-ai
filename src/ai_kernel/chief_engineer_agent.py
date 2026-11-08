@@ -1,4 +1,4 @@
-"""Chief Engineer Agent V1: repository inspection and selected test runner."""
+"""MathTeacher AI Chief Engineer Agent V2: bounded inspection and approved patching."""
 from __future__ import annotations
 import argparse
 import ast
