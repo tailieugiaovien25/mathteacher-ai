@@ -954,10 +954,22 @@ def main(argv: list[str] | None = None) -> int:
             }, ensure_ascii=False, indent=2))
             return 0
         run = agent.run(args.objective)
+        executed_tools = list(dict.fromkeys(
+            item["tool_id"]
+            for item in agent.observations
+            if isinstance(item, dict) and isinstance(item.get("tool_id"), str)
+        ))
+        planner_fallbacks = [
+            item["planner_fallback"]
+            for item in agent.observations
+            if isinstance(item, dict) and isinstance(item.get("planner_fallback"), str)
+        ]
         print(json.dumps({
             "run_id": run.run_id,
             "status": run.status.value,
             "cycles": run.cycle_count,
+            "executed_tools": executed_tools,
+            "planner_fallbacks": planner_fallbacks,
             "stop_reason": run.stop_reason,
             "approval_ids": list(run.approval_ids),
         }, ensure_ascii=False, indent=2))
