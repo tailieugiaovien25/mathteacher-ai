@@ -220,7 +220,7 @@ def _patch_manifest_digest(manifest: Mapping[str, Any]) -> str:
 
 def _reject_secret_payload(content: str) -> None:
     patterns = (
-        r"(?im)^\s*[A-Za-z0-9_]*(?:API[_-]?KEY|CLIENT[_-]?SECRET|PASSWORD|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN)\s*[:=]\s*['""]?[^'""\s#]{8,}",
+        r'''(?im)^\s*[A-Za-z0-9_]*(?:API[_-]?KEY|CLIENT[_-]?SECRET|PASSWORD|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN)\s*[:=]\s*['"]?[^'"\s#]{8,}''',
         r"\b(?:ghp|gho|ghs|ghu|ghr)_[A-Za-z0-9_]{20,}\b",
         r"\bsk-[A-Za-z0-9_-]{20,}\b",
         r"(?i)\bBearer\s+[A-Za-z0-9._~+/-]{20,}",
@@ -304,8 +304,24 @@ class ChiefEngineerAgent:
         self.service = service
         self.observations: list[dict[str, Any]] = []
         self.approvals = ApprovalQueue(JSONApprovalQueueStore(self.state_dir / "approvals.json"))
-        skills = default_ai_skills()
-        self.tools = AIToolRegistry(chief_engineer_tool_specs())
+        maintenance_skill = AISkillSpec(
+            skill_id=PATCH_SKILL_ID,
+            label="Chief Engineer code maintenance",
+            domain=AISkillDomain.SYSTEM_ADMIN,
+            capabilities=("coding", "repository", "testing"),
+            allowed_actions=frozenset({AIActionClass.READ_ONLY, AIActionClass.ADVISORY, AIActionClass.MUTATING}),
+            description="Áp dụng bản vá mã nguồn sau sao lưu và ADMIN phê duyệt.",
+        )
+        skills = (*default_ai_skills(), maintenance_skill)
+        patch_tool = AIToolSpec(
+            tool_id=PATCH_APPLY_TOOL,
+            label="Apply approved source patch",
+            description="Áp dụng bản vá đã duyệt; tạo backup trước khi ghi tệp.",
+            allowed_actions=frozenset({AIActionClass.MUTATING}),
+            capabilities=("coding", "repository"),
+            requires_admin_approval=True,
+        )
+        self.tools = AIToolRegistry((*chief_engineer_tool_specs(), patch_tool))
         self._bind_tools()
         self.runtime = SafeAgentRuntime(skills=skills, tools=self.tools,
             store=JSONAgentRunStore(self.state_dir / "agent_runs.json"),
@@ -331,6 +347,7 @@ class ChiefEngineerAgent:
         self.tools.bind("engineer.repo.inventory", self._record("engineer.repo.inventory", lambda a: repository_inventory(root, min(max(int(a.get("limit", 5000)), 100), 10000))))
         self.tools.bind("engineer.repo.read_file", self._record("engineer.repo.read_file", self._read_file))
         self.tools.bind("engineer.tests.run_pytest", self._record("engineer.tests.run_pytest", self._run_pytest))
+        self.tools.bind(PATCH_APPLY_TOOL, self._apply_patch_tool)
     def _read_file(self, args: Mapping[str, Any]):
         path = resolve_repository_file(self.root, args.get("path"))
         return {"path": path.relative_to(self.root).as_posix(),
