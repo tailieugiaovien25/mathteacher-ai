@@ -221,3 +221,53 @@ def test_patch_rejects_secret_like_content_and_does_not_change_source(tmp_path: 
         }], rationale="Must not persist credentials.")
 
     assert source.read_bytes() == original
+
+
+
+def test_patch_preview_shows_diff_before_admin_approval(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "engine.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+    prepared = agent.prepare_patch([{
+        "path": "src/engine.py",
+        "content": "VALUE = 2\n",
+        "expected_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+    }], rationale="Preview test.")
+    diff = agent.patch_preview(prepared["patch_id"])
+    assert "--- a/src/engine.py" in diff
+    assert "-VALUE = 1" in diff
+    assert "+VALUE = 2" in diff
+    assert source.read_text(encoding="utf-8") == "VALUE = 1\n"
+
+
+def test_patch_preview_rejects_source_changed_after_proposal(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "engine.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+    prepared = agent.prepare_patch([{
+        "path": "src/engine.py",
+        "content": "VALUE = 2\n",
+        "expected_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+    }], rationale="Stale preview test.")
+    source.write_text("VALUE = 3\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        agent.patch_preview(prepared["patch_id"])
+
+
+def test_test_subprocess_does_not_inherit_admin_or_provider_secrets(monkeypatch):
+    from ai_kernel.chief_engineer_agent import _safe_child_environment
+
+    monkeypatch.setenv("PATH", "/safe/path")
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-secret-value")
+    monkeypatch.setenv("MATH_TEACHER_AI_CHIEF_ENGINEER_ADMIN_TOKEN", "admin-secret-value")
+    env = _safe_child_environment()
+    assert env["PATH"] == "/safe/path"
+    assert "OLLAMA_API_KEY" not in env
+    assert "MATH_TEACHER_AI_CHIEF_ENGINEER_ADMIN_TOKEN" not in env
+    assert env["PYTHONDONTWRITEBYTECODE"] == "1"
