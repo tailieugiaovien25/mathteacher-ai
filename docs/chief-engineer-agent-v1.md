@@ -106,3 +106,30 @@ Run history, approvals, patch proposals and backups live below:
 The entire .mathteacher_ai/ folder is ignored by Git. Backups are local to the machine and are not uploaded to GitHub automatically.
 
 The Agent is a foreground process when invoked from PowerShell; V2 does not install a Windows scheduled task or run in the background. The patch workflow has CI coverage on GitHub Actions but still requires a local Windows test before being used on production source files.
+
+
+## Optional Windows Task Scheduler
+
+The Agent remains a foreground process unless the owner explicitly registers a scheduled task. The provided scripts are opt-in and do not register or start anything by themselves.
+
+After the feature branch has been safely checked out locally and the dependencies are ready, open PowerShell at the project root:
+
+    .\scripts\chief_engineer\Register-ChiefEngineerTask.ps1 -RepoRoot "$PWD" -DailyAt "07:00"
+
+This registers a daily task under the current Windows account with the Limited run level. The first run occurs at the next scheduled time; registration does not launch the Agent immediately. The default objective is read-only repository inspection. The scheduled task cannot invoke the V2 patch-application CLI.
+
+Local run logs are written under:
+
+    .mathteacher_ai\chief_engineer\logs\
+
+To run the Agent once in the foreground:
+
+    .\scripts\chief_engineer\Run-ChiefEngineer.ps1 -ConfigPath ".mathteacher_ai\chief_engineer\scheduled_task.json"
+
+The runner requires the repository's .venv when available; it falls back to the Python executable on PATH. It sets PYTHONPATH to src and restores the caller's PYTHONPATH / PYTHONDONTWRITEBYTECODE values after execution.
+
+To remove only the scheduled task without deleting state, backups or logs:
+
+    .\scripts\chief_engineer\Unregister-ChiefEngineerTask.ps1
+
+The scripts have a Windows PowerShell parser check in CI. Task registration and an actual scheduled execution still need to be verified on the user's Windows PC.
