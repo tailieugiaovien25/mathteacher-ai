@@ -735,7 +735,9 @@ def main(argv: list[str] | None = None) -> int:
     command = parser.add_mutually_exclusive_group(required=True)
     command.add_argument("--objective", help="Chạy kiểm tra repository bằng AI Planner.")
     command.add_argument("--prepare-patch-file", help="Đọc JSON patch proposal và tạo yêu cầu ADMIN approval.")
+    command.add_argument("--draft-patch-for", help="Danh sách đường dẫn src/*.py, phân tách bằng dấu phẩy; AI sẽ tạo bản vá nháp.")
     command.add_argument("--approve-patch-id", help="Phê duyệt và áp dụng patch ID sau khi xác nhận tương tác.")
+    parser.add_argument("--rationale", default="", help="Mục tiêu sửa lỗi khi dùng --draft-patch-for.")
     parser.add_argument("--admin-actor", default="", help="Mã định danh ADMIN trong nhật ký phê duyệt.")
     parser.add_argument("--max-cycles", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=90)
@@ -748,11 +750,17 @@ def main(argv: list[str] | None = None) -> int:
         )
         if args.prepare_patch_file:
             proposal_path = Path(args.prepare_patch_file).expanduser().resolve()
-            payload = json.loads(proposal_path.read_text(encoding="utf-8"))
+            payload = json.loads(proposal_path.read_text(encoding="utf-8-sig"))
             if not isinstance(payload, dict) or set(payload) != {"rationale", "changes"}:
                 raise ValueError("JSON patch proposal phải có đúng rationale và changes.")
             result = agent.prepare_patch(payload["changes"], rationale=payload["rationale"])
             print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        if args.draft_patch_for:
+            paths = [item.strip() for item in args.draft_patch_for.split(",") if item.strip()]
+            result = agent.draft_patch(paths, rationale=args.rationale)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            print(agent.patch_preview(result["patch_id"]))
             return 0
         if args.approve_patch_id:
             if not args.admin_actor.strip():
