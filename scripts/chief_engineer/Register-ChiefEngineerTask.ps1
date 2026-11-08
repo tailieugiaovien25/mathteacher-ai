@@ -6,7 +6,7 @@ param(
     [ValidatePattern('^(?:[01]\d|2[0-3]):[0-5]\d$')]
     [string]$DailyAt,
     [string]$TaskName = "MathTeacherAI-ChiefEngineer-Daily",
-    [string]$Objective = "Kiểm tra trạng thái Git, kiểm kê repository và rà soát các kiểm thử liên quan; chỉ đọc và báo cáo, không sửa mã nguồn."
+    [string]$Objective = "Kiểm tra trạng thái Git và kiểm kê cấu trúc repository; chỉ đọc và báo cáo, không chạy pytest, không sửa mã nguồn."
 )
 
 $ErrorActionPreference = "Stop"
