@@ -294,6 +294,11 @@ def _validate_patch_changes(root: Path, changes: object) -> list[dict[str, str]]
         current = path.read_bytes()
         if _sha256_bytes(current) != expected:
             raise ValueError(f"Tệp nguồn đã thay đổi kể từ lúc phân tích: {relative}")
+        try:
+            current_text = current.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Tệp nguồn không phải UTF-8 hợp lệ: {relative}") from exc
+        _reject_secret_payload(current_text)
         _reject_secret_payload(content)
         try:
             ast.parse(content, filename=relative)
@@ -634,8 +639,10 @@ class ChiefEngineerAgent:
                 tofile="b/" + item["path"],
             )
             chunks.extend(diff)
-        preview = redact_sensitive_text("".join(chunks))
-        return preview[:30000] or "(Bản vá không tạo ra khác biệt.)"
+        preview = "".join(chunks)
+        if len(preview) > 30000:
+            raise ValueError("Diff vượt 30.000 ký tự; hãy chia bản vá thành các phần nhỏ để ADMIN xem đầy đủ.")
+        return preview or "(Bản vá không tạo ra khác biệt.)"
 
     def approve_and_apply_patch(
         self,
