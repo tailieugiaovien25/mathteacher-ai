@@ -85,7 +85,9 @@ For the current PowerShell session, create a temporary random ADMIN token. Do no
 
 Then run:
 
-    python -m ai_kernel.chief_engineer_agent --repo-root "$PWD" --approve-patch-id "<approval_id>" --admin-actor "local-admin"
+    python -m ai_kernel.chief_engineer_agent --repo-root "$PWD" --approve-approval-id "<approval_id>" --admin-actor "local-admin"
+
+The legacy flag `--approve-patch-id` remains available as an alias; both flags expect the **approval_id**, not the patch_id.
 
 The CLI displays the unified diff before asking for the exact text:
 
