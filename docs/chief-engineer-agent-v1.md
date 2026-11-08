@@ -128,6 +128,11 @@ To run the Agent once in the foreground:
 
 The runner requires the repository's .venv when available; it falls back to the Python executable on PATH. It sets PYTHONPATH to src and restores the caller's PYTHONPATH / PYTHONDONTWRITEBYTECODE values after execution.
 
+For a one-time foreground run without registering any scheduled task:
+
+    $env:PYTHONPATH = "$PWD\src"
+    .\.venv\Scripts\python.exe -m ai_kernel.chief_engineer_agent --repo-root "$PWD" --objective "Kiểm tra Git và kiểm kê repository" --no-tests
+
 To remove only the scheduled task without deleting state, backups or logs:
 
     .\scripts\chief_engineer\Unregister-ChiefEngineerTask.ps1
