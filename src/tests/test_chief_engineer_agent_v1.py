@@ -83,6 +83,22 @@ def test_planner_parser_explains_unexpected_json_shapes():
         parse_tool_plan('"Không thể lập kế hoạch"')
 
 
+def test_planner_tool_call_error_reports_extra_keys_without_executing_them():
+    with pytest.raises(ValueError, match="trường không được phép: name"):
+        parse_tool_plan(
+            '{"tool_calls":[{"tool_id":"engineer.git.status",'
+            '"arguments":{},"name":"engineer.git.status"}]}'
+        )
+    with pytest.raises(ValueError, match="thiếu 'tool_id'"):
+        parse_tool_plan('{"tool_calls":[{"arguments":{}}]}')
+    with pytest.raises(ValueError, match="arguments.*JSON object"):
+        parse_tool_plan(
+            '{"tool_calls":[{"tool_id":"engineer.git.status","arguments":"{}"}]}'
+        )
+    with pytest.raises(ValueError, match="phải là JSON object"):
+        parse_tool_plan('{"tool_calls":["engineer.git.status"]}')
+
+
 def test_tool_allowlist_has_no_write_or_governance_action():
     specs = chief_engineer_tool_specs()
     assert specs
