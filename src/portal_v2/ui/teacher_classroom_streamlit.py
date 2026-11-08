@@ -247,9 +247,7 @@ def _offline_slide(row: dict, detail: dict, index: int) -> str:
         answer = "Phương án đúng: " + ", ".join(
             str(o["option_code"]) for o in detail["options"] if o["is_correct"])
     elif kind == "TRUE_FALSE":
-        choices = "".join(
-            f'<div class="choice truth" data-correct="{str(bool(o["correct_value"])).lower()}">'
-            f'<b>{i}. {rich(o["statement_text"])}</b>'
+        choices = "".join(            f'<div class="choice truth" data-correct="{str(bool(o["correct_value"])).lower()}">'            f'<b>{i}. {rich(o["statement_text"])}</b>'
             f'<div class="truth-actions"><button type="button" data-value="true">Đúng</button>'
             f'<button type="button" data-value="false">Sai</button></div></div>'
             for i, o in enumerate(detail["statements"], 1))
@@ -497,10 +495,8 @@ body:fullscreen .slide .answer p{font-size:26px!important}
 }
 
 /* Final wrong-answer state: deep red, visually distinct but not harsh. */
-.mcq.answer-wrong-settle,
-.truth button.answer-wrong-settle{
-  background:#7f1d2d!important;
-  border-color:#5f1020!important;
+.mcq.answer-wrong-settle,.truth button.answer-wrong-settle{
+  background:#7f1d2d!important;  border-color:#5f1020!important;
   color:#fff!important;
   box-shadow:0 5px 0 #4d0c18,0 13px 24px #3a071244!important;
 }
@@ -747,11 +743,9 @@ if(e.key.toLowerCase()==='f'&&!e.repeat)document.querySelector('#fullscreen').cl
                         f"let current={max(0, min(initial_index, len(slides) - 1))},sound=false,ctx;"
                         "if(storageKey){try{const saved=Number(localStorage.getItem(storageKey));"
                         "if(Number.isInteger(saved)&&saved>=0&&saved<slides.length)current=saved}catch(e){}}")
-    html = html.replace("document.body.style.setProperty('--slide-progress',(current+1)/slides.length);",
-                        "document.body.style.setProperty('--slide-progress',(current+1)/slides.length);"
+    html = html.replace("document.body.style.setProperty('--slide-progress',(current+1)/slides.length);",                        "document.body.style.setProperty('--slide-progress',(current+1)/slides.length);"
                         "if(storageKey){try{localStorage.setItem(storageKey,String(current))}catch(e){}}")
-    html = html.replace("});show(0);", "});show(current);")
-    html = html.replace("__AUDIO_SOURCES__", json.dumps(stage_audio_sources()), 1)
+    html = html.replace("});show(0);", "});show(current);")    html = html.replace("__AUDIO_SOURCES__", json.dumps(stage_audio_sources()), 1)
     return html.encode("utf-8")
 
 
@@ -896,13 +890,13 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                                 _detail(client, str(entry["question_version_id"])),
                             )
                         )
+                    offline_gameshow = build_offline_gameshow(
+                        session["title"], slides, session_id=selected_id
+                    )
+                    from portal_v2.ui.classroom_ai_mc_runtime import build_gameshow_mc_html
                     st.session_state["prepared_classroom_gameshow"] = (
-                        selected_id,
-                        build_offline_gameshow(
-                            session["title"],
-                            slides,
-                            session_id=selected_id,
-                        ),
+                        selected_id, offline_gameshow, slides,
+                        build_gameshow_mc_html(offline_gameshow),
                     )
                 except Exception as exc:
                     st.error(f"Không chuẩn bị được Gameshow: {exc}")
@@ -917,11 +911,10 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                     key=f"download_gameshow_{selected_id}",
                     use_container_width=True,
                 )
-                from streamlit.components.v1 import html as component_html
-                component_html(
-                    prepared_gameshow[1].decode("utf-8"),
-                    height=920,
-                    scrolling=True,
+                from portal_v2.ui.classroom_ai_mc_runtime import render_ai_integrated_gameshow
+                render_ai_integrated_gameshow(
+                    st, prepared_gameshow[3], prepared_gameshow[2],
+                    session_id=selected_id,
                 )
                 st.caption(
                     "Phím nhanh: ←/→ chuyển câu · Space hiện đáp án · "
@@ -993,8 +986,10 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                         if not row:
                             raise ValueError("Một câu không còn ở trạng thái đã duyệt hoặc không thuộc tài khoản này.")
                         slides.append((row, _detail(client, str(entry["question_version_id"]))))
+                    offline_stage = build_offline_presentation(session["title"], slides)
+                    from portal_v2.ui.classroom_ai_mc_runtime import build_gameshow_mc_html
                     st.session_state["offline_presentation"] = (
-                        selected_id, build_offline_presentation(session["title"], slides))
+                        selected_id, offline_stage, slides, build_gameshow_mc_html(offline_stage))
                 except Exception as exc:
                     st.error(f"Không thể chuẩn bị đầy đủ tệp trình chiếu: {exc}")
             prepared = st.session_state.get("offline_presentation")
@@ -1003,8 +998,10 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                     file_name=f"lop-hoc-{selected_id[:8]}.html", mime="text/html",
                     key=f"download_offline_{selected_id}", use_container_width=True)
                 if session["status"] != "LIVE" and st.toggle("▶ Xem thử sân khấu", key=f"inline_stage_{selected_id}"):
-                    from streamlit.components.v1 import html as component_html
-                    component_html(prepared[1].decode("utf-8"), height=740, scrolling=True)
+                    from portal_v2.ui.classroom_ai_mc_runtime import render_ai_integrated_presentation
+                    render_ai_integrated_presentation(
+                        st, prepared[3], prepared[2], session_id=selected_id,
+                    )
                     st.caption("Nút Toàn màn hình có thể bị chặn trong khung nhúng Streamlit. Khi đó hãy mở tệp HTML đã tải và bấm nút Toàn màn hình ở đó (hoặc F11).")
     if session["status"] == "PREPARING":
         st.info(f"Đã sẵn sàng {len(queue)} câu hỏi. Bạn có thể tải bản trình chiếu toàn màn hình trước khi bắt đầu.")
@@ -1028,11 +1025,16 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                         if not row:
                             raise ValueError("Một câu trong buổi học không còn được phép hiển thị.")
                         slides.append((row, _detail(client, str(entry["question_version_id"]))))
-                    stage = build_offline_presentation(
+                    stage_bytes = build_offline_presentation(
                         session["title"], slides, initial_index=pos - 1,
-                        storage_key=f"classroom-stage:{selected_id}").decode("utf-8")
-                    from streamlit.components.v1 import html as component_html
-                    component_html(stage, height=760, scrolling=True)
+                        storage_key=f"classroom-stage:{selected_id}")
+                    from portal_v2.ui.classroom_ai_mc_runtime import (
+                        build_gameshow_mc_html, render_ai_integrated_presentation,
+                    )
+                    render_ai_integrated_presentation(
+                        st, build_gameshow_mc_html(stage_bytes), slides,
+                        session_id=selected_id,
+                    )
                 except Exception as exc:
                     st.error(f"Không dựng được sân khấu; đang hiển thị câu dạng văn bản: {exc}")
                     _render_question(st, client, question, show_answer=False)
