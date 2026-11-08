@@ -992,11 +992,13 @@ div.st-key-classroom_question p{color:#142f4b;font-family:"Segoe UI",Arial,sans-
                         selected_id, offline_stage, slides, build_gameshow_mc_html(offline_stage))
                 except Exception as exc:
                     st.error(f"Không thể chuẩn bị đầy đủ tệp trình chiếu: {exc}")
-            prepared = st.session_state.get("offline_presentation")            if prepared and prepared[0] == selected_id:
+            prepared = st.session_state.get("offline_presentation")
+            if prepared and prepared[0] == selected_id:
                 st.download_button("⬇ Tải bản toàn màn hình ngoại tuyến (.html)", prepared[1],
                     file_name=f"lop-hoc-{selected_id[:8]}.html", mime="text/html",
                     key=f"download_offline_{selected_id}", use_container_width=True)
-                if session["status"] != "LIVE" and st.toggle("▶ Xem thử sân khấu", key=f"inline_stage_{selected_id}"):                    from portal_v2.ui.classroom_ai_mc_runtime import render_ai_integrated_presentation
+                if session["status"] != "LIVE" and st.toggle("▶ Xem thử sân khấu", key=f"inline_stage_{selected_id}"):
+                    from portal_v2.ui.classroom_ai_mc_runtime import render_ai_integrated_presentation
                     render_ai_integrated_presentation(
                         st, prepared[3], prepared[2], session_id=selected_id,
                     )
