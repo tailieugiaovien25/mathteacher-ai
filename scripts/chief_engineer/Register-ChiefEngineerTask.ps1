@@ -6,6 +6,7 @@ param(
     [ValidatePattern('^(?:[01]\d|2[0-3]):[0-5]\d$')]
     [string]$DailyAt,
     [string]$TaskName = "MathTeacherAI-ChiefEngineer-Daily",
+    [string]$PythonPath = "",
     [string]$Objective = "Kiểm tra trạng thái Git và kiểm kê cấu trúc repository; chỉ đọc và báo cáo, không chạy pytest, không sửa mã nguồn."
 )
 
@@ -25,11 +26,30 @@ if (-not (Test-Path -LiteralPath (Join-Path $root "src\ai_kernel\chief_engineer_
 $stateDir = Join-Path $root ".mathteacher_ai\chief_engineer"
 New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
 $configPath = Join-Path $stateDir "scheduled_task.json"
+$resolvedPython = $PythonPath
+if ([string]::IsNullOrWhiteSpace($resolvedPython)) {
+    $candidate = Join-Path $root ".venv\Scripts\python.exe"
+    if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+        $resolvedPython = $candidate
+    }
+    else {
+        $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+        if (-not $pythonCommand) {
+            throw "Không tìm thấy Python. Hãy truyền -PythonPath tới Python có đủ dependencies."
+        }
+        $resolvedPython = $pythonCommand.Source
+    }
+}
+$resolvedPython = [System.IO.Path]::GetFullPath($resolvedPython)
+if (-not (Test-Path -LiteralPath $resolvedPython -PathType Leaf)) {
+    throw "PythonPath không tồn tại: $resolvedPython"
+}
 $config = [ordered]@{
     repo_root = $root
+    python_path = $resolvedPython
     objective = $Objective
     created_at = (Get-Date).ToString("o")
-    mode = "read_only_observe_and_test"
+    mode = "read_only_no_tests"
 }
 $config | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configPath -Encoding UTF8
 
