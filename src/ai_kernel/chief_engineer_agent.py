@@ -170,9 +170,12 @@ def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
                 lines = lines[:-1]
             source = "\n".join(lines).strip()
         payload = json.loads(source)
-        # Some small local models double-encode a JSON response as a string.
+        # Some small local models double-encode a JSON object/array as a string.
+        # Do not try to decode ordinary text a second time.
         if isinstance(payload, str):
-            payload = json.loads(payload.strip())
+            nested_source = payload.strip()
+            if nested_source.startswith(("{", "[")):
+                payload = json.loads(nested_source)
 
     if isinstance(payload, list):
         # Accept the equivalent compact form: [{tool_id, arguments}, ...].
