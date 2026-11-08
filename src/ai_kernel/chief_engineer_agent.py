@@ -835,7 +835,7 @@ class ChiefEngineerAgent:
         if not any(marker in lowered for marker in ("read_file", "read file tool", "repository read file")):
             return None
         match = re.search(
-            r"(?i)\\b(?:read|open)\\s+((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\\.(?:py|md|toml|yml|yaml))\\b",
+            r"(?i)\b(?:read|open)\s+((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.(?:py|md|toml|yml|yaml))\b",
             objective,
         )
         if not match:
