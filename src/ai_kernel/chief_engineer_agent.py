@@ -24,19 +24,31 @@ MAX_FILE_BYTES = 49152
 
 
 def redact_sensitive_text(value: object) -> str:
-    text = str(value or "")
-    for marker in ("ghp_", "gho_", "ghs_", "sk-"):
-        if marker in text:
-            text = text.replace(marker, "[REDACTED]")
-    return text[:12000]
-
+    """Remove credential-bearing lines and truncate opaque token-bearing output."""
+    labels = ("api_key", "api-key", "client_secret", "client-secret", "password",
+              "access_token", "access-token", "refresh_token", "refresh-token")
+    token_markers = ("ghp_", "gho_", "ghs_", "ghu_", "ghr_", "sk-", "Bearer ")
+    safe_lines = []
+    for line in str(value or "").splitlines():
+        lowered = line.casefold()
+        positions = [line.find(mark) for mark in (":", "=") if line.find(mark) >= 0]
+        if any(label in lowered for label in labels) and positions:
+            cut = min(positions)
+            safe_lines.append(line[:cut + 1] + " [REDACTED]")
+            continue
+        marker_positions = [line.find(mark) for mark in token_markers if line.find(mark) >= 0]
+        if marker_positions:
+            safe_lines.append(line[:min(marker_positions)] + "[REDACTED]")
+        else:
+            safe_lines.append(line)
+    return "\n".join(safe_lines)[:12000]
 
 def _sensitive(path: Path) -> bool:
     parts = [part.casefold() for part in path.parts]
     name = path.name.casefold()
     return (
         any(part in EXCLUDED for part in parts)
-        or name in {".env", ".env.local", ".env.production", "id_rsa", "id_ed25519"}
+        or name.startswith(".env") or name in {"id_rsa", "id_ed25519"}
         or any(marker in name for marker in SENSITIVE)
         or path.suffix.casefold() in {".pem", ".key", ".p12", ".pfx", ".keystore"}
     )
@@ -184,14 +196,20 @@ class ChiefEngineerAgent:
             store=JSONAutonomousRunStore(self.state_dir / "autonomous_runs.json"),
             max_cycles=self.max_cycles, observation_provider=self._observe)
 
+    def _record(self, tool_id: str, handler):
+        def execute(args):
+            result = handler(args)
+            self.observations.append({"tool_id": tool_id, "result": result})
+            return result
+        return execute
+
     def _bind_tools(self):
         root, timeout = self.root, self.timeout
-        self.tools.bind("engineer.git.status", lambda _a: _command(["git", "status", "--short", "--branch"], root, timeout))
-        self.tools.bind("engineer.git.diff_summary", lambda _a: _command(["git", "diff", "--stat"], root, timeout))
-        self.tools.bind("engineer.repo.inventory", lambda a: repository_inventory(root, min(max(int(a.get("limit", 5000)), 100), 10000)))
-        self.tools.bind("engineer.repo.read_file", self._read_file)
-        self.tools.bind("engineer.tests.run_pytest", self._run_pytest)
-
+        self.tools.bind("engineer.git.status", self._record("engineer.git.status", lambda _a: _command(["git", "status", "--short", "--branch"], root, timeout)))
+        self.tools.bind("engineer.git.diff_summary", self._record("engineer.git.diff_summary", lambda _a: _command(["git", "diff", "--stat"], root, timeout)))
+        self.tools.bind("engineer.repo.inventory", self._record("engineer.repo.inventory", lambda a: repository_inventory(root, min(max(int(a.get("limit", 5000)), 100), 10000))))
+        self.tools.bind("engineer.repo.read_file", self._record("engineer.repo.read_file", self._read_file))
+        self.tools.bind("engineer.tests.run_pytest", self._record("engineer.tests.run_pytest", self._run_pytest))
     def _read_file(self, args: Mapping[str, Any]):
         path = resolve_repository_file(self.root, args.get("path"))
         return {"path": path.relative_to(self.root).as_posix(),
@@ -232,13 +250,6 @@ class ChiefEngineerAgent:
         if not objective or len(objective) > 2000:
             raise ValueError("Mục tiêu phải có từ 1 đến 2000 ký tự.")
         self.observations.clear()
-        for tool_id in [x.tool_id for x in self.tools.specs()]:
-            original = self.tools.handler(tool_id)
-            def capture(args, *, handler=original, name=tool_id):
-                result = handler(args)
-                self.observations.append({"tool_id": name, "result": result})
-                return result
-            self.tools.bind(tool_id, capture)
         def planner_provider(context):
             calls = self._plan(context)
             if calls:
