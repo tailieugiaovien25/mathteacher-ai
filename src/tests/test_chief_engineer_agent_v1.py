@@ -195,6 +195,64 @@ def test_empty_model_plan_bootstraps_explicit_read_only_inspection(tmp_path: Pat
     )
 
 
+def test_partial_model_plan_is_completed_to_full_read_only_inspection(tmp_path: Path, monkeypatch):
+    from types import SimpleNamespace
+    from ai_kernel import chief_engineer_agent as module
+
+    root = _repo(tmp_path)
+    executed_commands = []
+
+    def fake_command(argv, _root, _timeout):
+        executed_commands.append(list(argv))
+        return {"returncode": 0, "output": "## test\n", "timed_out": False}
+
+    monkeypatch.setattr(module, "_command", fake_command)
+
+    class PartialPlannerService:
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, **_kwargs):
+            self.calls += 1
+            return SimpleNamespace(
+                text='{"tool_calls":[{"tool_id":"engineer.git.status","arguments":{}}]}',
+                provider="ollama",
+                model="qwen3:0.6b",
+                profile_id="qwen3-local-0.6b",
+                used_fallback=False,
+            )
+
+    service = PartialPlannerService()
+    agent = module.ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=tmp_path / "partial-plan-state",
+        service=service,
+        max_cycles=2,
+        allow_tests=False,
+    )
+    run = agent.run("Inspect repository status and inventory")
+
+    assert run.status.value == "completed"
+    assert run.cycle_count == 2
+    assert len(run.agent_run_ids) == 1
+    assert service.calls == 1
+    assert executed_commands == [["git", "status", "--short", "--branch"]]
+    observed_tools = [
+        item["tool_id"]
+        for item in agent.observations
+        if isinstance(item, dict) and isinstance(item.get("tool_id"), str)
+    ]
+    assert set(observed_tools) == {
+        "engineer.git.status",
+        "engineer.repo.inventory",
+    }
+    assert "read_only_repository_inspection" in [
+        item.get("planner_fallback")
+        for item in agent.observations
+        if isinstance(item, dict)
+    ]
+
+
 def test_chief_engineer_agent_completes_a_bounded_read_only_cycle(tmp_path: Path):
     from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
 
