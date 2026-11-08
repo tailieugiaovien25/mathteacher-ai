@@ -138,3 +138,34 @@ To remove only the scheduled task without deleting state, backups or logs:
     .\scripts\chief_engineer\Unregister-ChiefEngineerTask.ps1
 
 The scripts have a Windows PowerShell parser check in CI. Task registration and an actual scheduled execution still need to be verified on the user's Windows PC.
+
+
+## Cài đặt thử nghiệm bằng Git worktree để giữ nguyên thư mục hiện tại
+
+Không cần chuyển nhánh trong thư mục dự án đang có các thay đổi cá nhân. Có thể tạo worktree riêng và dùng lại Python virtual environment đã cài ở repository gốc.
+
+Mở PowerShell:
+
+    $OriginalRepo = "C:\Users\HH\Documents\mathteacher-ai-lesson-slide-designer"
+    $Worktree = "C:\Users\HH\Documents\mathteacher-ai-chief-engineer-v2"
+
+    if (Test-Path -LiteralPath $Worktree) {
+        throw "Thư mục worktree đã tồn tại; chọn đường dẫn khác, không xóa thư mục cũ."
+    }
+
+    git -C $OriginalRepo status --short --branch
+    git -C $OriginalRepo fetch origin "refs/heads/feature/chief-engineer-agent-v1:refs/remotes/origin/feature/chief-engineer-agent-v1"
+    git -C $OriginalRepo worktree add -b feature/chief-engineer-agent-v2 $Worktree origin/feature/chief-engineer-agent-v1
+
+Chạy thử foreground mà không sửa mã:
+
+    $env:PYTHONPATH = "$Worktree\src"
+    & "$OriginalRepo\.venv\Scripts\python.exe" -m ai_kernel.chief_engineer_agent --repo-root "$Worktree" --objective "Kiểm tra Git và kiểm kê cấu trúc repository" --no-tests
+
+Nếu muốn đăng ký lịch chạy, tại worktree:
+
+    .\scripts\chief_engineer\Register-ChiefEngineerTask.ps1 -RepoRoot "$PWD" -DailyAt "07:00" -PythonPath "$OriginalRepo\.venv\Scripts\python.exe"
+
+Task Scheduler đăng nhập theo tài khoản Windows hiện tại (LogonType Interactive), do đó cần phiên người dùng đã đăng nhập. Với provider Ollama local, Ollama cũng phải hoạt động khi task đến giờ chạy. Lịch mặc định chỉ Git status và inventory; pytest bị loại khỏi Registry và không được thực thi.
+
+Nếu cần gỡ worktree sau này, trước tiên dùng lệnh git worktree remove với đường dẫn worktree khi chắc chắn không còn thay đổi cần giữ. Không dùng lệnh xóa thư mục thủ công.
