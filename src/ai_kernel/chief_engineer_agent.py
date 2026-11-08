@@ -143,7 +143,7 @@ def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
             lines = lines[1:]
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
-        source = "\\n".join(lines).strip()
+        source = "\n".join(lines).strip()
     payload = json.loads(source)
     if not isinstance(payload, dict) or not isinstance(payload.get("tool_calls", []), list):
         raise ValueError("Kế hoạch AI không đúng cấu trúc JSON.")
