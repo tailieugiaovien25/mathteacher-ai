@@ -796,6 +796,30 @@ class ChiefEngineerAgent:
     def _observe(self, _run: Any, _context: Any) -> Mapping[str, Any]:
         return {"recent_tool_observations": self.observations[-8:]}
 
+    def _bootstrap_read_only_inspection(self, context: Any) -> tuple[AIToolCall, ...]:
+        """Recover an explicit first-cycle inspection request when a small model returns no calls."""
+        if int(getattr(context, "cycle", 0) or 0) != 1:
+            return ()
+        objective = str(getattr(context, "objective", "") or "").casefold()
+        has_inspection_verb = any(
+            phrase in objective
+            for phrase in ("inspect", "check", "review", "audit", "kiểm tra", "rà soát")
+        )
+        has_status_intent = any(
+            phrase in objective
+            for phrase in ("status", "trạng thái", "git status")
+        )
+        has_inventory_intent = any(
+            phrase in objective
+            for phrase in ("inventory", "kiểm kê", "cấu trúc", "structure")
+        )
+        if has_inspection_verb and has_status_intent and has_inventory_intent:
+            return (
+                AIToolCall("engineer.git.status", {}),
+                AIToolCall("engineer.repo.inventory", {}),
+            )
+        return ()
+
     def _plan(self, context: Any) -> tuple[AIToolCall, ...]:
         if self.service is None:
             from .service import AIKernelService
@@ -828,7 +852,15 @@ class ChiefEngineerAgent:
             metadata={"interface": "chief_engineer_agent", "mutating": "false"},
             skill_id=self.SKILL_ID)
         try:
-            return parse_tool_plan(getattr(response, "text", response), self.max_steps)
+            calls = parse_tool_plan(getattr(response, "text", response), self.max_steps)
+            if not calls:
+                calls = self._bootstrap_read_only_inspection(context)
+                if calls:
+                    self.observations.append({
+                        "planner_fallback": "read_only_repository_inspection",
+                        "reason": "AI trả kế hoạch rỗng cho yêu cầu kiểm tra trạng thái và kiểm kê repository.",
+                    })
+            return calls
         except (ValueError, json.JSONDecodeError) as exc:
             provider = str(getattr(response, "provider", "unknown") or "unknown")
             model = str(getattr(response, "model", "unknown") or "unknown")
