@@ -116,7 +116,7 @@ After the feature branch has been safely checked out locally and the dependencie
 
     .\scripts\chief_engineer\Register-ChiefEngineerTask.ps1 -RepoRoot "$PWD" -DailyAt "07:00"
 
-This registers a daily task under the current Windows account with the Limited run level. The first run occurs at the next scheduled time; registration does not launch the Agent immediately. The default objective is read-only repository inspection. The scheduled task cannot invoke the V2 patch-application CLI.
+This registers a daily task under the current Windows account with the Limited run level. The first run occurs at the next scheduled time; registration does not launch the Agent immediately. The default objective is read-only Git status and repository inventory. The scheduled runner passes --no-tests, so the pytest tool is not even registered for scheduled runs. The scheduled task cannot invoke the V2 patch-application CLI.
 
 Local run logs are written under:
 
