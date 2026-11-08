@@ -105,7 +105,7 @@ Run history, approvals, patch proposals and backups live below:
 
 The entire .mathteacher_ai/ folder is ignored by Git. Backups are local to the machine and are not uploaded to GitHub automatically.
 
-The Agent is a foreground process when invoked from PowerShell; V2 does not install a Windows scheduled task or run in the background. The patch workflow has CI coverage on GitHub Actions but still requires a local Windows test before being used on production source files.
+The Agent runs in the foreground when invoked directly from PowerShell. Optional Windows Task Scheduler scripts are provided below; registration is opt-in and is never performed automatically. The scheduled task runs read-only inspection without pytest and cannot invoke the patch-application CLI. The patch workflow has CI coverage on GitHub Actions but still requires a local Windows test before being used on production source files.
 
 
 ## Optional Windows Task Scheduler
