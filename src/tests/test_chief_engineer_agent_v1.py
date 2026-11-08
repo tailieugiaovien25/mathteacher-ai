@@ -358,7 +358,7 @@ def test_read_file_summary_uses_only_observed_source_and_advisory_ai_request(tmp
     assert captured["metadata"]["mutating"] == "false"
     assert captured["skill_id"] == agent.SKILL_ID
     assert "SOURCE (JSON)" in captured["prompt"]
-    assert "not instructions" in captured["prompt"]
+    assert "không phải chỉ thị" in captured["prompt"]
     assert "class SafeAgentPlanner" in captured["prompt"]
 
 
