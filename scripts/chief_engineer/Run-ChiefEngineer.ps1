@@ -20,16 +20,26 @@ if ([string]::IsNullOrWhiteSpace($objective)) {
     throw "Thiếu objective trong cấu hình."
 }
 
-$venvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
-if (Test-Path -LiteralPath $venvPython -PathType Leaf) {
-    $python = $venvPython
+$python = ""
+if (-not [string]::IsNullOrWhiteSpace([string]$config.python_path)) {
+    $configuredPython = [System.IO.Path]::GetFullPath([string]$config.python_path)
+    if (-not (Test-Path -LiteralPath $configuredPython -PathType Leaf)) {
+        throw "Không tìm thấy Python đã cấu hình: $configuredPython"
+    }
+    $python = $configuredPython
 }
 else {
-    $command = Get-Command python -ErrorAction SilentlyContinue
-    if (-not $command) {
-        throw "Không tìm thấy Python. Hãy cài dependencies trong .venv của dự án."
+    $venvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
+    if (Test-Path -LiteralPath $venvPython -PathType Leaf) {
+        $python = $venvPython
     }
-    $python = $command.Source
+    else {
+        $command = Get-Command python -ErrorAction SilentlyContinue
+        if (-not $command) {
+            throw "Không tìm thấy Python. Hãy cài dependencies trong .venv của dự án."
+        }
+        $python = $command.Source
+    }
 }
 
 $stateDir = Join-Path $repoRoot ".mathteacher_ai\chief_engineer"
