@@ -201,7 +201,7 @@ def test_explicit_read_file_objective_binds_validated_path_without_model_guessin
     root = _repo(tmp_path)
     target = root / "src" / "ai_kernel" / "agent_planner.py"
     target.parent.mkdir(parents=True)
-    target.write_text("class SafeAgentPlanner:\\n    pass\\n", encoding="utf-8")
+    target.write_text("class SafeAgentPlanner:\n    pass\n", encoding="utf-8")
 
     class UnusedPlannerService:
         calls = 0
