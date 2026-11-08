@@ -497,6 +497,12 @@ class ChiefEngineerAgent:
                     mode=original_modes[item["path"]],
                 )
                 applied.append(item["path"])
+            manifest["status"] = "applied"
+            manifest["applied_at"] = datetime.now(timezone.utc).isoformat()
+            manifest["applied_paths"] = list(applied)
+            # Persist the applied marker inside the transaction scope. If this
+            # write fails after source replacement, restore files from backups.
+            _write_json_atomic(self._patch_manifest_path(manifest["patch_id"]), manifest)
         except Exception as exc:
             rollback_errors: list[str] = []
             for relative in reversed(applied):
@@ -508,15 +514,13 @@ class ChiefEngineerAgent:
             manifest["status"] = "rollback_failed" if rollback_errors else "rolled_back"
             manifest["failure"] = type(exc).__name__
             manifest["rollback_errors"] = rollback_errors
-            _write_json_atomic(self._patch_manifest_path(manifest["patch_id"]), manifest)
+            try:
+                _write_json_atomic(self._patch_manifest_path(manifest["patch_id"]), manifest)
+            except Exception as manifest_exc:
+                rollback_errors.append("manifest: " + type(manifest_exc).__name__)
             if rollback_errors:
-                raise RuntimeError("Áp dụng bản vá lỗi và rollback chưa hoàn tất; cần kiểm tra backup.") from exc
+                raise RuntimeError("Áp dụng bản vá lỗi hoặc trạng thái rollback chưa ghi được; cần kiểm tra backup.") from exc
             raise RuntimeError("Áp dụng bản vá lỗi; các tệp đã ghi được khôi phục từ backup.") from exc
-
-        manifest["status"] = "applied"
-        manifest["applied_at"] = datetime.now(timezone.utc).isoformat()
-        manifest["applied_paths"] = list(applied)
-        _write_json_atomic(self._patch_manifest_path(manifest["patch_id"]), manifest)
         return {
             "patch_id": manifest["patch_id"],
             "status": "applied",
