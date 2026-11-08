@@ -201,12 +201,33 @@ def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
     if len(rows) > max_calls:
         raise ValueError("Kế hoạch vượt giới hạn số bước.")
     calls = []
-    for row in rows:
-        if not isinstance(row, dict) or set(row) - {"tool_id", "arguments"}:
-            raise ValueError("Tool call không hợp lệ.")
-        tool_id, arguments = row.get("tool_id"), row.get("arguments", {})
-        if not isinstance(tool_id, str) or not tool_id.strip() or not isinstance(arguments, dict):
-            raise ValueError("Tool ID hoặc arguments không hợp lệ.")
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            raise ValueError(
+                f"Tool call #{index} phải là JSON object; AI trả kiểu {type(row).__name__}."
+            )
+        extra_keys = set(row) - {"tool_id", "arguments"}
+        if extra_keys:
+            names = ", ".join(sorted(str(key) for key in extra_keys)[:8])
+            raise ValueError(
+                f"Tool call #{index} có trường không được phép: {names}. "
+                "Chỉ chấp nhận đúng hai trường: tool_id và arguments."
+            )
+        if "tool_id" not in row:
+            present = ", ".join(sorted(str(key) for key in row.keys())[:8]) or "(không có)"
+            raise ValueError(
+                f"Tool call #{index} thiếu 'tool_id'; trường hiện có: {present}."
+            )
+        tool_id, arguments = row["tool_id"], row.get("arguments", {})
+        if not isinstance(tool_id, str) or not tool_id.strip():
+            raise ValueError(
+                f"Tool call #{index}: 'tool_id' phải là chuỗi không rỗng."
+            )
+        if not isinstance(arguments, dict):
+            raise ValueError(
+                f"Tool call #{index}: 'arguments' phải là JSON object; "
+                f"AI trả kiểu {type(arguments).__name__}."
+            )
         calls.append(AIToolCall(tool_id.strip(), arguments))
     return tuple(calls)
 
@@ -761,6 +782,10 @@ class ChiefEngineerAgent:
             "Không đề xuất shell command, sửa/xóa tệp, commit/push/merge/deploy hoặc đọc khóa bí mật. "
             "Chỉ trả về JSON hợp lệ, không Markdown, không lời dẫn, không giải thích. "
             "Schema bắt buộc: {\"tool_calls\":[{\"tool_id\":\"engineer.git.status\",\"arguments\":{}}]}. "
+            "Mỗi phần tử tool_calls phải là object và chỉ có đúng hai khóa tool_id (chuỗi) "
+            "và arguments (object JSON; dùng {} nếu không có tham số). "
+            "Không thêm khóa id, name, type, function, reason, rationale, thought hoặc description. "
+            "tool_id phải được sao chép chính xác từ allow-list; không tự nghĩ tên tool. "
             "Nếu không cần gọi tool, trả chính xác {\"tool_calls\":[]}. "
             "Không trả JSON array ở cấp cao nhất, không đổi tên trường, không trả arguments dạng chuỗi.\n"
             f"Mục tiêu: {context.objective}\nChu kỳ: {context.cycle}\n"
