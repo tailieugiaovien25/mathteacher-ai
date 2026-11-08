@@ -359,6 +359,208 @@ class ChiefEngineerAgent:
         argv = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--disable-warnings", "--maxfail=1", *targets]
         return _command(argv, self.root, self.timeout)
 
+    def _patch_manifest_path(self, patch_id: object) -> Path:
+        identifier = str(patch_id or "").strip()
+        if not re.fullmatch(r"[a-f0-9]{32}", identifier):
+            raise ValueError("Mã bản vá không hợp lệ.")
+        return self.state_dir / "patches" / (identifier + ".json")
+
+    def _load_patch_manifest(self, patch_id: object) -> dict[str, Any]:
+        path = self._patch_manifest_path(patch_id)
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            raise ValueError("Không tìm thấy đề xuất bản vá.") from exc
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("Không đọc được hồ sơ bản vá; từ chối áp dụng.") from exc
+        if not isinstance(payload, dict) or payload.get("patch_id") != str(patch_id):
+            raise ValueError("Hồ sơ bản vá không hợp lệ.")
+        if _patch_manifest_digest(payload) != payload.get("proposal_sha256"):
+            raise ValueError("Nội dung đề xuất đã thay đổi sau khi phê duyệt; từ chối áp dụng.")
+        return payload
+
+    def prepare_patch(self, changes: object, *, rationale: str) -> dict[str, Any]:
+        """Store a proposed source patch and create a pending ADMIN approval.
+
+        This method never changes repository source files.
+        """
+        reason = str(rationale or "").strip()
+        if not reason or len(reason) > 1200:
+            raise ValueError("Lý do bản vá phải từ 1 đến 1200 ký tự.")
+        normalized = _validate_patch_changes(self.root, changes)
+        patch_id = uuid4().hex
+        task_id = "chief-engineer-patch:" + patch_id
+        manifest: dict[str, Any] = {
+            "patch_id": patch_id,
+            "task_id": task_id,
+            "rationale": redact_sensitive_text(reason),
+            "changes": normalized,
+            "status": "awaiting_approval",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "approval_id": "",
+        }
+        manifest["proposal_sha256"] = _patch_manifest_digest(manifest)
+        manifest_path = self._patch_manifest_path(patch_id)
+        _write_json_atomic(manifest_path, manifest)
+        approval = self.approvals.create(
+            task_id=task_id,
+            skill_id=PATCH_SKILL_ID,
+            tool_id=PATCH_APPLY_TOOL,
+            arguments={"patch_id": patch_id, "proposal_sha256": manifest["proposal_sha256"]},
+            requester=AIOwnership.SYSTEM,
+            rationale=manifest["rationale"],
+            risk_level="high",
+        )
+        manifest["approval_id"] = approval.approval_id
+        _write_json_atomic(manifest_path, manifest)
+        return {
+            "patch_id": patch_id,
+            "approval_id": approval.approval_id,
+            "proposal_sha256": manifest["proposal_sha256"],
+            "status": manifest["status"],
+            "files": [item["path"] for item in normalized],
+            "source_changed": False,
+        }
+
+    def _apply_patch_tool(self, arguments: Mapping[str, Any]) -> dict[str, Any]:
+        if set(arguments) != {"patch_id", "proposal_sha256"}:
+            raise ValueError("Tham số áp dụng bản vá không hợp lệ.")
+        manifest = self._load_patch_manifest(arguments.get("patch_id"))
+        if manifest.get("status") != "awaiting_approval":
+            raise ValueError("Bản vá không còn ở trạng thái chờ phê duyệt.")
+        if arguments.get("proposal_sha256") != manifest.get("proposal_sha256"):
+            raise ValueError("Mã kiểm tra bản vá không khớp.")
+        approval_id = str(manifest.get("approval_id") or "")
+        approval = self.approvals.get(approval_id)
+        if (
+            approval.tool_id != PATCH_APPLY_TOOL
+            or approval.skill_id != PATCH_SKILL_ID
+            or approval.arguments != dict(arguments)
+            or approval.task_id != manifest.get("task_id")
+        ):
+            raise ValueError("Approval không khớp hồ sơ bản vá.")
+
+        # Revalidate every source hash immediately before taking backups.
+        normalized = _validate_patch_changes(self.root, manifest.get("changes"))
+        patch_backup_root = self.state_dir / "backups" / str(manifest["patch_id"])
+        patch_backup_root.mkdir(parents=True, exist_ok=False)
+        backups: list[dict[str, str]] = []
+        original_modes: dict[str, int] = {}
+        originals: dict[str, bytes] = {}
+        for item in normalized:
+            source_path = _resolve_patch_target(self.root, item["path"])
+            original = source_path.read_bytes()
+            original_sha = _sha256_bytes(original)
+            if original_sha != item["expected_sha256"]:
+                raise ValueError(f"Tệp nguồn thay đổi khi chuẩn bị backup: {item['path']}")
+            backup_path = patch_backup_root / item["path"]
+            _atomic_write_bytes(backup_path, original, mode=source_path.stat().st_mode & 0o777)
+            originals[item["path"]] = original
+            original_modes[item["path"]] = source_path.stat().st_mode & 0o777
+            backups.append({
+                "path": item["path"],
+                "backup_path": backup_path.relative_to(self.state_dir).as_posix(),
+                "sha256": original_sha,
+            })
+
+        manifest["backups"] = backups
+        manifest["status"] = "backed_up"
+        manifest["backed_up_at"] = datetime.now(timezone.utc).isoformat()
+        _write_json_atomic(self._patch_manifest_path(manifest["patch_id"]), manifest)
+
+        applied: list[str] = []
+        try:
+            for item in normalized:
+                source_path = _resolve_patch_target(self.root, item["path"])
+                # Close the time-of-check/time-of-use window as far as practical.
+                if _sha256_bytes(source_path.read_bytes()) != item["expected_sha256"]:
+                    raise ValueError(f"Tệp nguồn thay đổi trước khi ghi: {item['path']}")
+                _atomic_write_bytes(
+                    source_path,
+                    item["content"].encode("utf-8"),
+                    mode=original_modes[item["path"]],
+                )
+                applied.append(item["path"])
+        except Exception as exc:
+            rollback_errors: list[str] = []
+            for relative in reversed(applied):
+                try:
+                    source_path = _resolve_patch_target(self.root, relative)
+                    _atomic_write_bytes(source_path, originals[relative], mode=original_modes[relative])
+                except Exception as rollback_exc:
+                    rollback_errors.append(relative + ": " + type(rollback_exc).__name__)
+            manifest["status"] = "rollback_failed" if rollback_errors else "rolled_back"
+            manifest["failure"] = type(exc).__name__
+            manifest["rollback_errors"] = rollback_errors
+            _write_json_atomic(self._patch_manifest_path(manifest["patch_id"]), manifest)
+            if rollback_errors:
+                raise RuntimeError("Áp dụng bản vá lỗi và rollback chưa hoàn tất; cần kiểm tra backup.") from exc
+            raise RuntimeError("Áp dụng bản vá lỗi; các tệp đã ghi được khôi phục từ backup.") from exc
+
+        manifest["status"] = "applied"
+        manifest["applied_at"] = datetime.now(timezone.utc).isoformat()
+        manifest["applied_paths"] = list(applied)
+        _write_json_atomic(self._patch_manifest_path(manifest["patch_id"]), manifest)
+        return {
+            "patch_id": manifest["patch_id"],
+            "status": "applied",
+            "files": applied,
+            "backups": backups,
+        }
+
+    def approve_and_apply_patch(
+        self,
+        approval_id: str,
+        *,
+        admin_actor: str,
+        confirmation: str,
+    ):
+        """Approve and consume a pending patch exactly once after explicit confirmation."""
+        expected_confirmation = "APPLY PATCH " + str(approval_id or "").strip()
+        if confirmation != expected_confirmation:
+            raise ValueError("Xác nhận không khớp; bản vá chưa được phê duyệt hoặc áp dụng.")
+        if not str(admin_actor or "").strip():
+            raise ValueError("ADMIN actor là bắt buộc.")
+        approval = self.approvals.get(approval_id)
+        if approval.tool_id != PATCH_APPLY_TOOL or approval.skill_id != PATCH_SKILL_ID:
+            raise ValueError("Approval này không phải yêu cầu áp dụng bản vá.")
+        if approval.status.value != "pending":
+            raise ValueError("Approval không còn ở trạng thái chờ.")
+        manifest = self._load_patch_manifest(approval.arguments.get("patch_id"))
+        if (
+            manifest.get("approval_id") != approval_id
+            or manifest.get("task_id") != approval.task_id
+            or manifest.get("proposal_sha256") != approval.arguments.get("proposal_sha256")
+        ):
+            raise ValueError("Approval không khớp đề xuất bản vá.")
+        approved = self.approvals.approve(
+            approval_id,
+            admin_actor=admin_actor,
+            actor_owner=AIOwnership.ADMIN,
+        )
+        run = self.runtime.run(
+            task_id=approved.task_id,
+            skill_id=PATCH_SKILL_ID,
+            owner=AIOwnership.SYSTEM,
+            plan=(AIToolCall(PATCH_APPLY_TOOL, dict(approved.arguments)),),
+            approval_id=approved.approval_id,
+            approval_token=approved.execution_token,
+            max_steps=1,
+        )
+        if run.status.value != "completed":
+            raise RuntimeError("Agent không áp dụng được bản vá; trạng thái: " + run.status.value)
+        return run
+
+    def patch_status(self, patch_id: str) -> dict[str, Any]:
+        manifest = self._load_patch_manifest(patch_id)
+        return {
+            "patch_id": manifest["patch_id"],
+            "status": manifest.get("status", "unknown"),
+            "files": [item["path"] for item in manifest.get("changes", [])],
+            "approval_id": manifest.get("approval_id", ""),
+            "backups": manifest.get("backups", []),
+        }
+
     def _observe(self, _run: Any, _context: Any) -> Mapping[str, Any]:
         return {"recent_tool_observations": self.observations[-8:]}
 
