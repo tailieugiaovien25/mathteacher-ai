@@ -66,9 +66,12 @@ def test_planner_json_is_parsed_and_bounded():
     assert calls[0].tool_id == "engineer.git.status"
     assert parse_tool_plan("```json\n{\"tool_calls\": []}\n```") == ()
     assert parse_tool_plan('[{"tool_id":"engineer.git.status","arguments":{}}]')[0].tool_id == "engineer.git.status"
-    assert parse_tool_plan('"\\\\{\\\"tool_calls\\\":[]}"') == ()
+    assert parse_tool_plan('" {\\\"tool_calls\\\":[]} "') == ()
+    too_many = '{"tool_calls":[' + ','.join(
+        '{"tool_id":"engineer.git.status","arguments":{}}' for _ in range(7)
+    ) + ']}'
     with pytest.raises(ValueError, match="vượt giới hạn"):
-        parse_tool_plan('{"tool_calls":' + str([{"tool_id":"engineer.git.status","arguments":{}}] * 7) + '}')
+        parse_tool_plan(too_many)
 
 
 def test_planner_parser_explains_unexpected_json_shapes():
