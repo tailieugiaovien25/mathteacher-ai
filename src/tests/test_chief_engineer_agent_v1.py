@@ -195,6 +195,72 @@ def test_empty_model_plan_bootstraps_explicit_read_only_inspection(tmp_path: Pat
     )
 
 
+def test_explicit_read_file_objective_binds_validated_path_without_model_guessing(tmp_path: Path):
+    from ai_kernel import chief_engineer_agent as module
+
+    root = _repo(tmp_path)
+    target = root / "src" / "ai_kernel" / "agent_planner.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("class SafeAgentPlanner:\\n    pass\\n", encoding="utf-8")
+
+    class UnusedPlannerService:
+        calls = 0
+
+        def run(self, **_kwargs):
+            self.calls += 1
+            raise AssertionError("Explicit read target must not depend on model-generated path arguments.")
+
+    service = UnusedPlannerService()
+    agent = module.ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=tmp_path / "explicit-read-state",
+        service=service,
+        max_cycles=2,
+        allow_tests=False,
+    )
+    run = agent.run(
+        "Read src/ai_kernel/agent_planner.py and explain the planner. "
+        "Use the repository read_file tool."
+    )
+
+    assert run.status.value == "completed"
+    assert run.cycle_count == 2
+    assert len(run.agent_run_ids) == 1
+    assert service.calls == 0
+    read_results = [
+        item["result"]
+        for item in agent.observations
+        if isinstance(item, dict)
+        and item.get("tool_id") == "engineer.repo.read_file"
+    ]
+    assert len(read_results) == 1
+    assert read_results[0]["path"] == "src/ai_kernel/agent_planner.py"
+    assert "class SafeAgentPlanner" in read_results[0]["content"]
+    assert "explicit_read_file_path_binding" in [
+        item.get("planner_fallback")
+        for item in agent.observations
+        if isinstance(item, dict)
+    ]
+
+
+def test_explicit_read_file_objective_rejects_path_escape(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    agent = ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=tmp_path / "explicit-read-escape-state",
+        service=object(),
+        max_cycles=2,
+        allow_tests=False,
+    )
+    with pytest.raises(ValueError, match="vượt ra ngoài repository"):
+        agent.run(
+            "Read ../outside.py and explain the contents. "
+            "Use the repository read_file tool."
+        )
+
+
 def test_partial_model_plan_is_completed_to_full_read_only_inspection(tmp_path: Path, monkeypatch):
     from types import SimpleNamespace
     from ai_kernel import chief_engineer_agent as module
