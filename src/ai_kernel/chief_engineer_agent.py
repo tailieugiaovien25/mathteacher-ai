@@ -25,8 +25,8 @@ MAX_FILE_BYTES = 49152
 
 def redact_sensitive_text(value: object) -> str:
     """Remove credential-bearing lines and truncate opaque token-bearing output."""
-    labels = ("api_key", "api-key", "client_secret", "client-secret", "password",
-              "access_token", "access-token", "refresh_token", "refresh-token")
+    labels = ("api_key", "api-key", "client_secret", "client-secret", "secret", "password",
+              "token", "access_token", "access-token", "refresh_token", "refresh-token")
     token_markers = ("ghp_", "gho_", "ghs_", "ghu_", "ghr_", "sk-", "Bearer ")
     safe_lines = []
     for line in str(value or "").splitlines():
@@ -136,7 +136,15 @@ def validate_test_targets(root: Path, paths: object) -> list[str]:
 
 
 def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
-    payload = json.loads(str(raw or "").strip())
+    source = str(raw or "").strip()
+    if source.startswith("```"):
+        lines = source.splitlines()
+        if lines and lines[0].lstrip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        source = "\\n".join(lines).strip()
+    payload = json.loads(source)
     if not isinstance(payload, dict) or not isinstance(payload.get("tool_calls", []), list):
         raise ValueError("Kế hoạch AI không đúng cấu trúc JSON.")
     rows = payload.get("tool_calls", [])
@@ -233,9 +241,9 @@ class ChiefEngineerAgent:
             "Bạn là Chief Engineer của MathTeacher AI. Chỉ dùng tool trong allow-list. "
             "Không đề xuất shell command, sửa/xóa tệp, commit/push/merge/deploy hoặc đọc khóa bí mật. "
             "Trả về JSON thuần theo schema {tool_calls:[{tool_id,arguments}]}; "
-            "khi đủ bằng chứng trả tool_calls rỗng.\\n"
-            f"Mục tiêu: {context.objective}\\nChu kỳ: {context.cycle}\\n"
-            f"Allow-list: {json.dumps(available, ensure_ascii=False)}\\n"
+            "khi đủ bằng chứng trả tool_calls rỗng.\n"
+            f"Mục tiêu: {context.objective}\nChu kỳ: {context.cycle}\n"
+            f"Allow-list: {json.dumps(available, ensure_ascii=False)}\n"
             f"Kết quả: {json.dumps(self.observations[-8:], ensure_ascii=False)}"
         )
         response = self.service.run(task_id=f"{context.task_id}.planner.{context.cycle}",
