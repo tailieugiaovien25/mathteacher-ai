@@ -796,10 +796,12 @@ class ChiefEngineerAgent:
     def _observe(self, _run: Any, _context: Any) -> Mapping[str, Any]:
         return {"recent_tool_observations": self.observations[-8:]}
 
-    def _bootstrap_read_only_inspection(self, context: Any) -> tuple[AIToolCall, ...]:
-        """Recover an explicit first-cycle inspection request when a small model returns no calls."""
-        if int(getattr(context, "cycle", 0) or 0) != 1:
-            return ()
+    def _bootstrap_read_only_inspection(self, context: Any) -> tuple[AIToolCall, ...] | None:
+        """Return the remaining deterministic read-only steps for an explicit status+inventory objective.
+
+        None means this helper does not own the objective. An empty tuple means
+        the requested inspection is already complete and the planner should stop.
+        """
         objective = str(getattr(context, "objective", "") or "").casefold()
         has_inspection_verb = any(
             phrase in objective
@@ -813,14 +815,23 @@ class ChiefEngineerAgent:
             phrase in objective
             for phrase in ("inventory", "kiểm kê", "cấu trúc", "structure")
         )
-        if has_inspection_verb and has_status_intent and has_inventory_intent:
-            return (
-                AIToolCall("engineer.git.status", {}),
-                AIToolCall("engineer.repo.inventory", {}),
-            )
-        return ()
+        if not (has_inspection_verb and has_status_intent and has_inventory_intent):
+            return None
+        completed = set(getattr(context, "completed_tool_ids", ()) or ())
+        required = (
+            ("engineer.git.status", {}),
+            ("engineer.repo.inventory", {}),
+        )
+        return tuple(
+            AIToolCall(tool_id, arguments)
+            for tool_id, arguments in required
+            if tool_id not in completed
+        )
 
     def _plan(self, context: Any) -> tuple[AIToolCall, ...]:
+        required_inspection_calls = self._bootstrap_read_only_inspection(context)
+        if required_inspection_calls is not None and not required_inspection_calls:
+            return ()
         if self.service is None:
             from .service import AIKernelService
             self.service = AIKernelService()
@@ -853,13 +864,18 @@ class ChiefEngineerAgent:
             skill_id=self.SKILL_ID)
         try:
             calls = parse_tool_plan(getattr(response, "text", response), self.max_steps)
-            if not calls:
-                calls = self._bootstrap_read_only_inspection(context)
-                if calls:
+            if required_inspection_calls is not None:
+                proposed_ids = tuple(call.tool_id for call in calls)
+                required_ids = tuple(call.tool_id for call in required_inspection_calls)
+                if proposed_ids != required_ids:
                     self.observations.append({
                         "planner_fallback": "read_only_repository_inspection",
-                        "reason": "AI trả kế hoạch rỗng cho yêu cầu kiểm tra trạng thái và kiểm kê repository.",
+                        "reason": (
+                            "Chuẩn hóa kế hoạch theo yêu cầu kiểm tra trạng thái và kiểm kê; "
+                            "chỉ dùng các công cụ READ_ONLY còn thiếu."
+                        ),
                     })
+                calls = required_inspection_calls
             return calls
         except (ValueError, json.JSONDecodeError) as exc:
             provider = str(getattr(response, "provider", "unknown") or "unknown")
