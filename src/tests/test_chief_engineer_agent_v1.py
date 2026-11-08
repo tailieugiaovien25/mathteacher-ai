@@ -417,3 +417,39 @@ def test_no_tests_mode_removes_pytest_tool_from_registry(tmp_path: Path):
     assert "engineer.tests.run_pytest" not in tool_ids
     assert "engineer.git.status" in tool_ids
     assert "engineer.repo.inventory" in tool_ids
+
+
+
+def test_patch_preview_refuses_to_truncate_long_diff(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "large_module.py"
+    original_text = "".join(f"VALUE_{index:04d} = 1\n" for index in range(1400))
+    changed_text = "".join(f"VALUE_{index:04d} = 2\n" for index in range(1400))
+    source.write_text(original_text, encoding="utf-8")
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+    proposal = agent.prepare_patch([{
+        "path": "src/large_module.py",
+        "content": changed_text,
+        "expected_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+    }], rationale="Test full diff visibility.")
+    with pytest.raises(ValueError, match="chia bản vá"):
+        agent.patch_preview(proposal["patch_id"])
+    assert source.read_text(encoding="utf-8") == original_text
+
+
+def test_patch_refuses_source_containing_recognized_secret(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "secret_module.py"
+    original = 'API_KEY = "this-is-a-test-secret-value-12345"\n'
+    source.write_text(original, encoding="utf-8")
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=object())
+    with pytest.raises(ValueError, match="khóa bí mật"):
+        agent.prepare_patch([{
+            "path": "src/secret_module.py",
+            "content": "VALUE = 2\n",
+            "expected_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        }], rationale="Must reject source with embedded credentials.")
