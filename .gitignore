@@ -276,3 +276,6 @@ README_CAI_DAT_V28.txt
 README_CAI_DAT_V29.txt
 authoring-context-persistence-display-notifications-v30/
 cong-cu-soan-bai-modern-ui-v2/
+
+# MathTeacher AI local runtime state, audit logs and approvals
+.mathteacher_ai/
