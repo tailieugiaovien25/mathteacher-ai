@@ -33,7 +33,10 @@ $config = [ordered]@{
 }
 $config | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configPath -Encoding UTF8
 
-$powerShell = Join-Path $PSHOME "powershell.exe"
+$powerShell = (Get-Process -Id $PID).Path
+if (-not (Test-Path -LiteralPath $powerShell -PathType Leaf)) {
+    throw "Không xác định được PowerShell executable đang chạy."
+}
 $quotedRunner = '"' + $runner + '"'
 $quotedConfig = '"' + $configPath + '"'
 $arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File $quotedRunner -ConfigPath $quotedConfig"
