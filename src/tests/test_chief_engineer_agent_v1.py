@@ -65,8 +65,19 @@ def test_planner_json_is_parsed_and_bounded():
     assert len(calls) == 1
     assert calls[0].tool_id == "engineer.git.status"
     assert parse_tool_plan("```json\n{\"tool_calls\": []}\n```") == ()
-    with pytest.raises(ValueError):
-        parse_tool_plan('{"tool_calls":' + str([{}] * 7) + '}')
+    assert parse_tool_plan('[{"tool_id":"engineer.git.status","arguments":{}}]')[0].tool_id == "engineer.git.status"
+    assert parse_tool_plan('"\\\\{\\\"tool_calls\\\":[]}"') == ()
+    with pytest.raises(ValueError, match="vượt giới hạn"):
+        parse_tool_plan('{"tool_calls":' + str([{"tool_id":"engineer.git.status","arguments":{}}] * 7) + '}')
+
+
+def test_planner_parser_explains_unexpected_json_shapes():
+    with pytest.raises(ValueError, match="thiếu trường 'tool_calls'"):
+        parse_tool_plan('{"actions":[]}')
+    with pytest.raises(ValueError, match="phải là danh sách"):
+        parse_tool_plan('{"tool_calls":{"tool_id":"engineer.git.status"}}')
+    with pytest.raises(ValueError, match="kiểu dữ liệu nhận được: str"):
+        parse_tool_plan('"Không thể lập kế hoạch"')
 
 
 def test_tool_allowlist_has_no_write_or_governance_action():
