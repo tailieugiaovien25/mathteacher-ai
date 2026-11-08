@@ -227,6 +227,7 @@ def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
 def _patch_manifest_digest(manifest: Mapping[str, Any]) -> str:
     stable = {
         "patch_id": manifest["patch_id"],
+        "task_id": manifest["task_id"],
         "rationale": manifest["rationale"],
         "changes": manifest["changes"],
     }
@@ -701,7 +702,12 @@ class ChiefEngineerAgent:
         if self.service is None:
             from .service import AIKernelService
             self.service = AIKernelService()
-        available = [{"tool_id": x.tool_id, "description": x.description} for x in self.tools.specs()]
+        read_actions = {AIActionClass.READ_ONLY, AIActionClass.ADVISORY}
+        available = [
+            {"tool_id": spec.tool_id, "description": spec.description}
+            for spec in self.tools.specs()
+            if spec.allowed_actions.issubset(read_actions)
+        ]
         prompt = (
             "Bạn là Chief Engineer của MathTeacher AI. Chỉ dùng tool trong allow-list. "
             "Không đề xuất shell command, sửa/xóa tệp, commit/push/merge/deploy hoặc đọc khóa bí mật. "
