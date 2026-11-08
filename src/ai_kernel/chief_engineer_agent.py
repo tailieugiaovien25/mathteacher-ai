@@ -340,7 +340,7 @@ class ChiefEngineerAgent:
             capabilities=("coding", "repository"),
             requires_admin_approval=True,
         )
-        self.tools = AIToolRegistry((*chief_engineer_tool_specs(), patch_tool))
+        self.tools = AIToolRegistry((*chief_engineer_tool_specs(include_tests=self.allow_tests), patch_tool))
         self._bind_tools()
         self.runtime = SafeAgentRuntime(skills=skills, tools=self.tools,
             store=JSONAgentRunStore(self.state_dir / "agent_runs.json"),
