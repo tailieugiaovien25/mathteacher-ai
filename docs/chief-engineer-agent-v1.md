@@ -38,6 +38,16 @@ V2 can apply a proposed patch only when all checks below pass:
 
 No source patch is automatically applied by the model planner. The V1 inspection tool allow-list remains read-only. The separate maintenance tool is MUTATING and requires the existing Kernel approval flow.
 
+### Let the AI draft a proposal
+
+The configured AI Kernel can draft a full-file replacement for up to three explicitly selected Python files under src/. The combined source sent to the model is limited to 24,000 characters; files containing recognized credential patterns are refused. The model response is checked against the exact path allow-list and revalidated by the deterministic patch validator.
+
+Example:
+
+    python -m ai_kernel.chief_engineer_agent --repo-root "$PWD" --draft-patch-for "src/portal_v2/ui/example.py" --rationale "Sửa lỗi kiểm tra dữ liệu đầu vào"
+
+This command only creates a pending proposal, prints the generated diff, and reports patch_id/approval_id. It does not modify source files. Inspect the diff carefully before running the ADMIN approval command below.
+
 ### Prepare a proposal
 
 Create a UTF-8 JSON file (keep local proposal files under .mathteacher_ai/ so Git ignores them) with this shape:
