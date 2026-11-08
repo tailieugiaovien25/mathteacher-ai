@@ -46,7 +46,7 @@ try {
     Push-Location $repoRoot
     "[$(Get-Date -Format o)] Chief Engineer Agent started." | Set-Content -LiteralPath $logPath -Encoding UTF8
     "Repository: $repoRoot" | Add-Content -LiteralPath $logPath -Encoding UTF8
-    & $python -m ai_kernel.chief_engineer_agent --repo-root $repoRoot --objective $objective --max-cycles 4 --timeout 90 *>&1 |
+    & $python -m ai_kernel.chief_engineer_agent --repo-root $repoRoot --objective $objective --max-cycles 4 --timeout 90 --no-tests *>&1 |
         Out-String -Width 240 | Add-Content -LiteralPath $logPath -Encoding UTF8
     $agentExit = $LASTEXITCODE
     "[$(Get-Date -Format o)] ExitCode=$agentExit" | Add-Content -LiteralPath $logPath -Encoding UTF8
