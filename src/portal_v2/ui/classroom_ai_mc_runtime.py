@@ -54,10 +54,11 @@ box-shadow:0 12px 38px #0009">
   speech.speak(u);
  }
  function questionContext(){
-  const slide=document.querySelector('.question-slide.active');
+  const slide=document.querySelector('.question-slide.active') || [...document.querySelectorAll('.slide')].find(x=>getComputedStyle(x).display!=='none');
   if(!slide)return null;
+  const allSlides=[...document.querySelectorAll('.question-slide, .slide')];
   return {
-   index:Number(slide.dataset.index||0),
+   index:Math.max(0,allSlides.indexOf(slide)),
    question:slide.querySelector('h1')?.innerText?.trim().slice(0,3000)||'',
    options:[...slide.querySelectorAll('.mcq')].map(x=>x.innerText.trim().slice(0,500)),
    statements:[...slide.querySelectorAll('.truth')].map(x=>x.innerText.trim().slice(0,500))
@@ -110,22 +111,22 @@ box-shadow:0 12px 38px #0009">
     return source.encode("utf-8")
 
 
-def render_ai_integrated_gameshow(st: Any, html: bytes, slides: list[tuple[dict, dict]], *, session_id: str) -> None:
-    """Render Gameshow in a bidirectional Streamlit component and answer MC events."""
+def _render_ai_integrated_stage(st: Any, html: bytes, slides: list[tuple[dict, dict]], *, session_id: str, surface: str) -> None:
+    """Render a classroom stage in a bidirectional component and answer MC events."""
     import streamlit.components.v1 as components
 
     component_dir = Path(__file__).with_name("classroom_lucky_wheel_component")
-    component = components.declare_component("mathteacher_gameshow_ai_mc_v1", path=str(component_dir))
+    component = components.declare_component(f"mathteacher_{surface}_ai_mc_v1", path=str(component_dir))
     event = component(
         html=html.decode("utf-8"),
-        ai_response=st.session_state.get(f"gameshow_ai_response:{session_id}"),
-        key=f"classroom_gameshow_ai_component_{session_id}",
+        ai_response=st.session_state.get(f"{surface}_ai_response:{session_id}"),
+        key=f"classroom_{surface}_ai_component_{session_id}",
         default=None,
     )
     if not isinstance(event, dict) or event.get("action") not in {"announce", "student_answer"}:
         return
     event_id = str(event.get("event_id", ""))[:100]
-    processed_key = f"gameshow_ai_processed:{session_id}"
+    processed_key = f"{surface}_ai_processed:{session_id}"
     if not event_id or st.session_state.get(processed_key) == event_id:
         return
     st.session_state[processed_key] = event_id
@@ -181,5 +182,13 @@ def render_ai_integrated_gameshow(st: Any, html: bytes, slides: list[tuple[dict,
         import logging
         logging.getLogger(__name__).exception("Gameshow AI MC event rejected")
         text = "MC chưa xử lý được yêu cầu này. Mời giáo viên tiếp tục điều khiển Gameshow."
-    st.session_state[f"gameshow_ai_response:{session_id}"] = {"event_id": event_id, "text": text}
+    st.session_state[f"{surface}_ai_response:{session_id}"] = {"event_id": event_id, "text": text}
     st.rerun()
+
+
+def render_ai_integrated_gameshow(st: Any, html: bytes, slides: list[tuple[dict, dict]], *, session_id: str) -> None:
+    _render_ai_integrated_stage(st, html, slides, session_id=session_id, surface="gameshow")
+
+
+def render_ai_integrated_presentation(st: Any, html: bytes, slides: list[tuple[dict, dict]], *, session_id: str) -> None:
+    _render_ai_integrated_stage(st, html, slides, session_id=session_id, surface="presentation")
