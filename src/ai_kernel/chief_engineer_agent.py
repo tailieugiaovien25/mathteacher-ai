@@ -252,9 +252,17 @@ def _resolve_patch_target(root: Path, raw_path: object) -> Path:
     if not raw or chr(0) in raw or "\\" in raw:
         raise ValueError("Đường dẫn bản vá không hợp lệ.")
     candidate = Path(raw)
-    if candidate.is_absolute() or not raw.startswith("src/") or candidate.suffix.casefold() != ".py":
-        raise ValueError("Bản vá V2 chỉ được nhắm tới tệp Python hiện có bên trong src/.")
+    parts = raw.split("/")
+    if (
+        candidate.is_absolute()
+        or len(parts) < 2
+        or parts[0] != "src"
+        or any(part in {"", ".", ".."} for part in parts[1:])
+        or candidate.suffix.casefold() != ".py"
+    ):
+        raise ValueError("Bản vá V2 chỉ chấp nhận đường dẫn chuẩn tới tệp Python bên trong src/.")
     root = root.resolve()
+    src_root = root / "src"
     cursor = root
     for part in candidate.parts:
         cursor = cursor / part
@@ -263,8 +271,9 @@ def _resolve_patch_target(root: Path, raw_path: object) -> Path:
     resolved = cursor.resolve()
     try:
         relative = resolved.relative_to(root)
+        resolved.relative_to(src_root.resolve())
     except ValueError as exc:
-        raise ValueError("Đường dẫn bản vá vượt ra ngoài repository.") from exc
+        raise ValueError("Đường dẫn bản vá phải nằm hoàn toàn bên trong src/.") from exc
     if _sensitive(relative) or not resolved.is_file():
         raise ValueError("Tệp bản vá không tồn tại hoặc thuộc vùng bị bảo vệ.")
     if resolved.stat().st_size > PATCH_MAX_BYTES:
