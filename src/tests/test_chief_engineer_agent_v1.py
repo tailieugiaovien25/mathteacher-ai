@@ -145,6 +145,56 @@ def test_secret_scrubber_does_not_emit_common_credentials():
     assert "[REDACTED]" in cleaned
 
 
+def test_empty_model_plan_bootstraps_explicit_read_only_inspection(tmp_path: Path, monkeypatch):
+    from types import SimpleNamespace
+    from ai_kernel import chief_engineer_agent as module
+
+    root = _repo(tmp_path)
+    executed = []
+
+    def fake_command(argv, _root, _timeout):
+        executed.append(list(argv))
+        return {"returncode": 0, "output": "## test\n", "timed_out": False}
+
+    monkeypatch.setattr(module, "_command", fake_command)
+
+    class EmptyPlannerService:
+        def run(self, **_kwargs):
+            return SimpleNamespace(
+                text='{"tool_calls":[]}',
+                provider="ollama",
+                model="qwen3:0.6b",
+                profile_id="qwen3-local-0.6b",
+                used_fallback=False,
+            )
+
+    agent = module.ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=tmp_path / "empty-plan-state",
+        service=EmptyPlannerService(),
+        max_cycles=2,
+        allow_tests=False,
+    )
+    run = agent.run("Inspect repository status and inventory")
+
+    assert run.status.value == "completed"
+    assert len(run.agent_run_ids) == 1
+    assert executed == [["git", "status", "--short", "--branch"]]
+    observed_tools = {
+        item.get("tool_id")
+        for item in agent.observations
+        if isinstance(item, dict) and item.get("tool_id")
+    }
+    assert observed_tools == {
+        "engineer.git.status",
+        "engineer.repo.inventory",
+    }
+    assert any(
+        item.get("planner_fallback") == "read_only_repository_inspection"
+        for item in agent.observations
+    )
+
+
 def test_chief_engineer_agent_completes_a_bounded_read_only_cycle(tmp_path: Path):
     from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
 
