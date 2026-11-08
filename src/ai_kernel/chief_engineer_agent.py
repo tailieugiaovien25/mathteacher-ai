@@ -601,23 +601,64 @@ class ChiefEngineerAgent:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="MathTeacher AI Chief Engineer Agent V1")
+    parser = argparse.ArgumentParser(description="MathTeacher AI Chief Engineer Agent V2")
     parser.add_argument("--repo-root", required=True)
-    parser.add_argument("--objective", required=True)
+    command = parser.add_mutually_exclusive_group(required=True)
+    command.add_argument("--objective", help="Chạy kiểm tra repository bằng AI Planner.")
+    command.add_argument("--prepare-patch-file", help="Đọc JSON patch proposal và tạo yêu cầu ADMIN approval.")
+    command.add_argument("--approve-patch-id", help="Phê duyệt và áp dụng patch ID sau khi xác nhận tương tác.")
+    parser.add_argument("--admin-actor", default="", help="Mã định danh ADMIN trong nhật ký phê duyệt.")
     parser.add_argument("--max-cycles", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=90)
     args = parser.parse_args(argv)
     try:
-        run = ChiefEngineerAgent(repo_root=args.repo_root, max_cycles=args.max_cycles, timeout=args.timeout).run(args.objective)
-        print(json.dumps({"run_id": run.run_id, "status": run.status.value,
-            "cycles": run.cycle_count, "stop_reason": run.stop_reason,
-            "approval_ids": list(run.approval_ids)}, ensure_ascii=False, indent=2))
+        agent = ChiefEngineerAgent(
+            repo_root=args.repo_root,
+            max_cycles=args.max_cycles,
+            timeout=args.timeout,
+        )
+        if args.prepare_patch_file:
+            proposal_path = Path(args.prepare_patch_file).expanduser().resolve()
+            payload = json.loads(proposal_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict) or set(payload) != {"rationale", "changes"}:
+                raise ValueError("JSON patch proposal phải có đúng rationale và changes.")
+            result = agent.prepare_patch(payload["changes"], rationale=payload["rationale"])
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        if args.approve_patch_id:
+            if not args.admin_actor.strip():
+                raise ValueError("--admin-actor là bắt buộc khi áp dụng patch.")
+            expected = "APPLY PATCH " + args.approve_patch_id.strip()
+            confirmation = input("Để phê duyệt và áp dụng, hãy nhập chính xác: " + expected + "\n> ")
+            run = agent.approve_and_apply_patch(
+                args.approve_patch_id,
+                admin_actor=args.admin_actor,
+                confirmation=confirmation,
+            )
+            print(json.dumps({
+                "run_id": run.run_id,
+                "status": run.status.value,
+                "approval_id": args.approve_patch_id,
+                "patch": agent.patch_status(agent.approvals.get(args.approve_patch_id).arguments["patch_id"]),
+                "execution_token": "[NOT DISPLAYED]",
+            }, ensure_ascii=False, indent=2))
+            return 0
+        run = agent.run(args.objective)
+        print(json.dumps({
+            "run_id": run.run_id,
+            "status": run.status.value,
+            "cycles": run.cycle_count,
+            "stop_reason": run.stop_reason,
+            "approval_ids": list(run.approval_ids),
+        }, ensure_ascii=False, indent=2))
         return 0 if run.status.value == "completed" else 2
     except Exception as exc:
-        print(json.dumps({"status": "failed", "error_type": type(exc).__name__,
-            "message": redact_sensitive_text(exc)}, ensure_ascii=False, indent=2))
+        print(json.dumps({
+            "status": "failed",
+            "error_type": type(exc).__name__,
+            "message": redact_sensitive_text(exc),
+        }, ensure_ascii=False, indent=2))
         return 2
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
