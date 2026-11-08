@@ -314,3 +314,57 @@ def test_patch_failure_rolls_back_already_written_files(tmp_path: Path, monkeypa
     assert second.read_bytes() == originals[second]
     assert agent.patch_status(prepared["patch_id"])["status"] == "rolled_back"
     assert agent.approvals.get(prepared["approval_id"]).status.value == "failed"
+
+
+
+def test_ai_drafts_patch_but_never_changes_source_before_approval(tmp_path: Path):
+    import json
+    from types import SimpleNamespace
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "engine.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    original = source.read_bytes()
+
+    class FakeKernelService:
+        def run(self, **_kwargs):
+            return SimpleNamespace(text=json.dumps({
+                "changes": [{"path": "src/engine.py", "content": "VALUE = 2\n"}]
+            }))
+
+    agent = ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=tmp_path / "state",
+        service=FakeKernelService(),
+    )
+    result = agent.draft_patch(
+        ["src/engine.py"],
+        rationale="Cập nhật giá trị trong tệp thử nghiệm.",
+    )
+    assert result["generated_by_ai"] is True
+    assert result["source_changed"] is False
+    assert source.read_bytes() == original
+    assert "-VALUE = 1" in agent.patch_preview(result["patch_id"])
+    assert "+VALUE = 2" in agent.patch_preview(result["patch_id"])
+
+
+def test_ai_draft_cannot_escape_selected_source_files(tmp_path: Path):
+    import json
+    from types import SimpleNamespace
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    source = root / "src" / "engine.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+
+    class FakeKernelService:
+        def run(self, **_kwargs):
+            return SimpleNamespace(text=json.dumps({
+                "changes": [{"path": "../outside.py", "content": "VALUE = 2\n"}]
+            }))
+
+    agent = ChiefEngineerAgent(repo_root=root, state_dir=tmp_path / "state", service=FakeKernelService())
+    with pytest.raises(ValueError):
+        agent.draft_patch(["src/engine.py"], rationale="Path allowlist.")
+    assert source.read_text(encoding="utf-8") == "VALUE = 1\n"
