@@ -1,0 +1,35 @@
+name: Chief Engineer Agent tests
+
+on:
+  push:
+    branches:
+      - feature/chief-engineer-agent-v1
+    paths:
+      - "src/ai_kernel/chief_engineer_agent.py"
+      - "src/tests/test_chief_engineer_agent_v1.py"
+      - ".github/workflows/chief-engineer-agent.yml"
+  pull_request:
+    paths:
+      - "src/ai_kernel/chief_engineer_agent.py"
+      - "src/tests/test_chief_engineer_agent_v1.py"
+      - ".github/workflows/chief-engineer-agent.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  chief-engineer-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install pytest==8.4.2
+      - name: Run Chief Engineer Agent safety tests
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m pytest -q -p no:cacheprovider src/tests/test_chief_engineer_agent_v1.py
