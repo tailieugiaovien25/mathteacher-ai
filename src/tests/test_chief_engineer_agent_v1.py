@@ -400,3 +400,20 @@ def test_agent_resumes_approved_but_unclaimed_patch(tmp_path: Path, monkeypatch)
     )
     assert run.status.value == "completed"
     assert source.read_text(encoding="utf-8") == "VALUE = 2\n"
+
+
+
+def test_no_tests_mode_removes_pytest_tool_from_registry(tmp_path: Path):
+    from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+
+    root = _repo(tmp_path)
+    agent = ChiefEngineerAgent(
+        repo_root=root,
+        state_dir=tmp_path / "state-no-tests",
+        service=object(),
+        allow_tests=False,
+    )
+    tool_ids = {spec.tool_id for spec in agent.tools.specs()}
+    assert "engineer.tests.run_pytest" not in tool_ids
+    assert "engineer.git.status" in tool_ids
+    assert "engineer.repo.inventory" in tool_ids
