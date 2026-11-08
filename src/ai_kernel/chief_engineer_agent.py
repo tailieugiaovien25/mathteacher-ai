@@ -828,7 +828,36 @@ class ChiefEngineerAgent:
             if tool_id not in completed
         )
 
+    def _bootstrap_explicit_read_file(self, context: Any) -> tuple[AIToolCall, ...] | None:
+        """Bind an explicitly requested repository file to the safe read_file tool."""
+        objective = str(getattr(context, "objective", "") or "")
+        lowered = objective.casefold()
+        if not any(marker in lowered for marker in ("read_file", "read file tool", "repository read file")):
+            return None
+        match = re.search(
+            r"(?i)\\b(?:read|open)\\s+((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\\.(?:py|md|toml|yml|yaml))\\b",
+            objective,
+        )
+        if not match:
+            return None
+        # Resolve and validate before constructing a tool call. This preserves
+        # the existing extension, sensitive-path, symlink, and repository bounds.
+        target = resolve_repository_file(self.root, match.group(1))
+        relative = target.relative_to(self.root).as_posix()
+        completed = set(getattr(context, "completed_tool_ids", ()) or ())
+        if "engineer.repo.read_file" in completed:
+            return ()
+        return (AIToolCall("engineer.repo.read_file", {"path": relative}),)
+
     def _plan(self, context: Any) -> tuple[AIToolCall, ...]:
+        required_file_calls = self._bootstrap_explicit_read_file(context)
+        if required_file_calls is not None:
+            if required_file_calls:
+                self.observations.append({
+                    "planner_fallback": "explicit_read_file_path_binding",
+                    "reason": "Đường dẫn tệp được trích từ mục tiêu và xác minh trước khi gọi read_file.",
+                })
+            return required_file_calls
         required_inspection_calls = self._bootstrap_read_only_inspection(context)
         if required_inspection_calls is not None and not required_inspection_calls:
             return ()
