@@ -14,6 +14,10 @@ on:
       - ".github/workflows/chief-engineer-agent.yml"
       - "scripts/chief_engineer/**"
       - "docs/chief-engineer-agent-v1.md"
+      - "src/portal_v2/ui/admin_chief_engineer_agent_streamlit.py"
+      - "src/portal_v2/ui/admin_navigation.py"
+      - "src/portal_v2/ui/admin_shell.py"
+      - "src/portal_v2/ui/workspace_navigation.py"
       - ".gitignore"
   pull_request:
     paths:
@@ -24,6 +28,10 @@ on:
       - ".github/workflows/chief-engineer-agent.yml"
       - "scripts/chief_engineer/**"
       - "docs/chief-engineer-agent-v1.md"
+      - "src/portal_v2/ui/admin_chief_engineer_agent_streamlit.py"
+      - "src/portal_v2/ui/admin_navigation.py"
+      - "src/portal_v2/ui/admin_shell.py"
+      - "src/portal_v2/ui/workspace_navigation.py"
       - ".gitignore"
 
 permissions:

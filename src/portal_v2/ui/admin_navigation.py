@@ -31,6 +31,7 @@ ADMIN_PAGE_MARKETING_AI = "marketing_ai"
 ADMIN_PAGE_AI_APPROVAL_CENTER = "ai_approval_center"
 ADMIN_PAGE_AI_RUNTIME_CENTER = "ai_runtime_center"
 ADMIN_PAGE_AI_AUTONOMOUS_CENTER = "ai_autonomous_center"
+ADMIN_PAGE_CHIEF_ENGINEER_AGENT = "chief_engineer_agent"
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,7 @@ ADMIN_PORTAL_PAGES = (
         "Trung tâm điều phối giáo án",
     ),
     AdminPortalPage(ADMIN_PAGE_SYSTEM_ADMIN_AI, "AI Quản trị hệ thống"),
+    AdminPortalPage(ADMIN_PAGE_CHIEF_ENGINEER_AGENT, "AI Agent"),
     AdminPortalPage(ADMIN_PAGE_MARKETING_AI, "AI Marketing"),
     AdminPortalPage(ADMIN_PAGE_AI_APPROVAL_CENTER, "AI Approval Center"),
     AdminPortalPage(ADMIN_PAGE_AI_RUNTIME_CENTER, "AI Runtime & Model Center"),

@@ -53,6 +53,7 @@ from portal_v2.ui.admin_marketing_ai_streamlit import render_admin_marketing_ai
 from portal_v2.ui.admin_ai_approval_center_streamlit import render_admin_ai_approval_center
 from portal_v2.ui.admin_ai_runtime_center_streamlit import render_admin_ai_runtime_center
 from portal_v2.ui.admin_ai_autonomous_center_streamlit import render_admin_ai_autonomous_center
+from portal_v2.ui.admin_chief_engineer_agent_streamlit import render_admin_chief_engineer_agent
 
 from portal_v2.ui.admin_navigation import (
     ADMIN_PAGE_ACADEMIC_YEAR_CONFIGURATION,
@@ -64,6 +65,7 @@ from portal_v2.ui.admin_navigation import (
     ADMIN_PAGE_AI_APPROVAL_CENTER,
     ADMIN_PAGE_AI_RUNTIME_CENTER,
     ADMIN_PAGE_AI_AUTONOMOUS_CENTER,
+    ADMIN_PAGE_CHIEF_ENGINEER_AGENT,
     ADMIN_PAGE_ASSESSMENT_TEMPLATES,
     ADMIN_PAGE_ASSESSMENT_REVIEWS,
     ADMIN_PAGE_MATH6_ASSESSMENT,
@@ -585,6 +587,10 @@ def render_admin_page(
 
     if page.page_id == ADMIN_PAGE_AI_AUTONOMOUS_CENTER:
         render_admin_ai_autonomous_center(st, admin_actor=authorization.user_id)
+        return
+
+    if page.page_id == ADMIN_PAGE_CHIEF_ENGINEER_AGENT:
+        render_admin_chief_engineer_agent(st, admin_actor=authorization.user_id)
         return
 
     renderers = {

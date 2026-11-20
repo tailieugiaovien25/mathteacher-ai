@@ -96,6 +96,7 @@ _ADMIN_GROUPS = {
     "ai_approval_center": "Vận hành",
     "ai_runtime_center": "Vận hành",
     "ai_autonomous_center": "Vận hành",
+    "chief_engineer_agent": "Vận hành",
     "math_question_reviews": "Nội dung & duyệt",
 }
 

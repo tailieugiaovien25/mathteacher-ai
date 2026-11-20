@@ -11,6 +11,8 @@ The Agent reuses the existing AI Kernel:
 
 ## Read-only inspection
 
+ADMIN can open **AI Agent** from the Streamlit sidebar to submit a bounded repository-inspection objective and review the run status and tool log. The page is available only in the ADMIN area, honors `SYSTEM_ADMIN_AI_ENABLED`, and does not expose test execution or source patching.
+
 The observer allow-list contains:
 - Git branch/worktree status and diff statistics.
 - Bounded repository inventory; skips secret/configuration folders, virtual environments, caches, dependencies and local AI state.
