@@ -51,6 +51,28 @@ Nếu dùng Ollama Cloud, đặt thêm các khóa `MATH_TEACHER_AI_PROVIDER`,
 Không dùng endpoint `127.0.0.1` trên Cloud vì endpoint đó trỏ tới chính máy chủ
 của ứng dụng, không phải Ollama đang chạy trên máy cá nhân.
 
+### Fallback Qwen 3 0.6B trên máy cá nhân
+
+Fallback chỉ dùng được khi chạy Teacher Portal trên chính máy có Ollama. Cloud
+không thể kết nối tới `localhost` của PC người dùng. Cài/chạy Ollama và tải model
+`qwen3:0.6b`, rồi trên máy cá nhân đặt biến môi trường
+`MATH_TEACHER_AI_LOCAL_FALLBACK_ENABLED=true` trước khi chạy Streamlit. Khi
+Ollama Cloud trả HTTP 402, AI Agent sẽ dùng profile `qwen3-local-0.6b` nếu ADMIN
+đã bật profile đó và Ollama local đang sẵn sàng. Fallback này chỉ áp dụng cho
+Chief Engineer Agent; AI khác không tự đổi model.
+
+Ví dụ trong Windows PowerShell:
+
+```powershell
+ollama pull qwen3:0.6b
+$env:MATH_TEACHER_AI_LOCAL_FALLBACK_ENABLED = "true"
+streamlit run streamlit_app.py
+```
+
+Nếu chạy portal local, đặt secrets cần thiết trong `.streamlit/secrets.toml`
+trên máy đó; không commit file này. Trong **AI Runtime & Model Center**, giữ
+profile `qwen3-local-0.6b` trong allow-list/fallback.
+
 Sau khi ứng dụng khởi động lại, ADMIN mở **AI Agent**, nhập mục tiêu khảo sát
 repository rồi chọn **Chạy AI Agent**. Trang chỉ cho phép thao tác đọc; nếu
 provider chưa kết nối, kiểm tra **AI Runtime & Model Center** và cấu hình Secrets.

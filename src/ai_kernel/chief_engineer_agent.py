@@ -891,6 +891,13 @@ class ChiefEngineerAgent:
             owner=AIOwnership.SYSTEM, action=AIActionClass.ADVISORY,
             metadata={"interface": "chief_engineer_agent", "mutating": "false"},
             skill_id=self.SKILL_ID)
+        if bool(getattr(response, "used_fallback", False)):
+            self.observations.append({
+                "provider_fallback": True,
+                "provider": str(getattr(response, "provider", "ollama") or "ollama"),
+                "model": str(getattr(response, "model", "") or ""),
+                "profile_id": str(getattr(response, "profile_id", "") or ""),
+            })
         try:
             calls = parse_tool_plan(getattr(response, "text", response), self.max_steps)
             if required_inspection_calls is not None:

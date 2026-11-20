@@ -82,6 +82,13 @@ def render_admin_chief_engineer_agent(st: Any, *, admin_actor: str) -> None:
                 }
             except OllamaProviderError as exc:
                 st.error(f"Không thể gọi Ollama. {exc}")
+                if exc.status_code == 402:
+                    st.info(
+                        "Để dùng Qwen 3 0.6B trên máy cá nhân, chạy ứng dụng Streamlit "
+                        "trên cùng máy với Ollama, tải model qwen3:0.6b và bật "
+                        "MATH_TEACHER_AI_LOCAL_FALLBACK_ENABLED=true. Trang Streamlit Cloud "
+                        "không thể truy cập Ollama trên PC cá nhân."
+                    )
             except Exception as exc:
                 st.error(
                     "Không thể chạy AI Agent. Hãy kiểm tra AI Runtime & Model Center "

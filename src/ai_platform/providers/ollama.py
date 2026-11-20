@@ -8,7 +8,9 @@ from ai_platform.contracts import AIRequest, AIResponse
 
 
 class OllamaProviderError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def _http_error_message(status: int) -> str:
@@ -17,6 +19,7 @@ def _http_error_message(status: int) -> str:
         401: "Ollama từ chối xác thực; kiểm tra OLLAMA_API_KEY trong Secrets của ứng dụng.",
         403: "API key không có quyền gọi model này; kiểm tra quyền hoặc gói Ollama Cloud.",
         404: "Không tìm thấy endpoint hoặc model; kiểm tra OLLAMA_BASE_URL và tên model.",
+        402: "Ollama Cloud yêu cầu thanh toán hoặc đã hết credit.",
         429: "Ollama đang giới hạn tốc độ hoặc tài khoản đã hết quota; thử lại sau hoặc kiểm tra usage.",
     }
     return f"Ollama HTTP {status}: {details.get(status, 'Kiểm tra cấu hình endpoint và model trong AI Runtime & Model Center.')}"
@@ -102,7 +105,7 @@ class OllamaProvider:
         try:
             response = request.urlopen(req, timeout=self.timeout_seconds)
         except error.HTTPError as exc:
-            raise OllamaProviderError(_http_error_message(exc.code)) from exc
+            raise OllamaProviderError(_http_error_message(exc.code), status_code=exc.code) from exc
         except (error.URLError, TimeoutError) as exc:
             raise OllamaProviderError("Không kết nối được Ollama local.") from exc
 
@@ -142,7 +145,7 @@ class OllamaProvider:
             with request.urlopen(req, timeout=self.timeout_seconds) as response:
                 raw = json.loads(response.read().decode("utf-8"))
         except error.HTTPError as exc:
-            raise OllamaProviderError(_http_error_message(exc.code)) from exc
+            raise OllamaProviderError(_http_error_message(exc.code), status_code=exc.code) from exc
         except (error.URLError, TimeoutError) as exc:
             raise OllamaProviderError("KhÃ´ng káº¿t ná»‘i Ä‘Æ°á»£c Ollama local.") from exc
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:

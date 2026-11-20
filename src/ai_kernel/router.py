@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Callable
 
 from ai_platform.contracts import AIProvider, AIRequest
-from ai_platform.providers.ollama import OllamaProvider
+from ai_platform.providers.ollama import OllamaProvider, OllamaProviderError
 
 from .audit import make_audit_event
 from .contracts import AIKernelRequest, AIKernelResponse
@@ -100,6 +101,74 @@ class AIRouter:
             raise RuntimeError(f"ChÆ°a cÃ³ provider cho profile {profile.profile_id}.")
         return self.provider
 
+    def _try_local_agent_fallback(
+        self,
+        request: AIKernelRequest,
+        ai_request: AIRequest,
+        primary_error: OllamaProviderError,
+    ) -> tuple[ModelProfile, object] | None:
+        enabled = os.getenv("MATH_TEACHER_AI_LOCAL_FALLBACK_ENABLED", "").strip().casefold()
+        if (
+            primary_error.status_code != 402
+            or enabled not in {"1", "true", "yes", "on"}
+            or request.metadata.get("interface") != "chief_engineer_agent"
+            or self.runtime_manager is None
+        ):
+            return None
+
+        fallback_profile = next(
+            (
+                profile
+                for profile in self.runtime_manager.fallback_profiles()
+                if profile.profile_id == "qwen3-local-0.6b"
+                and profile.provider == "ollama"
+            ),
+            None,
+        )
+        if fallback_profile is None:
+            raise OllamaProviderError(
+                "Ollama Cloud hết credit; Qwen 3 0.6B chưa được ADMIN bật làm fallback."
+            ) from primary_error
+
+        local_url = (
+            os.getenv("MATH_TEACHER_AI_LOCAL_OLLAMA_URL", "http://127.0.0.1:11434")
+            .strip()
+            .rstrip("/")
+        )
+        local_provider = OllamaProvider(
+            base_url=local_url,
+            model=fallback_profile.model,
+        )
+        if not local_provider.health():
+            raise OllamaProviderError(
+                "Ollama Cloud hết credit nhưng không kết nối được Ollama local tại "
+                f"{local_url}. Bản chạy Streamlit Cloud không thể truy cập Ollama trên PC cá nhân."
+            ) from primary_error
+        if fallback_profile.model not in local_provider.list_models():
+            raise OllamaProviderError(
+                "Ollama Cloud hết credit nhưng máy local chưa có model qwen3:0.6b; "
+                "hãy chạy `ollama pull qwen3:0.6b`."
+            ) from primary_error
+
+        fallback_request = AIRequest(
+            task=ai_request.task,
+            prompt=ai_request.prompt,
+            system_prompt=ai_request.system_prompt,
+            metadata={
+                **dict(ai_request.metadata),
+                "profile_id": fallback_profile.profile_id,
+                "ollama_num_ctx": str(fallback_profile.context_window),
+                "provider_fallback_from": "ollama-cloud-http-402",
+            },
+        )
+        try:
+            return fallback_profile, local_provider.generate(fallback_request)
+        except OllamaProviderError as fallback_error:
+            raise OllamaProviderError(
+                "Ollama Cloud hết credit và Qwen 3 0.6B local cũng thất bại: "
+                f"{fallback_error}"
+            ) from primary_error
+
     def stream(self, request: AIKernelRequest):
         decision = self.choose(request)
         event = make_audit_event(request, decision.profile.profile_id)
@@ -146,26 +215,32 @@ class AIRouter:
         if decision.profile.provider == "ollama":
             provider_metadata["ollama_num_ctx"] = str(decision.profile.context_window)
 
-        ai_response = provider.generate(
-            AIRequest(
-                task=request.task_id,
-                prompt=request.prompt,
-                system_prompt=(
-                    "MathTeacher AI Kernel. TuÃ¢n thá»§ governance: "
-                    "khÃ´ng tá»± sá»­a code lÃµi, khÃ´ng tá»± Ä‘á»•i policy, "
-                    "khÃ´ng tá»± thá»±c hiá»‡n thao tÃ¡c production. "
-                    "Chá»‰ Ä‘Æ°a ra káº¿t luáº­n dá»±a trÃªn báº±ng chá»©ng Ä‘Ã£ cung cáº¥p."
-                ),
-                metadata=provider_metadata,
-            )
+        ai_request = AIRequest(
+            task=request.task_id,
+            prompt=request.prompt,
+            system_prompt=(
+                "MathTeacher AI Kernel. Tuân thủ governance: "
+                "không tự sửa code lõi, không tự đổi policy, "
+                "không tự thực hiện thao tác production. "
+                "Chỉ đưa ra kết luận dựa trên bằng chứng đã cung cấp."
+            ),
+            metadata=provider_metadata,
         )
+        response_profile = decision.profile
+        try:
+            ai_response = provider.generate(ai_request)
+        except OllamaProviderError as exc:
+            fallback = self._try_local_agent_fallback(request, ai_request, exc)
+            if fallback is None:
+                raise
+            response_profile, ai_response = fallback
         return AIKernelResponse(
             text=ai_response.text,
             provider=ai_response.provider,
             model=ai_response.model,
-            profile_id=decision.profile.profile_id,
+            profile_id=response_profile.profile_id,
             task_id=request.task_id,
             audit_id=event.audit_id,
             action=request.action,
-            used_fallback=ai_response.used_fallback,
+            used_fallback=ai_response.used_fallback or response_profile != decision.profile,
         )
