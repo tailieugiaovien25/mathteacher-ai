@@ -5,6 +5,7 @@ from typing import Any
 
 from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
 from ai_platform.config import AIPlatformConfig
+from ai_platform.providers.ollama import OllamaProviderError
 
 
 _RESULT_KEY = "chief_engineer_agent_ui_result"
@@ -79,6 +80,8 @@ def render_admin_chief_engineer_agent(st: Any, *, admin_actor: str) -> None:
                     "approval_ids": list(run.approval_ids),
                     "observations": list(agent.observations),
                 }
+            except OllamaProviderError as exc:
+                st.error(f"Không thể gọi Ollama. {exc}")
             except Exception as exc:
                 st.error(
                     "Không thể chạy AI Agent. Hãy kiểm tra AI Runtime & Model Center "
