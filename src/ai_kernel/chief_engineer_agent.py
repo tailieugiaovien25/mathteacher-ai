@@ -926,6 +926,21 @@ class ChiefEngineerAgent:
                         ),
                     })
                 calls = required_inspection_calls
+            elif not calls and context.cycle == 1:
+                # A valid empty plan is still a no-op for a fresh repository
+                # inspection. Collect a small read-only baseline so the Agent
+                # cannot report completion without any evidence.
+                calls = (
+                    AIToolCall("engineer.git.status", {}),
+                    AIToolCall("engineer.repo.inventory", {}),
+                )
+                self.observations.append({
+                    "planner_fallback": "read_only_repository_inspection",
+                    "reason": (
+                        "Planner trả kế hoạch rỗng; Agent tự đọc Git status và kiểm kê "
+                        "repository để tạo bằng chứng tối thiểu."
+                    ),
+                })
             return calls
         except (ValueError, json.JSONDecodeError) as exc:
             provider = str(getattr(response, "provider", "unknown") or "unknown")
