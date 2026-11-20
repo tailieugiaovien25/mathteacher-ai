@@ -293,7 +293,11 @@ def _render_teaching_chat(st: Any, *, user_id: str | None, teacher_control: bool
         answer = str(response or "").strip()
         if not answer:
             raise RuntimeError("AI Kernel returned an empty response")
-    except Exception:
+    except Exception as exc:
+        # Keep the friendly UI fallback, but record only privacy-safe diagnostics.
+        from portal_v2.ai_diagnostics import log_teaching_assistant_failure
+
+        log_teaching_assistant_failure(exc, mode=mode)
         answer = (
             "Em chưa thể trả lời lúc này. Con thử gửi lại sau ít phút nhé."
             if mode == "student"
