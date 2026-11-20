@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ai_kernel.chief_engineer_agent import ChiefEngineerAgent
+from ai_kernel.chief_engineer_agent import ChiefEngineerAgent, redact_sensitive_text
 from ai_platform.config import AIPlatformConfig
 from ai_platform.providers.ollama import OllamaProviderError
 
@@ -63,6 +63,9 @@ def render_admin_chief_engineer_agent(st: Any, *, admin_actor: str) -> None:
         if not objective.strip():
             st.error("Hãy nhập mục tiêu khảo sát.")
         else:
+            # Do not leave a previous successful run on screen after the new
+            # request failed; it can make the error look unrelated.
+            st.session_state.pop(_RESULT_KEY, None)
             try:
                 with st.spinner("AI Agent đang khảo sát repository…"):
                     agent = ChiefEngineerAgent(
@@ -90,9 +93,14 @@ def render_admin_chief_engineer_agent(st: Any, *, admin_actor: str) -> None:
                         "không thể truy cập Ollama trên PC cá nhân."
                     )
             except Exception as exc:
+                safe_details = redact_sensitive_text(exc)[:1000]
                 st.error(
                     "Không thể chạy AI Agent. Hãy kiểm tra AI Runtime & Model Center "
-                    f"và cấu hình provider. Loại lỗi: {type(exc).__name__}."
+                    f"và cấu hình provider. Loại lỗi: {type(exc).__name__}: {safe_details}"
+                )
+                st.info(
+                    "Agent chỉ đọc repository và không chạy kiểm thử. Nếu mục tiêu cần "
+                    "kiểm tra bằng test, hãy yêu cầu ADMIN chạy kiểm thử riêng."
                 )
 
     result = st.session_state.get(_RESULT_KEY)
