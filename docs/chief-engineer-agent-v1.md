@@ -15,13 +15,13 @@ The observer allow-list contains:
 - Git branch/worktree status and diff statistics.
 - Bounded repository inventory; skips secret/configuration folders, virtual environments, caches, dependencies and local AI state.
 - Reading selected Python, TOML, Markdown and YAML files inside the repository with size limits and credential scrubbing.
-- Running at most five explicitly selected test_*.py files beneath src/tests/ using a fixed Python pytest argument vector and a timeout. Arbitrary shell commands are not accepted.
+- The pytest tool is disabled by default because repository tests can have side effects. Enable it explicitly with `--allow-tests`; it can then run at most five selected `test_*.py` files beneath `src/tests/` using a fixed Python argument vector and timeout. Arbitrary shell commands are not accepted.
 
 Run from the project root in Windows PowerShell:
 
     .\.venv\Scripts\Activate.ps1
     $env:PYTHONPATH = "$PWD\src"
-    python -m ai_kernel.chief_engineer_agent --repo-root "$PWD" --objective "Kiểm tra trạng thái Git, kiểm kê mã nguồn và kiểm thử liên quan"
+    python -m ai_kernel.chief_engineer_agent --repo-root "$PWD" --objective "Kiểm tra trạng thái Git, kiểm kê mã nguồn và kiểm thử liên quan" --allow-tests
 
 The Agent uses the AI provider/model configured for the existing AI Kernel. Do not paste API keys into command arguments, patch proposals, or reports.
 

@@ -261,7 +261,7 @@ def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
     return tuple(calls)
 
 
-def chief_engineer_tool_specs(*, include_tests: bool = True) -> tuple[AIToolSpec, ...]:
+def chief_engineer_tool_specs(*, include_tests: bool = False) -> tuple[AIToolSpec, ...]:
     safe = frozenset({AIActionClass.READ_ONLY, AIActionClass.ADVISORY})
     specs = (
         AIToolSpec("engineer.git.status", "Git status", "Đọc trạng thái Git.", safe, ("coding", "repository")),
@@ -402,7 +402,7 @@ class ChiefEngineerAgent:
 
     def __init__(self, *, repo_root: str | os.PathLike[str], service: Any | None = None,
                  state_dir: str | os.PathLike[str] | None = None, timeout: int = 90,
-                 max_cycles: int = 4, max_steps: int = 6, allow_tests: bool = True):
+                 max_cycles: int = 4, max_steps: int = 6, allow_tests: bool = False):
         self.root = Path(repo_root).expanduser().resolve()
         if not self.root.is_dir() or not (self.root / ".git").exists():
             raise ValueError("repo_root phải là Git repository.")
@@ -946,6 +946,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--admin-actor", default="", help="Mã định danh ADMIN trong nhật ký phê duyệt.")
     parser.add_argument("--max-cycles", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=90)
+    parser.add_argument(
+        "--allow-tests", action="store_true",
+        help="Cho phép Agent chạy tối đa 5 tệp test_*.py đã chọn trong src/tests/ (có thể có tác dụng phụ).",
+    )
     parser.add_argument("--no-tests", action="store_true", help="Không đăng ký hoặc chạy công cụ pytest.")
     args = parser.parse_args(argv)
     try:
@@ -953,7 +957,7 @@ def main(argv: list[str] | None = None) -> int:
             repo_root=args.repo_root,
             max_cycles=args.max_cycles,
             timeout=args.timeout,
-            allow_tests=not args.no_tests,
+            allow_tests=args.allow_tests and not args.no_tests,
         )
         if args.prepare_patch_file:
             proposal_path = Path(args.prepare_patch_file).expanduser().resolve()

@@ -3,7 +3,9 @@ name: Chief Engineer Agent tests
 on:
   push:
     branches:
+      - main
       - feature/chief-engineer-agent-v1
+      - feature/chief-engineer-agent-v2
     paths:
       - "src/ai_kernel/chief_engineer_agent.py"
       - "src/tests/test_chief_engineer_agent_v1.py"
