@@ -74,7 +74,7 @@ class OllamaProvider:
             with request.urlopen(req, timeout=min(self.timeout_seconds, 5.0)) as response:
                 raw = json.loads(response.read().decode("utf-8"))
         except (error.HTTPError, error.URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise OllamaProviderError("KhÃ´ng Ä‘á»c Ä‘Æ°á»£c danh sÃ¡ch model Ollama.") from exc
+            raise OllamaProviderError("Không đọc được danh sách model Ollama.") from exc
         models = raw.get("models") or []
         return tuple(
             str(item.get("name") or "").strip()
@@ -107,7 +107,10 @@ class OllamaProvider:
         except error.HTTPError as exc:
             raise OllamaProviderError(_http_error_message(exc.code), status_code=exc.code) from exc
         except (error.URLError, TimeoutError) as exc:
-            raise OllamaProviderError("Không kết nối được Ollama local.") from exc
+            reason = getattr(exc, "reason", exc)
+            raise OllamaProviderError(
+                f"Không kết nối được Ollama local ({type(reason).__name__})."
+            ) from exc
 
         try:
             while True:
@@ -147,10 +150,13 @@ class OllamaProvider:
         except error.HTTPError as exc:
             raise OllamaProviderError(_http_error_message(exc.code), status_code=exc.code) from exc
         except (error.URLError, TimeoutError) as exc:
-            raise OllamaProviderError("KhÃ´ng káº¿t ná»‘i Ä‘Æ°á»£c Ollama local.") from exc
+            reason = getattr(exc, "reason", exc)
+            raise OllamaProviderError(
+                f"Không kết nối được Ollama local ({type(reason).__name__})."
+            ) from exc
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise OllamaProviderError("Ollama tráº£ vá» dá»¯ liá»‡u khÃ´ng há»£p lá»‡.") from exc
+            raise OllamaProviderError("Ollama trả về dữ liệu không hợp lệ.") from exc
         text = str(((raw.get("message") or {}).get("content") or "")).strip()
         if not text:
-            raise OllamaProviderError("Ollama khÃ´ng tráº£ vá» ná»™i dung.")
+            raise OllamaProviderError("Ollama không trả về nội dung.")
         return AIResponse(text=text, provider=self.provider_id, model=self.model)
