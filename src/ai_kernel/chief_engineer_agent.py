@@ -169,7 +169,16 @@ def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             source = "\n".join(lines).strip()
-        payload = json.loads(source)
+        try:
+            payload = json.loads(source)
+        except json.JSONDecodeError as exc:
+            if exc.msg != "Extra data":
+                raise
+            # Small local models sometimes append commentary after a valid
+            # JSON tool plan. Keep the first complete value, then validate its
+            # schema and every tool against the existing allow-list as usual.
+            start = len(source) - len(source.lstrip())
+            payload, _end = json.JSONDecoder().raw_decode(source, start)
         # Some small local models double-encode a JSON object/array as a string.
         # Do not try to decode ordinary text a second time.
         if isinstance(payload, str):
