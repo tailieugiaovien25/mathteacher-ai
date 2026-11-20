@@ -38,6 +38,7 @@ def render_admin_chief_engineer_agent(st: Any, *, admin_actor: str) -> None:
         )
 
     root = _repository_root()
+    st.caption(f"Repository đang mở: `{root}`")
     if not (root / ".git").exists():
         st.warning(
             "Runtime hiện tại không có metadata Git nên Agent chưa thể kiểm tra repository. "
@@ -77,11 +78,19 @@ def render_admin_chief_engineer_agent(st: Any, *, admin_actor: str) -> None:
                     run = agent.run(objective.strip())
                 st.session_state[_RESULT_KEY] = {
                     "run_id": run.run_id,
-                    "status": run.status.value,
+                    "status": (
+                        run.status.value
+                        if any(
+                            isinstance(item, dict) and item.get("tool_id")
+                            for item in agent.observations
+                        ) or run.approval_ids
+                        else "no_action"
+                    ),
                     "cycles": run.cycle_count,
                     "stop_reason": run.stop_reason,
                     "approval_ids": list(run.approval_ids),
                     "observations": list(agent.observations),
+                    "repository_root": str(root),
                 }
             except OllamaProviderError as exc:
                 st.error(f"Không thể gọi Ollama. {exc}")
@@ -108,16 +117,33 @@ def render_admin_chief_engineer_agent(st: Any, *, admin_actor: str) -> None:
         st.info("Nhập mục tiêu rồi chọn **Chạy AI Agent** để bắt đầu.")
         return
 
+    observations = result.get("observations", ())
+    has_tool_result = any(
+        isinstance(item, dict) and item.get("tool_id") for item in observations
+    )
+    has_approvals = bool(result.get("approval_ids"))
+    display_status = (
+        result.get("status", "unknown")
+        if has_tool_result or has_approvals
+        else "Chưa khảo sát"
+    )
+
     st.markdown("### Kết quả gần nhất")
     columns = st.columns(3)
-    columns[0].metric("Trạng thái", str(result.get("status", "unknown")))
+    columns[0].metric("Trạng thái", str(display_status))
     columns[1].metric("Chu kỳ", str(result.get("cycles", 0)))
     columns[2].metric("Approval", str(len(result.get("approval_ids", ()))))
     st.caption(f"Run: `{result.get('run_id', '')}`")
     if result.get("stop_reason"):
         st.write(str(result["stop_reason"]))
 
-    observations = result.get("observations", ())
+    if display_status == "Chưa khảo sát":
+        st.warning(
+            "Planner không chọn công cụ nào, nên chưa có khảo sát repository. "
+            "Hãy kiểm tra mục tiêu có chỉ định đúng repository đang mở hay không."
+        )
+        st.caption(f"Repository hiện tại: `{result.get('repository_root', root)}`")
+        return
     if not observations:
         st.info("Run chưa ghi nhận kết quả công cụ.")
         return
