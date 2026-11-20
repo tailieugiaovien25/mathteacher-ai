@@ -41,6 +41,20 @@ Ollama có thể có giới hạn hoặc chi phí sử dụng theo gói. Sau khi
 Streamlit Cloud sẽ khởi động lại ứng dụng. Khi các biến provider/model/endpoint
 này được đặt, chúng là cấu hình runtime có thẩm quyền cho deployment Cloud.
 
+## Bật AI Agent cho ADMIN
+
+Trong **App settings > Secrets**, đặt `SYSTEM_ADMIN_AI_ENABLED = "true"`. Entry
+point của Streamlit chuyển cờ này sang cấu hình runtime; khi lưu Secrets,
+Streamlit Cloud khởi động lại ứng dụng. Chỉ bật sau khi đã cấu hình provider AI.
+Nếu dùng Ollama Cloud, đặt thêm các khóa `MATH_TEACHER_AI_PROVIDER`,
+`MATH_TEACHER_AI_MODEL`, `OLLAMA_BASE_URL` và `OLLAMA_API_KEY` như ví dụ trên.
+Không dùng endpoint `127.0.0.1` trên Cloud vì endpoint đó trỏ tới chính máy chủ
+của ứng dụng, không phải Ollama đang chạy trên máy cá nhân.
+
+Sau khi ứng dụng khởi động lại, ADMIN mở **AI Agent**, nhập mục tiêu khảo sát
+repository rồi chọn **Chạy AI Agent**. Trang chỉ cho phép thao tác đọc; nếu
+provider chưa kết nối, kiểm tra **AI Runtime & Model Center** và cấu hình Secrets.
+
 Để chạy AI hoàn toàn local trên một máy khác, cài Ollama và model trên máy đó rồi
 chạy cả Streamlit app và Ollama trên cùng máy. Máy chỉ mở ứng dụng Cloud không thể
 dùng Ollama cài trên máy cá nhân một cách tự động.

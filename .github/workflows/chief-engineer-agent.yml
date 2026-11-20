@@ -18,6 +18,10 @@ on:
       - "src/portal_v2/ui/admin_navigation.py"
       - "src/portal_v2/ui/admin_shell.py"
       - "src/portal_v2/ui/workspace_navigation.py"
+      - "streamlit_app.py"
+      - "src/tests/test_streamlit_cloud_entrypoint.py"
+      - ".streamlit/secrets.toml.example"
+      - "docs/STREAMLIT_COMMUNITY_CLOUD_V2.md"
       - ".gitignore"
   pull_request:
     paths:
@@ -32,6 +36,10 @@ on:
       - "src/portal_v2/ui/admin_navigation.py"
       - "src/portal_v2/ui/admin_shell.py"
       - "src/portal_v2/ui/workspace_navigation.py"
+      - "streamlit_app.py"
+      - "src/tests/test_streamlit_cloud_entrypoint.py"
+      - ".streamlit/secrets.toml.example"
+      - "docs/STREAMLIT_COMMUNITY_CLOUD_V2.md"
       - ".gitignore"
 
 permissions:
@@ -56,7 +64,7 @@ jobs:
         env:
           PYTHONPATH: src
           PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m pytest -q -p no:cacheprovider src/tests/test_chief_engineer_agent_v1.py
+        run: python -m pytest -q -p no:cacheprovider src/tests/test_chief_engineer_agent_v1.py src/tests/test_streamlit_cloud_entrypoint.py
       - name: Run existing AI Kernel planner/runtime regressions (Ubuntu)
         if: runner.os == 'Linux'
         env:
