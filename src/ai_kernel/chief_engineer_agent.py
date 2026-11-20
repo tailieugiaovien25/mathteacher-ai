@@ -208,12 +208,17 @@ def parse_tool_plan(raw: object, max_calls: int = 6) -> tuple[AIToolCall, ...]:
             f"kiểu dữ liệu nhận được: {type(payload).__name__}."
         )
     # Some small local models echo the orchestration observation schema
-    # ({cycle, planned_tools}) instead of emitting each tool call directly.
-    # Normalize only this exact wrapper; every resulting call still passes
-    # strict field validation and the runtime's registered-tool allow-list.
+    # ({cycle, planned_tools}) instead of emitting each tool call directly,
+    # sometimes with tool-call fields copied onto the wrapper. Normalize that
+    # known shape; every resulting call still passes strict field validation
+    # and the runtime's registered-tool allow-list.
     normalized_rows = []
     for index, row in enumerate(rows, start=1):
-        if isinstance(row, dict) and set(row) == {"cycle", "planned_tools"}:
+        if (
+            isinstance(row, dict)
+            and {"cycle", "planned_tools"}.issubset(row)
+            and set(row).issubset({"cycle", "planned_tools", "tool_id", "arguments"})
+        ):
             cycle = row["cycle"]
             planned_tools = row["planned_tools"]
             if isinstance(cycle, bool) or not isinstance(cycle, int) or cycle < 1:
