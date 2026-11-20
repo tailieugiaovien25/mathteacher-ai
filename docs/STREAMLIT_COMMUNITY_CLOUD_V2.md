@@ -73,6 +73,10 @@ Nếu chạy portal local, đặt secrets cần thiết trong `.streamlit/secret
 trên máy đó; không commit file này. Trong **AI Runtime & Model Center**, giữ
 profile `qwen3-local-0.6b` trong allow-list/fallback.
 
+Muốn mở riêng giao diện AI Agent cục bộ và chạy Qwen trực tiếp, dùng script
+`scripts/chief_engineer/Run-ChiefEngineerLocal.ps1`. Script bind Streamlit vào
+`127.0.0.1`, chọn `qwen3:0.6b` và không cần Supabase hay Ollama Cloud Secrets.
+
 Sau khi ứng dụng khởi động lại, ADMIN mở **AI Agent**, nhập mục tiêu khảo sát
 repository rồi chọn **Chạy AI Agent**. Trang chỉ cho phép thao tác đọc; nếu
 provider chưa kết nối, kiểm tra **AI Runtime & Model Center** và cấu hình Secrets.
