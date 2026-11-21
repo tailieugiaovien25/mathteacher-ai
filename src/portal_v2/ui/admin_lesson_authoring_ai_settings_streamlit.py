@@ -95,17 +95,26 @@ def render_admin_standardization_ai_settings(st, *, client=None) -> None:
             index=providers.index(provider),
             format_func=lambda value: {"gemini": "Google Gemini", "openai": "OpenAI"}.get(value, value),
         )
-        model = st.text_input(
-            "Model AI cho Chuẩn hóa giáo án",
-            value=str(current.get("document_ai_model") or ""),
-            help="Để trống để dùng model mặc định đã cấu hình cho nhà cung cấp.",
+        saved_model = str(current.get("document_ai_model") or "").strip()
+        if selected_provider != provider:
+            saved_model = ""
+        model_choices = ["default"] + (["keep_saved"] if saved_model else [])
+        model_choice = st.selectbox(
+            "Phiên bản AI",
+            model_choices,
+            index=1 if saved_model else 0,
+            format_func=lambda value: (
+                "Giữ lựa chọn hiện tại" if value == "keep_saved"
+                else "Mặc định của nhà cung cấp"
+            ),
+            help="Không cần nhập tên model kỹ thuật.",
         )
         save_ai = st.form_submit_button("💾 Lưu", type="primary", use_container_width=True)
     if save_ai:
         updated = dict(_settings(st))
         updated["document_ai_enabled"] = bool(enabled)
         updated["document_ai_provider"] = str(selected_provider).strip().lower()
-        updated["document_ai_model"] = str(model or "").strip()
+        updated["document_ai_model"] = saved_model if model_choice == "keep_saved" else ""
         if resolved is None or resolved.snapshot is None:
             st.error(
                 "Chưa có cấu hình giáo án toàn hệ thống ACTIVE để áp dụng AI. "
@@ -124,7 +133,7 @@ def render_admin_standardization_ai_settings(st, *, client=None) -> None:
             active_payload["ai_runtime"] = {
                 "enabled": bool(enabled),
                 "provider": str(selected_provider).strip().lower(),
-                "model": str(model or "").strip() or None,
+                "model": (saved_model if model_choice == "keep_saved" else "") or None,
             }
             activation = LessonPlanConfigurationAdminService(
                 SupabaseLessonPlanConfigurationAdminRepository(client)
@@ -340,13 +349,23 @@ def render_admin_lesson_authoring_ai_settings(st, *, client=None) -> None:
                     "openai": "OpenAI",
                 }.get(value, value),
             )
-            document_ai_model = st.text_input(
-                "Model AI cho Chuẩn hóa giáo án",
-                value=str(current.get("document_ai_model") or ""),
-                help=(
-                    "Có thể để trống để dùng model mặc định an toàn "
-                    "đã cấu hình cho nhà cung cấp."
+            saved_document_ai_model = str(
+                current.get("document_ai_model") or ""
+            ).strip()
+            if document_ai_provider != current_document_ai_provider:
+                saved_document_ai_model = ""
+            document_ai_model_choices = ["default"] + (
+                ["keep_saved"] if saved_document_ai_model else []
+            )
+            document_ai_model_choice = st.selectbox(
+                "Phiên bản AI",
+                document_ai_model_choices,
+                index=1 if saved_document_ai_model else 0,
+                format_func=lambda value: (
+                    "Giữ lựa chọn hiện tại" if value == "keep_saved"
+                    else "Mặc định của nhà cung cấp"
                 ),
+                help="Không cần nhập tên model kỹ thuật.",
             )
 
         with format_tab:
@@ -454,7 +473,11 @@ def render_admin_lesson_authoring_ai_settings(st, *, client=None) -> None:
             "advanced_trace": bool(advanced_trace),
             "document_ai_enabled": bool(document_ai_enabled),
             "document_ai_provider": str(document_ai_provider).strip().lower(),
-            "document_ai_model": str(document_ai_model or "").strip(),
+            "document_ai_model": (
+                saved_document_ai_model
+                if document_ai_model_choice == "keep_saved"
+                else ""
+            ),
         }
         st.success(
             "Đã lưu thiết lập Soạn bài cùng AI cho phiên làm việc hiện tại. "

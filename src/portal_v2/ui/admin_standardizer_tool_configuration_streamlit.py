@@ -27,16 +27,11 @@ def _show_configuration_storage_error(st, error: Exception) -> None:
         or "lesson_plan_configuration_versions" in normalized
     ):
         st.error("Cơ sở dữ liệu chưa sẵn sàng cho cấu hình công cụ chuẩn hóa.")
-        st.caption(
-            "Áp dụng lần lượt migration "
-            "202608300012_admin_lesson_plan_configuration_foundation_v58c6a4.sql "
-            "và 202608300013_protect_active_lesson_plan_configuration_version_v58c6a9.sql "
-            "trong Supabase."
-        )
+        st.caption("Cần quản trị hệ thống kiểm tra kết nối dữ liệu cấu hình.")
     else:
         st.error("Không thể tải cấu hình công cụ chuẩn hóa.")
-    with st.expander("Chi tiết kỹ thuật"):
-        st.code(message, language="text")
+    with st.expander("Thông tin dành cho hỗ trợ kỹ thuật"):
+        st.caption("Mã lỗi đã được ghi nhận để quản trị hệ thống xử lý.")
 
 
 def _save_and_activate(*, service, profile, code, name, subject_ref, payload):
@@ -64,7 +59,7 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
     lifecycle = LessonPlanConfigurationAdminService(admin)
     resolver = StandardizerToolConfigurationService(admin)
 
-    st.markdown("### III-A. Cấu hình Công cụ chuẩn giáo án chung")
+    st.markdown("### Bật và chọn chức năng dùng chung")
     try:
         profiles = admin.list_profiles()
         common = resolver.resolve().common_payload
@@ -81,13 +76,24 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
         ),
         None,
     )
+    st.caption("Chọn các chức năng bằng ô đánh dấu. Nhấn Lưu để áp dụng ngay.")
     with st.form("standardizer_tool_common_form"):
         enabled = st.checkbox("Kích hoạt công cụ", value=bool(common_settings.get("enabled", True)))
         ai_enabled = st.checkbox("Cho phép AI hỗ trợ", value=bool(common_settings.get("ai_enabled", True)))
         saved_actions = common_settings.get("allowed_actions")
         if not isinstance(saved_actions, list):
             saved_actions = list(ACTIONS)
-        allowed_actions = st.multiselect("Chức năng được phép", ACTIONS, default=[item for item in saved_actions if item in ACTIONS])
+        selected_actions = set(item for item in saved_actions if item in ACTIONS)
+        st.markdown("**Chức năng được phép**")
+        action_columns = st.columns(2)
+        allowed_actions = []
+        for index, action in enumerate(ACTIONS):
+            if action_columns[index % 2].checkbox(
+                action,
+                value=action in selected_actions,
+                key="standardizer_tool_common_action_" + str(index),
+            ):
+                allowed_actions.append(action)
         confirmation_options = ["Bắt buộc", "Cảnh báo", "Không yêu cầu"]
         saved_confirmation = str(common_settings.get("confirmation_policy") or "Bắt buộc")
         confirmation = st.selectbox(
@@ -96,7 +102,8 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
         )
         integrity_gate = st.checkbox("Chặn lưu khi kiểm tra toàn vẹn thất bại", value=bool(common_settings.get("integrity_gate", True)), disabled=True)
         preserve_formula = st.checkbox("Giữ nguyên giá trị công thức Toán", value=True, disabled=True)
-        system_instruction = st.text_area("Chỉ dẫn bắt buộc cho AI", value=str(common_settings.get("system_instruction") or "Tuân thủ cấu hình ADMIN và không thay đổi nội dung ngoài phạm vi được giao."))
+        system_instruction = "Tuân thủ cấu hình ADMIN và không thay đổi nội dung ngoài phạm vi được giao."
+        st.caption("AI luôn tuân thủ cấu hình ADMIN và không tự sửa nội dung giáo án.")
         save_common = st.form_submit_button("💾 Lưu", type="primary", use_container_width=True)
     if save_common:
         try:
@@ -114,17 +121,41 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
         st.success("Đã lưu và áp dụng cấu hình công cụ chung ngay.")
         st.rerun()
 
-    st.markdown("### III-B. Cấu hình Công cụ chuẩn giáo án theo môn")
-    subject_ref = st.text_input("Mã môn áp dụng", key="standardizer_tool_subject_ref").strip().upper()
+    st.markdown("### Chọn chức năng theo môn")
+    try:
+        from portal_v2.ui.admin_lesson_plan_coordination_center_streamlit import (
+            _load_canonical_lesson_plan_scope_catalog,
+        )
+
+        subjects, _ = _load_canonical_lesson_plan_scope_catalog(client=client)
+    except Exception as error:
+        _show_configuration_storage_error(st, error)
+        return
+    subject_options = {"": "Dùng thiết lập chung cho mọi môn"}
+    for subject in subjects:
+        subject_code = str(getattr(subject, "code", "") or "").strip().upper()
+        if subject_code:
+            subject_name = str(getattr(subject, "name", "") or subject_code).strip()
+            subject_options[subject_code] = subject_name
+    subject_ref = st.selectbox(
+        "Môn học",
+        options=list(subject_options),
+        format_func=lambda value: subject_options.get(value, value),
+        key="standardizer_tool_subject_ref_choice",
+        help="Chọn tên môn; mã kỹ thuật được hệ thống tự xác định.",
+    )
     try:
         resolved = resolver.resolve(subject_ref=subject_ref)
     except Exception as error:
         _show_configuration_storage_error(st, error)
         return
-    st.caption("Giá trị kế thừa từ Công cụ chung — chỉ đọc")
-    st.json(dict(resolved.common_payload.get("tool_common") or {}))
+    inherited_actions = list(
+        (resolved.common_payload.get("tool_common") or {}).get("allowed_actions", ACTIONS)
+    )
+    inherited_actions = [item for item in inherited_actions if item in ACTIONS]
+    st.caption("Thiết lập chung đang cho phép: " + (", ".join(inherited_actions) or "chưa chọn chức năng"))
     if not subject_ref:
-        st.info("Nhập mã môn để mở bảng điều khiển chức năng riêng.")
+        st.info("Chọn một môn cụ thể ở trên để thiết lập quyền dùng riêng cho môn đó.")
         return
     subject_code = resolver.profile_code(subject_ref)
     subject_profile = next(
@@ -141,9 +172,20 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
     saved_subject_actions = controls.get("allowed_actions")
     if not isinstance(saved_subject_actions, list):
         saved_subject_actions = common_actions
+    st.caption("Thiết lập riêng của môn có thể thu hẹp các chức năng đang được phép dùng chung.")
     with st.form("standardizer_tool_subject_form"):
-        subject_enabled = st.checkbox("Kích hoạt công cụ cho môn " + subject_ref, value=bool(controls.get("enabled", True)))
-        subject_actions = st.multiselect("Chức năng áp dụng cho môn", common_actions, default=[item for item in saved_subject_actions if item in common_actions])
+        subject_enabled = st.checkbox("Kích hoạt công cụ cho môn " + subject_options.get(subject_ref, subject_ref), value=bool(controls.get("enabled", True)))
+        st.markdown("**Chức năng được phép cho môn này**")
+        subject_columns = st.columns(2)
+        selected_subject_actions = set(item for item in saved_subject_actions if item in common_actions)
+        subject_actions = []
+        for index, action in enumerate(common_actions):
+            if subject_columns[index % 2].checkbox(
+                action,
+                value=action in selected_subject_actions,
+                key="standardizer_tool_subject_action_" + subject_ref + "_" + str(index),
+            ):
+                subject_actions.append(action)
         subject_instruction = st.text_area("Chỉ dẫn AI riêng của môn", value=str(controls.get("subject_instruction") or ""))
         proposal_count = st.number_input("Số phương án AI tối đa", 1, 5, int(controls.get("proposal_count") or 2))
         require_review = st.checkbox("Bắt buộc giáo viên duyệt đề xuất AI", value=bool(controls.get("require_review", True)))

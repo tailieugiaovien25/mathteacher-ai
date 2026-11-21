@@ -33,16 +33,11 @@ def _show_configuration_storage_error(st, error: Exception, *, action: str) -> N
         or "lesson_plan_configuration_versions" in normalized
     ):
         st.error("Chưa thể " + action + ": Supabase thiếu bảng cấu hình giáo án.")
-        st.caption(
-            "Áp dụng lần lượt migration "
-            "202608300012_admin_lesson_plan_configuration_foundation_v58c6a4.sql "
-            "và 202608300013_protect_active_lesson_plan_configuration_version_v58c6a9.sql "
-            "trong Supabase."
-        )
+        st.caption("Cần quản trị hệ thống kiểm tra kết nối dữ liệu cấu hình.")
     else:
         st.error("Không thể " + action + ".")
-    with st.expander("Chi tiết kỹ thuật"):
-        st.code(message, language="text")
+    with st.expander("Thông tin dành cho hỗ trợ kỹ thuật"):
+        st.caption("Mã lỗi đã được ghi nhận để quản trị hệ thống xử lý.")
 
 
 def _render_coordination_center_visual_system(st) -> None:
@@ -87,6 +82,54 @@ def _parse_configuration_payload(raw_payload: str) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("Payload cấu hình phải là một JSON object.")
     return payload
+
+
+def _render_configuration_summary(st, payload: dict | None) -> None:
+    """Show effective settings in plain language without exposing serialized data."""
+    normalized = payload if isinstance(payload, dict) else {}
+    profile = normalized.get("template_profile")
+    profile = profile if isinstance(profile, dict) else {}
+    layout = profile.get("layout")
+    layout = layout if isinstance(layout, dict) else {}
+    dates = normalized.get("date_policy")
+    dates = dates if isinstance(dates, dict) else {}
+    approval = normalized.get("approval_policy")
+    approval = approval if isinstance(approval, dict) else {}
+    repository = normalized.get("document_repository")
+    repository = repository if isinstance(repository, dict) else {}
+    ai = normalized.get("ai_runtime")
+    ai = ai if isinstance(ai, dict) else {}
+
+    st.markdown("**Định dạng**")
+    try:
+        font_size = float(layout.get("body_font_size_pt") or 14)
+    except (TypeError, ValueError):
+        font_size = 14.0
+    st.write(
+        f"{profile.get('profile_name') or 'Mẫu mặc định'} · "
+        f"{layout.get('paper_size') or 'A4'} · "
+        f"{layout.get('font_name') or 'Times New Roman'} · {font_size:g} pt"
+    )
+    date_cols = st.columns(2)
+    drafting_days = int(dates.get("drafting_before_monday_days") or 0)
+    approval_days = int(dates.get("approval_before_monday_days") or 0)
+    date_cols[0].metric(
+        "Ngày soạn",
+        f"Trước thứ Hai {drafting_days} ngày"
+        if dates.get("drafting_before_monday_enabled", True)
+        else "Không tự tính",
+    )
+    date_cols[1].metric(
+        "Ngày duyệt",
+        f"Trước thứ Hai {approval_days} ngày"
+        if dates.get("approval_before_monday_enabled", True)
+        else "Không tự tính",
+    )
+    st.caption(
+        "Phê duyệt: " + str(approval.get("approval_label") or "Tổ chuyên môn")
+        + " · " + ("Đã đăng ký kho Drive" if repository.get("google_drive_lesson_plan_folder_id") else "Chưa đăng ký kho Drive")
+        + " · AI: " + (str(ai.get("provider") or "chưa chọn") if ai.get("enabled") else "đang tắt")
+    )
 
 
 def _configuration_editor_defaults(payload: dict | None) -> dict:
@@ -221,9 +264,6 @@ def _render_structured_configuration_editor(
         key=drive_folder_input_key,
         help="Chỉ nhập Folder ID; không nhập đường dẫn ổ đĩa hoặc URL đầy đủ.",
     )
-
-    import json
-
 
     st.markdown("### Danh sách chức năng cài đặt")
     st.caption(
@@ -543,23 +583,15 @@ def _render_structured_configuration_editor(
         st.caption("Xem trước nội dung: " + approval_text_template.replace("{{approval_date}}", "Ngày … tháng … năm …").replace("{{approval_label}}", approval_label))
 
     with advanced_tab:
-        st.markdown("### 4. Nâng cao")
-        with st.expander("Cấu hình nâng cao (JSON)", expanded=False):
-            st.caption(
-                "JSON chỉ dành cho trường hợp cần giữ hoặc bổ sung thuộc tính "
-                "chưa có trên biểu mẫu. Các trường trực quan phía trên sẽ được "
-                "ưu tiên khi lưu."
-            )
-            advanced_json = st.text_area(
-                "JSON nâng cao",
-                value=json.dumps(
-                    defaults["payload"],
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                height=220,
-                key=key_prefix + "_advanced_json",
-            )
+        st.markdown("### 4. Công thức và an toàn")
+        st.caption(
+            "Các quy tắc bảo toàn công thức và kiểm tra toàn vẹn được áp dụng "
+            "tự động cho mọi giáo án. ADMIN không cần nhập mã hay chỉnh dữ liệu kỹ thuật."
+        )
+        st.info(
+            "Công thức Toán dùng Times New Roman; giữ nguyên cấu trúc OMML/OLE "
+            "và giá trị. Hệ thống sẽ chặn lưu nếu kiểm tra toàn vẹn thất bại."
+        )
 
     return {
         "google_drive_lesson_plan_folder_id": str(
@@ -567,7 +599,9 @@ def _render_structured_configuration_editor(
                 drive_folder_input_key, ""
             ) or ""
         ).strip(),
-        "advanced_json": advanced_json,
+        # Preserve settings introduced by newer runtimes without exposing their
+        # serialized payload to ADMIN. Visible form controls below override these.
+        "base_payload": defaults["payload"],
         "profile_name": profile_name,
         "paper_size": paper_size,
         "font_name": font_name,
@@ -610,9 +644,8 @@ def _render_structured_configuration_editor(
 
 
 def _build_configuration_payload_from_editor(editor: dict) -> dict:
-    payload = _parse_configuration_payload(
-        str(editor.get("advanced_json") or "{}")
-    )
+    base_payload = editor.get("base_payload")
+    payload = dict(base_payload) if isinstance(base_payload, dict) else {}
 
     template_profile = payload.get("template_profile")
     if not isinstance(template_profile, dict):
@@ -1295,7 +1328,6 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                     )
                 else:
                     st.success("Phiên bản đã chuyển sang PUBLISHED.")
-                    st.json(version)
                     # V14B6N_R7B2D11E5A_REFRESH_AFTER_PUBLISH
                     # Refresh so published_ids sees the newly PUBLISHED version.
                     st.rerun()
@@ -1344,15 +1376,7 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                     st.success(
                         "Đã chuyển sang phiên bản PUBLISHED được chọn."
                     )
-                    st.json(
-                        {
-                            "profile": result.profile,
-                            "current_version": result.current_version,
-                            "retired_previous_version": (
-                                result.retired_previous_version
-                            ),
-                        }
-                    )
+                    st.caption("Phiên bản đã được đổi theo lựa chọn của ADMIN.")
 
 
 def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
@@ -1399,7 +1423,9 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
                     st.success(
                         f"{snapshot.profile_name} · phiên bản {snapshot.version_number}"
                     )
-                    st.json(dict(resolved.configuration_payload))
+                    _render_configuration_summary(
+                        st, dict(resolved.configuration_payload)
+                    )
 
         st.subheader("Phạm vi chuyển giao từ USER")
         st.write(

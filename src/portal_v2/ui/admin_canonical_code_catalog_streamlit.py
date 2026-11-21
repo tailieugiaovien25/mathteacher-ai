@@ -187,12 +187,12 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
 
     subjects = tuple(item.subject_id for item in subject_items)
     subject_labels = {
-        item.subject_id: f"{item.name} ({item.code})"
+        item.subject_id: str(item.name)
         for item in subject_items
     }
     component_labels = {
         str(getattr(item, "component_id", "") or ""): (
-            f"{getattr(item, 'name', '')} ({getattr(item, 'component_id', '')})"
+            str(getattr(item, "name", "") or "Phân môn")
         )
         for item in component_items
         if str(getattr(item, "component_id", "") or "").strip()
@@ -210,7 +210,6 @@ def _render_admin_lesson_plan_grouping_policy(st, *, client) -> None:
     )
     if _policy_proof:
         st.success("Đã xác minh lưu cấu hình và đọc lại từ Supabase.")
-        st.code(_policy_proof)
 
     with st.form("admin_lesson_plan_grouping_policy_form"):
         subject_ref = st.selectbox(

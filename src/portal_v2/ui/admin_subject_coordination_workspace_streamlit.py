@@ -157,29 +157,19 @@ def _render_lesson_plan_effective(st, *, status: str, value: Any) -> None:
         )
     _render_lesson_plan_configuration_details(st, payload)
     if snapshot is None:
-        st.info("CURRENT DEFAULT")
-        st.caption("Chưa có cấu hình ADMIN ACTIVE/PUBLISHED phù hợp. Runtime tiếp tục dùng mặc định hiện hành.")
+        st.info("Đang dùng cấu hình mặc định")
+        st.caption("Chưa có cấu hình riêng; hệ thống đang dùng mặc định.")
         st.write({"Nguồn": source, "Phạm vi": "Mặc định runtime hiện hành"})
         return
-    st.success("ADMIN ACTIVE / PUBLISHED")
-    st.write({
-        "Nguồn": source,
-        "Hồ sơ": _snapshot_field(snapshot, "profile_name"),
-        "Mã hồ sơ": _snapshot_field(snapshot, "profile_code"),
-        "Môn": _snapshot_field(snapshot, "subject_ref") or "GLOBAL",
-        "Phân môn": _snapshot_field(snapshot, "component_ref") or "Mặc định môn / GLOBAL",
-        "Phiên bản": _snapshot_field(snapshot, "version_number"),
-        "Configuration version ID": _snapshot_field(snapshot, "configuration_version_id"),
-    })
-    if isinstance(payload, dict) and payload:
-        with st.expander("Thông số cấu hình hiệu lực", expanded=True):
-            st.json(dict(payload))
-    else:
-        st.caption("Configuration payload hiện tại rỗng.")
-
+    st.success("Cấu hình ADMIN đang có hiệu lực")
+    st.caption(
+        _snapshot_field(snapshot, "profile_name")
+        + " · Phiên bản " + (_snapshot_field(snapshot, "version_number") or "—")
+        + " · Đang áp dụng"
+    )
     # G1B_P1B_R2A_EFFECTIVE_LESSON_PLAN_DETAILS_CALL
-    _g1b_p1b_r2a_render_effective_lesson_plan_details(st, payload)
-
+    # The plain-language Vietnamese summary above is the only visible settings view.
+
 # G1B_P1B_R2A_EFFECTIVE_LESSON_PLAN_DETAILS
 def _g1b_p1b_r2a_render_effective_lesson_plan_details(st, payload) -> None:
     normalized = dict(payload or {})
@@ -356,7 +346,8 @@ def _render_grouping_effective(st, *, status: str, value: Any) -> None:
         st.caption(_text(value))
         return
     mode = _enum_text(value)
-    st.success("ACTIVE RESOLVED")
+    st.success("Cách soạn giáo án đang áp dụng")
+
     st.write({
         "Chế độ nhóm hiệu lực": mode or "Chưa xác định",
         "Thứ tự resolve": "Phân môn -> mặc định Môn -> mặc định hệ thống",
@@ -366,21 +357,25 @@ def _render_grouping_effective(st, *, status: str, value: Any) -> None:
 # G1B_P1B_R1_UNIFIED_EFFECTIVE_CONFIGURATION_VIEW
 def render_admin_subject_coordination_workspace(*, client: Any) -> None:
     st.title("Trung tâm điều phối theo Môn / Phân môn")
-    st.caption("P1B - Cấu hình hiệu lực READ ONLY. Không ghi dữ liệu và không thay đổi runtime.")
+    st.caption("Xem nhanh cấu hình đang áp dụng cho môn và phân môn đã chọn.")
+
     try:
         subjects, components = _catalog(client)
     except Exception as exc:
         st.error("Không đọc được danh mục Môn canonical.")
-        st.code(f"{type(exc).__name__}: {exc}")
+        st.caption("Quản trị hệ thống cần kiểm tra kết nối và danh mục môn học.")
+
         return
     subject_by = {_attr(x, "subject_id", "id", "subject_ref"): x for x in subjects if _attr(x, "subject_id", "id", "subject_ref")}
     if not subject_by:
         st.warning("UNKNOWN: Không có Môn canonical khả dụng.")
         return
-    sid = st.selectbox("Môn", tuple(subject_by), format_func=lambda x: f"{_display_name(subject_by[x], fallback=x)} ({x})", key="g1b_p1a_subject_ref")
+    sid = st.selectbox("Môn", tuple(subject_by), format_func=lambda x: _display_name(subject_by[x], fallback=x), key="g1b_p1a_subject_ref")
+
     component_by = {_attr(x, "component_id", "id", "component_ref"): x for x in components if _attr(x, "component_id", "id", "component_ref") and _attr(x, "subject_id", "subject_ref") == sid}
     none_label = "-- Mặc định của môn --"
-    selected = st.selectbox("Phân môn", (none_label,) + tuple(component_by), format_func=lambda x: none_label if x == none_label else f"{_display_name(component_by[x], fallback=x)} ({x})", key="g1b_p1a_component_ref")
+    selected = st.selectbox("Phân môn", (none_label,) + tuple(component_by), format_func=lambda x: none_label if x == none_label else _display_name(component_by[x], fallback=x), key="g1b_p1a_component_ref")
+
     cid = "" if selected == none_label else selected
     if cid and _attr(component_by[cid], "subject_id", "subject_ref") != sid:
         st.error("BLOCKED: Phân môn không thuộc Môn đang chọn.")
@@ -388,7 +383,8 @@ def render_admin_subject_coordination_workspace(*, client: Any) -> None:
     subject_name = _display_name(subject_by[sid], fallback=sid)
     component_name = "Mặc định của môn" if not cid else _display_name(component_by[cid], fallback=cid)
     st.subheader("Phạm vi điều phối đang xem")
-    st.write({"Môn": subject_name, "Mã môn": sid, "Phân môn": component_name, "Mã phân môn": cid or "", "Chế độ": "READ ONLY"})
+    st.info(f"Đang xem: {subject_name} · {component_name}")
+
     lp_status, lp_value = _lesson_plan_effective(client, sid, cid)
     gp_status, gp_value = _grouping_effective(client, sid, cid)
     st.subheader("Cấu hình hiệu lực")
