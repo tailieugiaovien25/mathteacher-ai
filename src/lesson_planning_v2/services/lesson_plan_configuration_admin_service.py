@@ -91,6 +91,31 @@ class LessonPlanConfigurationAdminService:
             change_note=change_note,
         )
 
+    def save_and_activate(
+        self,
+        *,
+        profile_id: str,
+        configuration_payload: Mapping[str, Any],
+        change_note: str | None = None,
+        retire_previous: bool = False,
+    ) -> LessonPlanConfigurationActivationResult:
+        """Save a new version and make it effective in one ADMIN action."""
+        draft = self.create_next_draft_version(
+            profile_id=profile_id,
+            configuration_payload=configuration_payload,
+            change_note=change_note,
+        )
+        published = self.publish(
+            configuration_version_id=str(draft.get("configuration_version_id") or "")
+        )
+        return self.activate_published_version(
+            profile_id=profile_id,
+            configuration_version_id=str(
+                published.get("configuration_version_id") or ""
+            ),
+            retire_previous=retire_previous,
+        )
+
     def update_draft(
         self,
         *,

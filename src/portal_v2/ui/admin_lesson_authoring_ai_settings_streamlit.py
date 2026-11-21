@@ -45,6 +45,38 @@ def _settings(st) -> dict[str, Any]:
 
 # V14B6N_R7B2D5B_STANDARDIZATION_AI_RENDERER
 def render_admin_standardization_ai_settings(st, *, client=None) -> None:
+    resolved = None
+    if client is not None:
+        try:
+            from lesson_planning_v2.adapters.supabase_lesson_plan_configuration_repository import (
+                SupabaseLessonPlanConfigurationRepository,
+            )
+            from lesson_planning_v2.services.lesson_plan_configuration_service import (
+                LessonPlanConfigurationService,
+            )
+
+            resolved = LessonPlanConfigurationService(
+                SupabaseLessonPlanConfigurationRepository(client)
+            ).resolve(subject_ref="", component_ref=None, fallback_payload={})
+        except Exception as error:
+            st.error("Không thể đọc cấu hình AI đang áp dụng: " + str(error))
+    if _STATE_KEY not in st.session_state:
+        initial = dict(_DEFAULTS)
+        active_payload = (
+            dict(resolved.configuration_payload)
+            if resolved is not None
+            else {}
+        )
+        ai_runtime = active_payload.get("ai_runtime")
+        if isinstance(ai_runtime, dict):
+            initial.update(
+                {
+                    "document_ai_enabled": bool(ai_runtime.get("enabled", False)),
+                    "document_ai_provider": str(ai_runtime.get("provider") or "gemini"),
+                    "document_ai_model": str(ai_runtime.get("model") or ""),
+                }
+            )
+        st.session_state[_STATE_KEY] = initial
     current = _settings(st)
     st.markdown("#### AI phân tích tài liệu khi Chuẩn hóa giáo án")
     st.caption("ADMIN chọn nhà cung cấp AI cho lớp phân tích tài liệu. API key chỉ được đọc từ secrets hệ thống và không hiển thị tại đây.")
@@ -68,14 +100,49 @@ def render_admin_standardization_ai_settings(st, *, client=None) -> None:
             value=str(current.get("document_ai_model") or ""),
             help="Để trống để dùng model mặc định đã cấu hình cho nhà cung cấp.",
         )
-        save_ai = st.form_submit_button("Lưu cấu hình AI chuẩn hóa", use_container_width=True)
+        save_ai = st.form_submit_button("💾 Lưu", type="primary", use_container_width=True)
     if save_ai:
         updated = dict(_settings(st))
         updated["document_ai_enabled"] = bool(enabled)
         updated["document_ai_provider"] = str(selected_provider).strip().lower()
         updated["document_ai_model"] = str(model or "").strip()
+        if resolved is None or resolved.snapshot is None:
+            st.error(
+                "Chưa có cấu hình giáo án toàn hệ thống ACTIVE để áp dụng AI. "
+                "Hãy tạo cấu hình toàn hệ thống rồi lưu lại."
+            )
+            return
+        try:
+            from lesson_planning_v2.adapters.supabase_lesson_plan_configuration_admin_repository import (
+                SupabaseLessonPlanConfigurationAdminRepository,
+            )
+            from lesson_planning_v2.services.lesson_plan_configuration_admin_service import (
+                LessonPlanConfigurationAdminService,
+            )
+
+            active_payload = dict(resolved.configuration_payload)
+            active_payload["ai_runtime"] = {
+                "enabled": bool(enabled),
+                "provider": str(selected_provider).strip().lower(),
+                "model": str(model or "").strip() or None,
+            }
+            activation = LessonPlanConfigurationAdminService(
+                SupabaseLessonPlanConfigurationAdminRepository(client)
+            ).save_and_activate(
+                profile_id=str(resolved.snapshot.profile_id),
+                configuration_payload=active_payload,
+                change_note="ADMIN lưu và áp dụng AI Chuẩn hóa giáo án",
+            )
+        except Exception as error:
+            st.error("Không thể lưu và áp dụng cấu hình AI: " + str(error))
+            return
         st.session_state[_STATE_KEY] = updated
-        st.success("Đã lưu cấu hình AI chuẩn hóa cho phiên làm việc hiện tại.")
+        st.success(
+            "Đã lưu và áp dụng cấu hình AI ngay (phiên bản "
+            + str(activation.current_version.get("version_number") or "")
+            + "). API key chỉ được đọc từ secrets hệ thống."
+        )
+        st.rerun()
 
 def render_admin_lesson_authoring_ai_settings(st, *, client=None) -> None:
     del client

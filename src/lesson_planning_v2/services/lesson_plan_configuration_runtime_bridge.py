@@ -136,14 +136,36 @@ def project_admin_payload_to_standardization_state(
     session_state[ADMIN_RUNTIME_PAYLOAD_KEY] = normalized
 
     date_policy = normalized.get("date_policy")
-    if isinstance(date_policy, Mapping):
+    effective_date_policy = dict(date_policy) if isinstance(date_policy, Mapping) else {}
+    subject_ref = _runtime_subject_ref(session_state)
+    subject_policies = normalized.get("date_policy_by_subject")
+    matched_subject_policy = None
+    if isinstance(subject_policies, Mapping):
+        for key, candidate in subject_policies.items():
+            if not isinstance(candidate, Mapping):
+                continue
+            aliases = {
+                _clean_ref(key).casefold(),
+                _clean_ref(candidate.get("subject_code")).casefold(),
+                _clean_ref(candidate.get("subject_id")).casefold(),
+                _clean_ref(candidate.get("subject_ref")).casefold(),
+            }
+            if subject_ref and subject_ref.casefold() in aliases:
+                matched_subject_policy = candidate
+                break
+    if matched_subject_policy is not None:
+        effective_date_policy.update(matched_subject_policy)
+    session_state["lesson_plan_admin_effective_date_policy"] = effective_date_policy
+    if effective_date_policy:
         for source_key, target_key in _DATE_POLICY_KEY_MAP.items():
-            if source_key in date_policy:
-                session_state[target_key] = date_policy[source_key]
-
+            if source_key in effective_date_policy:
+                session_state[target_key] = effective_date_policy[source_key]
+        session_state["standardization_allow_teaching_date_override"] = bool(
+            effective_date_policy.get("allow_teaching_date_override", True)
+        )
         for direct_key in _DIRECT_DATE_POLICY_KEYS:
-            if direct_key in date_policy:
-                session_state[direct_key] = date_policy[direct_key]
+            if direct_key in effective_date_policy:
+                session_state[direct_key] = effective_date_policy[direct_key]
 
     template_profile = normalized.get("template_profile")
     if isinstance(template_profile, Mapping):
@@ -238,6 +260,7 @@ def apply_active_admin_lesson_plan_configuration(
     if resolved.snapshot is None:
         session_state.pop(ADMIN_RUNTIME_ERROR_KEY, None)
         session_state[ADMIN_RUNTIME_SOURCE_KEY] = "existing_runtime_default"
+        session_state.pop("standardization_allow_teaching_date_override", None)
         return AdminRuntimeProjectionResult(
             applied=False,
             source="existing_runtime_default",

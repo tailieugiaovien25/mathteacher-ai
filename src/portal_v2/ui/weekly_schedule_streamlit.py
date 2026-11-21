@@ -3414,6 +3414,7 @@ def _render_lesson_plan_metadata_override_editor(
     class_name,
     week_number: int,
     selected_index: int,
+    allow_teaching_date_override: bool = True,
 ):
     """
     Render canonical lesson metadata before DOCX processing.
@@ -3456,6 +3457,7 @@ def _render_lesson_plan_metadata_override_editor(
             key_prefix
             + "teaching_date"
         ),
+        disabled=not allow_teaching_date_override,
     )
 
     class_value = st.text_input(
@@ -4922,6 +4924,12 @@ text_input(
                         view.week_number
                     ),
                     selected_index=selected_index,
+                    allow_teaching_date_override=bool(
+                        st.session_state.get(
+                            "standardization_allow_teaching_date_override",
+                            True,
+                        )
+                    ),
                 )
             )
     else:
@@ -8410,7 +8418,7 @@ def _mt_iter_date_paragraphs(
             yield paragraph
 
 
-def _mt_remove_approval_block_bytes(content):
+def _mt_remove_approval_block_bytes(content, approval_label=""):
     """Remove only a near-tail approval block from a standardized DOCX."""
     from io import BytesIO
     import re
@@ -8423,14 +8431,13 @@ def _mt_remove_approval_block_bytes(content):
         value = unicodedata.normalize("NFD", str(value or ""))
         value = "".join(ch for ch in value if unicodedata.category(ch) != "Mn")
         return " ".join(value.casefold().split())
-    markers = ("to cm duyet", "to chuyen mon duyet")
+    custom_marker = normalize(approval_label)
+    markers = tuple(marker for marker in ("to cm duyet", "to chuyen mon duyet", custom_marker) if marker)
     date_re = re.compile(r"(ngay|thang|nam).*(ngay|thang|nam)", re.I)
     document = Document(BytesIO(bytes(content)))
     elements = [child for child in document.element.body if child.tag != qn("w:sectPr")]
     marker_index = None
     for index, element in enumerate(elements):
-        if element.tag != qn("w:p"):
-            continue
         normalized = normalize("".join(element.itertext()))
         if any(marker in normalized for marker in markers):
             marker_index = index
@@ -10778,6 +10785,7 @@ def _g1b_v2_ensure_admin_approval_block(
     approval_date,
     approval_label: str,
     alignment: str = "right",
+    approval_policy: dict | None = None,
 ) -> bytes:
     """Ensure exactly one ADMIN-configured approval block near document end."""
     from io import BytesIO
@@ -10799,16 +10807,19 @@ def _g1b_v2_ensure_admin_approval_block(
 
     document = Document(BytesIO(bytes(content)))
     markers = ("to cm duyet", "to chuyen mon duyet")
-    existing = next(
-        (
-            paragraph
-            for paragraph in document.paragraphs
-            if any(marker in normalize(paragraph.text) for marker in markers)
-        ),
-        None,
+    policy = dict(approval_policy or {})
+    label = str(approval_label or "").strip() or "Tổ CM duyệt"
+    markers = ("to cm duyet", "to chuyen mon duyet", normalize(label))
+    existing = any(
+        any(marker in normalize("".join(element.itertext())) for marker in markers)
+        for element in document.element.body
     )
     if existing is not None:
-        return _mt_overlay_approval_date_bytes(content, approval_date)
+        cleaned = _mt_remove_approval_block_bytes(content, approval_label=label)
+        if cleaned != bytes(content):
+            document = Document(BytesIO(cleaned))
+        else:
+            return _mt_overlay_approval_date_bytes(content, approval_date)
 
     alignment_map = {
         "left": WD_ALIGN_PARAGRAPH.LEFT,
@@ -10819,32 +10830,119 @@ def _g1b_v2_ensure_admin_approval_block(
         str(alignment or "right").strip().casefold(),
         WD_ALIGN_PARAGRAPH.RIGHT,
     )
-    label = str(approval_label or "").strip() or "T\u1ed5 CM duy\u1ec7t"
     long_date = approval_date.strftime(
         "Ng\u00e0y %d th\u00e1ng %m n\u0103m %Y"
     )
+    text_template = str(policy.get("text_template") or "{{approval_date}}\n{{approval_label}}")
+    show_date = bool(policy.get("show_date", True))
+    text_template = text_template.replace("{{approval_date}}", long_date if show_date else "")
+    text_template = text_template.replace("{{approval_label}}", label)
+    lines = text_template.splitlines() or [label]
+    signature_blanks = max(0, min(8, int(policy.get("signature_blank_lines", 4) or 0)))
 
-    date_paragraph = document.add_paragraph()
-    date_paragraph.alignment = paragraph_alignment
-    date_paragraph.paragraph_format.space_before = Pt(14)
-    date_paragraph.paragraph_format.space_after = Pt(0)
-    date_run = date_paragraph.add_run(long_date)
-    date_run.italic = True
-
-    label_paragraph = document.add_paragraph()
-    label_paragraph.alignment = paragraph_alignment
-    label_paragraph.paragraph_format.space_before = Pt(0)
-    label_paragraph.paragraph_format.space_after = Pt(56)
-    label_run = label_paragraph.add_run(label)
-    label_run.bold = True
+    frame_enabled = bool(policy.get("frame_enabled", False))
+    table_enabled = bool(policy.get("table_enabled", False))
+    host = document
+    frame_table = None
+    if frame_enabled:
+        frame_table = document.add_table(rows=1, cols=1)
+        frame_table.autofit = True
+        host = frame_table.cell(0, 0)
+        border_style = str(policy.get("frame_style") or "single")
+        border_width = max(2, min(24, int(float(policy.get("frame_width_pt", 0.75)) * 8)))
+        border_color = str(policy.get("frame_color_rgb") or "000000").upper()
+        tbl_pr = frame_table._tbl.tblPr
+        borders = tbl_pr.find(qn("w:tblBorders"))
+        if borders is None:
+            from docx.oxml import OxmlElement
+            borders = OxmlElement("w:tblBorders")
+            tbl_pr.append(borders)
+        for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            from docx.oxml import OxmlElement
+            element = OxmlElement("w:" + edge)
+            element.set(qn("w:val"), {"single":"single", "double":"double", "dashed":"dashed"}.get(border_style, "single"))
+            element.set(qn("w:sz"), str(border_width))
+            element.set(qn("w:color"), border_color)
+            borders.append(element)
+        host.paragraphs[0].paragraph_format.space_before = Pt(14)
+    date_run = label_run = None
+    first = True
+    for line in lines:
+        paragraph = host.paragraphs[0] if first and frame_enabled else host.add_paragraph()
+        first = False
+        paragraph.alignment = paragraph_alignment
+        paragraph.paragraph_format.space_before = Pt(14 if not frame_enabled and paragraph is document.paragraphs[-1] else 0)
+        paragraph.paragraph_format.space_after = Pt(0)
+        if line.strip() == long_date and show_date:
+            date_run = paragraph.add_run(line)
+            date_run.italic = True
+        elif line.strip() == label:
+            label_run = paragraph.add_run(line)
+            label_run.bold = True
+        else:
+            paragraph.add_run(line)
+        for run in paragraph.runs:
+            run.font.name = "Times New Roman"
+            run.font.size = Pt(14)
+            run.font.color.rgb = __import__("docx").shared.RGBColor(0, 0, 0)
+            run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Times New Roman")
+        paragraph_properties = paragraph._p.get_or_add_pPr()
+        paragraph_shading = paragraph_properties.find(qn("w:shd"))
+        if paragraph_shading is None:
+            from docx.oxml import OxmlElement
+            paragraph_shading = OxmlElement("w:shd")
+            paragraph_properties.append(paragraph_shading)
+        paragraph_shading.set(qn("w:fill"), "FFFFFF")
+    for _ in range(signature_blanks):
+        host.add_paragraph()
+    if table_enabled:
+        cells = policy.get("table_cells")
+        cells = cells if isinstance(cells, list) else []
+        rows = [[str(cell or "") for cell in row] for row in cells if isinstance(row, (list, tuple))][:8]
+        width = min(4, max((len(row) for row in rows), default=0))
+        if rows and width:
+            if frame_enabled:
+                from docx.shared import Inches
+                table = host.add_table(rows=len(rows), cols=width, width=Inches(6))
+            else:
+                table = host.add_table(rows=len(rows), cols=width)
+            style = str(policy.get("table_border_style") or "single")
+            width_pt = max(2, min(24, int(float(policy.get("table_border_width_pt", .5)) * 8)))
+            from docx.oxml import OxmlElement
+            borders = table._tbl.tblPr.find(qn("w:tblBorders"))
+            if borders is None:
+                borders = OxmlElement("w:tblBorders")
+                table._tbl.tblPr.append(borders)
+            for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+                element = OxmlElement("w:" + edge)
+                element.set(qn("w:val"), {"single":"single", "double":"double", "dashed":"dashed"}.get(style, "single"))
+                element.set(qn("w:sz"), str(width_pt))
+                element.set(qn("w:color"), "000000")
+                borders.append(element)
+            for row_index, row in enumerate(rows):
+                for col_index in range(width):
+                    cell = table.cell(row_index, col_index)
+                    cell.text = row[col_index] if col_index < len(row) else ""
+                    from docx.oxml import OxmlElement
+                    cell_properties = cell._tc.get_or_add_tcPr()
+                    cell_shading = cell_properties.find(qn("w:shd"))
+                    if cell_shading is None:
+                        cell_shading = OxmlElement("w:shd")
+                        cell_properties.append(cell_shading)
+                    cell_shading.set(qn("w:fill"), "FFFFFF")
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.name = "Times New Roman"
+                            run.font.size = Pt(14)
+                            run.font.color.rgb = __import__("docx").shared.RGBColor(0, 0, 0)
+                            run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Times New Roman")
 
     for run in (date_run, label_run):
-        run.font.name = "Times New Roman"
-        run.font.size = Pt(14)
-        run._element.get_or_add_rPr().rFonts.set(
-            qn("w:eastAsia"),
-            "Times New Roman",
-        )
+        if run is not None:
+            run.font.name = "Times New Roman"
+            run.font.size = Pt(14)
+            run.font.color.rgb = __import__("docx").shared.RGBColor(0, 0, 0)
+            run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Times New Roman")
 
     output = BytesIO()
     document.save(output)
@@ -11284,6 +11382,7 @@ def standardize_lesson_plan_v2_document(
                 )
                 or "right"
             ),
+            approval_policy=st.session_state.get("lesson_plan_admin_approval_policy"),
         )
     output_bytes = _g1b_v2_trim_trailing_empty_paragraphs(output_bytes)
     return str(output_name or file_name), output_bytes

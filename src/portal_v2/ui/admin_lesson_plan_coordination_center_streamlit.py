@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from portal_v2.ui.admin_subject_coordination_workspace_streamlit import render_admin_subject_coordination_workspace
 
 from lesson_planning_v2.adapters.supabase_lesson_plan_configuration_repository import (
@@ -75,24 +76,6 @@ def _render_coordination_center_visual_system(st) -> None:
     )
 
 
-def _render_group_save_button(st, *, group_key: str, group_label: str) -> None:
-    st.divider()
-    if st.button(
-        "💾 Lưu cấu hình " + group_label,
-        key="admin_lesson_plan_coordination_save_" + group_key,
-        type="primary",
-        use_container_width=True,
-    ):
-        st.session_state[
-            "admin_lesson_plan_coordination_last_saved_group"
-        ] = group_key
-        st.success(
-            "Đã ghi nhận cấu hình " + group_label + ". "
-            "Các cấu hình nghiệp vụ được lưu dưới dạng DRAFT; "
-            "ADMIN cần Xuất bản và Áp dụng để đưa vào runtime USER."
-        )
-
-
 def _parse_configuration_payload(raw_payload: str) -> dict:
     import json
 
@@ -128,6 +111,9 @@ def _configuration_editor_defaults(payload: dict | None) -> dict:
     approval_policy = normalized.get("approval_policy")
     if not isinstance(approval_policy, dict):
         approval_policy = {}
+    date_policy_by_subject = normalized.get("date_policy_by_subject")
+    if not isinstance(date_policy_by_subject, dict):
+        date_policy_by_subject = {}
 
     return {
         "payload": normalized,
@@ -177,8 +163,35 @@ def _configuration_editor_defaults(payload: dict | None) -> dict:
             )
             or 1
         ),
+        "approval_text_template": str(
+            approval_policy.get("text_template")
+            or "{{approval_date}}\n{{approval_label}}"
+        ),
+        "approval_show_date": bool(approval_policy.get("show_date", True)),
+        "approval_signature_blank_lines": int(
+            approval_policy.get("signature_blank_lines", 4) or 0
+        ),
+        "approval_frame_enabled": bool(approval_policy.get("frame_enabled", False)),
+        "approval_frame_style": str(approval_policy.get("frame_style") or "single"),
+        "approval_frame_width_pt": float(approval_policy.get("frame_width_pt") or 0.75),
+        "approval_frame_color_rgb": str(approval_policy.get("frame_color_rgb") or "000000"),
+        "approval_table_enabled": bool(approval_policy.get("table_enabled", False)),
+        "approval_table_cells": approval_policy.get("table_cells") or [["Tổ trưởng", "Thư ký"], ["", ""]],
+        "approval_table_border_style": str(approval_policy.get("table_border_style") or "single"),
+        "approval_table_border_width_pt": float(approval_policy.get("table_border_width_pt") or 0.5),
+        "date_policy_by_subject": date_policy_by_subject,
         "google_drive_lesson_plan_folder_id": str(_g1b_repo.get("google_drive_lesson_plan_folder_id", "") or "").strip(),
     }
+
+
+def _parse_approval_table_content(value: str) -> list[list[str]]:
+    rows = [[cell.strip() for cell in line.split("|")] for line in str(value or "").splitlines() if line.strip()]
+    if not rows:
+        return []
+    if len(rows) > 8 or max(map(len, rows)) > 4:
+        raise ValueError("Bảng phê duyệt chỉ được tối đa 8 hàng và 4 cột.")
+    width = max(map(len, rows))
+    return [row + [""] * (width - len(row)) for row in rows]
 
 
 def _render_structured_configuration_editor(
@@ -186,6 +199,8 @@ def _render_structured_configuration_editor(
     *,
     key_prefix: str,
     initial_payload: dict | None,
+    client=None,
+    allow_subject_date_overrides: bool = False,
 ) -> dict:
     # G1B_H4D3_DRIVE_FOLDER_FIELD
     drive_folder_input_key = f"{key_prefix}_google_drive_folder_id_input"
@@ -217,7 +232,7 @@ def _render_structured_configuration_editor(
     presentation_tab, date_tab, approval_tab, advanced_tab = st.tabs(
         [
             "Mẫu & trình bày",
-            "Ngày soạn – ngày duyệt",
+            "Ngày soạn – ngày dạy – ngày duyệt",
             "Phê duyệt",
             "Nâng cao",
         ]
@@ -310,7 +325,7 @@ def _render_structured_configuration_editor(
 
     with date_tab:
         st.markdown("### 2. Ngày soạn – ngày duyệt")
-        st.caption("Thiết lập cách hệ thống tự động xác định ngày soạn và ngày duyệt.")
+        st.caption("Thiết lập ngày soạn, ngày dạy và ngày duyệt; cấu hình chi tiết có thể khác nhau theo từng môn.")
         date_col1, date_col2 = st.columns(2)
         with date_col1:
             drafting_enabled = st.checkbox(
@@ -341,9 +356,80 @@ def _render_structured_configuration_editor(
                 key=key_prefix + "_approval_days",
             )
 
+        subject_date_policies = dict(defaults["date_policy_by_subject"] or {})
+        if allow_subject_date_overrides:
+            st.markdown("#### Thiết lập riêng theo môn")
+            st.caption(
+                "Mỗi môn có thể dùng số ngày soạn/duyệt riêng. Ngày dạy lấy từ "
+                "Lịch báo giảng; ADMIN có thể cho phép giáo viên điều chỉnh ngày dạy."
+            )
+            try:
+                subjects, _ = _load_canonical_lesson_plan_scope_catalog(client=client)
+            except Exception as error:
+                subjects = ()
+                st.warning("Không tải được danh sách môn để thiết lập ngày riêng: " + str(error))
+            if not subjects:
+                st.info("Chưa có môn ACTIVE trong danh mục canonical.")
+            for subject in subjects:
+                subject_code = str(getattr(subject, "code", "") or "").strip()
+                if not subject_code:
+                    continue
+                subject_id = str(getattr(subject, "subject_id", "") or "").strip()
+                subject_name = str(getattr(subject, "name", subject_code) or subject_code)
+                previous = subject_date_policies.get(subject_code, {})
+                if not isinstance(previous, dict):
+                    previous = {}
+                widget_subject = re.sub(r"[^A-Za-z0-9_-]+", "_", subject_code)
+                with st.expander(f"{subject_name} ({subject_code})", expanded=False):
+                    subject_cols = st.columns(3)
+                    subject_drafting_enabled = subject_cols[0].checkbox(
+                        "Tính Ngày soạn trước thứ Hai",
+                        value=bool(previous.get("drafting_before_monday_enabled", defaults["drafting_before_monday_enabled"])),
+                        key=f"{key_prefix}_{widget_subject}_drafting_enabled",
+                    )
+                    subject_drafting_days = subject_cols[0].number_input(
+                        "Ngày soạn trước thứ Hai",
+                        min_value=0,
+                        max_value=14,
+                        value=int(previous.get("drafting_before_monday_days", defaults["drafting_before_monday_days"])),
+                        step=1,
+                        disabled=not subject_drafting_enabled,
+                        key=f"{key_prefix}_{widget_subject}_drafting_days",
+                    )
+                    subject_approval_enabled = subject_cols[1].checkbox(
+                        "Tính Ngày duyệt trước thứ Hai",
+                        value=bool(previous.get("approval_before_monday_enabled", defaults["approval_before_monday_enabled"])),
+                        key=f"{key_prefix}_{widget_subject}_approval_enabled",
+                    )
+                    subject_approval_days = subject_cols[1].number_input(
+                        "Ngày duyệt trước thứ Hai",
+                        min_value=0,
+                        max_value=14,
+                        value=int(previous.get("approval_before_monday_days", defaults["approval_before_monday_days"])),
+                        step=1,
+                        disabled=not subject_approval_enabled,
+                        key=f"{key_prefix}_{widget_subject}_approval_days",
+                    )
+                    allow_teaching_date_override = subject_cols[2].checkbox(
+                        "Cho phép USER điều chỉnh Ngày dạy",
+                        value=bool(previous.get("allow_teaching_date_override", True)),
+                        key=f"{key_prefix}_{widget_subject}_teaching_override",
+                        help="Ngày dạy mặc định vẫn lấy từ Lịch báo giảng theo lớp.",
+                    )
+                subject_date_policies[subject_code] = {
+                    "subject_code": subject_code,
+                    "subject_id": subject_id,
+                    "subject_name": subject_name,
+                    "drafting_before_monday_enabled": bool(subject_drafting_enabled),
+                    "drafting_before_monday_days": int(subject_drafting_days),
+                    "approval_before_monday_enabled": bool(subject_approval_enabled),
+                    "approval_before_monday_days": int(subject_approval_days),
+                    "allow_teaching_date_override": bool(allow_teaching_date_override),
+                }
+
     with approval_tab:
         st.markdown("### 3. Phê duyệt")
-        st.caption("Thiết lập nhãn và vị trí khối phê duyệt cuối giáo án.")
+        st.caption("Thiết kế nội dung, khung và bảng của khối phê duyệt cuối giáo án.")
         approval_label = st.text_input(
             "Nhãn phê duyệt",
             value=defaults["approval_label"],
@@ -364,6 +450,97 @@ def _render_structured_configuration_editor(
             }[value],
             key=key_prefix + "_approval_alignment",
         )
+        approval_text_template = st.text_area(
+            "Nội dung khối phê duyệt",
+            value=defaults["approval_text_template"],
+            height=100,
+            key=key_prefix + "_approval_text_template",
+            help="Dùng {{approval_date}} để chèn ngày duyệt và {{approval_label}} để chèn nhãn. Mỗi dòng thành một dòng trong Word.",
+        )
+        approval_show_date = st.checkbox(
+            "Hiển thị ngày duyệt trong khối",
+            value=defaults["approval_show_date"],
+            key=key_prefix + "_approval_show_date",
+        )
+        approval_signature_blank_lines = st.number_input(
+            "Số dòng trống cho chữ ký",
+            min_value=0,
+            max_value=8,
+            value=defaults["approval_signature_blank_lines"],
+            step=1,
+            key=key_prefix + "_approval_signature_blank_lines",
+        )
+        approval_frame_enabled = st.checkbox(
+            "Tạo khung bao quanh khối phê duyệt",
+            value=defaults["approval_frame_enabled"],
+            key=key_prefix + "_approval_frame_enabled",
+        )
+        frame_col1, frame_col2, frame_col3 = st.columns(3)
+        frame_styles = ["single", "double", "dashed"]
+        approval_frame_style = frame_col1.selectbox(
+            "Kiểu khung",
+            frame_styles,
+            index=frame_styles.index(defaults["approval_frame_style"] if defaults["approval_frame_style"] in frame_styles else "single"),
+            disabled=not approval_frame_enabled,
+            key=key_prefix + "_approval_frame_style",
+        )
+        approval_frame_width_pt = frame_col2.number_input(
+            "Độ dày khung (pt)",
+            min_value=0.25,
+            max_value=3.0,
+            value=defaults["approval_frame_width_pt"],
+            step=0.25,
+            disabled=not approval_frame_enabled,
+            key=key_prefix + "_approval_frame_width_pt",
+        )
+        frame_colors = {"Đen": "000000", "Xanh đậm": "1F4E79", "Đỏ đậm": "C00000"}
+        frame_color_labels = list(frame_colors)
+        selected_frame_color = next((label for label, value in frame_colors.items() if value == defaults["approval_frame_color_rgb"]), "Đen")
+        approval_frame_color_rgb = frame_colors[frame_col3.selectbox(
+            "Màu khung",
+            frame_color_labels,
+            index=frame_color_labels.index(selected_frame_color),
+            disabled=not approval_frame_enabled,
+            key=key_prefix + "_approval_frame_color",
+        )]
+        approval_table_enabled = st.checkbox(
+            "Thêm bảng chữ ký của tổ chuyên môn",
+            value=defaults["approval_table_enabled"],
+            key=key_prefix + "_approval_table_enabled",
+        )
+        table_default = defaults["approval_table_cells"]
+        if not isinstance(table_default, list):
+            table_default = [["Tổ trưởng", "Thư ký"], ["", ""]]
+        table_text_default = "\n".join(
+            " | ".join(str(value or "") for value in row)
+            for row in table_default if isinstance(row, (list, tuple))
+        )
+        approval_table_content = st.text_area(
+            "Nội dung ô bảng (mỗi dòng là một hàng, ngăn cột bằng dấu |)",
+            value=table_text_default,
+            height=110,
+            disabled=not approval_table_enabled,
+            key=key_prefix + "_approval_table_content",
+            help="Tối đa 8 hàng và 4 cột. Để trống một ô nếu cần chừa chỗ ký.",
+        )
+        table_border_styles = ["single", "double", "dashed"]
+        approval_table_border_style = st.selectbox(
+            "Kiểu đường viền bảng chữ ký",
+            table_border_styles,
+            index=table_border_styles.index(defaults["approval_table_border_style"] if defaults["approval_table_border_style"] in table_border_styles else "single"),
+            disabled=not approval_table_enabled,
+            key=key_prefix + "_approval_table_border_style",
+        )
+        approval_table_border_width_pt = st.number_input(
+            "Độ dày đường viền bảng chữ ký (pt)",
+            min_value=0.25,
+            max_value=3.0,
+            value=defaults["approval_table_border_width_pt"],
+            step=0.25,
+            disabled=not approval_table_enabled,
+            key=key_prefix + "_approval_table_border_width_pt",
+        )
+        st.caption("Xem trước nội dung: " + approval_text_template.replace("{{approval_date}}", "Ngày … tháng … năm …").replace("{{approval_label}}", approval_label))
 
     with advanced_tab:
         st.markdown("### 4. Nâng cao")
@@ -417,6 +594,18 @@ def _render_structured_configuration_editor(
         "approval_label": approval_label,
         "alignment": alignment,
         "approval_offset_days": int(approval_days),
+        "approval_text_template": str(approval_text_template or ""),
+        "approval_show_date": bool(approval_show_date),
+        "approval_signature_blank_lines": int(approval_signature_blank_lines),
+        "approval_frame_enabled": bool(approval_frame_enabled),
+        "approval_frame_style": str(approval_frame_style),
+        "approval_frame_width_pt": float(approval_frame_width_pt),
+        "approval_frame_color_rgb": str(approval_frame_color_rgb),
+        "approval_table_enabled": bool(approval_table_enabled),
+        "approval_table_content": str(approval_table_content or ""),
+        "approval_table_border_style": str(approval_table_border_style),
+        "approval_table_border_width_pt": float(approval_table_border_width_pt),
+        "date_policy_by_subject": subject_date_policies if allow_subject_date_overrides else defaults["date_policy_by_subject"],
     }
 
 
@@ -488,6 +677,12 @@ def _build_configuration_payload_from_editor(editor: dict) -> dict:
     )
     payload["date_policy"] = date_policy
 
+    if "date_policy_by_subject" in editor:
+        per_subject = editor.get("date_policy_by_subject")
+        if not isinstance(per_subject, dict):
+            raise ValueError("Cấu hình ngày theo môn phải là một JSON object.")
+        payload["date_policy_by_subject"] = per_subject
+
     approval_policy = payload.get("approval_policy")
     if not isinstance(approval_policy, dict):
         approval_policy = {}
@@ -499,13 +694,25 @@ def _build_configuration_payload_from_editor(editor: dict) -> dict:
             ).strip(),
             "alignment": str(editor.get("alignment") or "right"),
             "approval_offset_days": int(editor["approval_offset_days"]),
+            "text_template": str(editor.get("approval_text_template") or "{{approval_date}}\n{{approval_label}}"),
+            "show_date": bool(editor.get("approval_show_date", True)),
+            "signature_blank_lines": int(editor.get("approval_signature_blank_lines", 4)),
+            "frame_enabled": bool(editor.get("approval_frame_enabled", False)),
+            "frame_style": str(editor.get("approval_frame_style") or "single"),
+            "frame_width_pt": float(editor.get("approval_frame_width_pt", 0.75)),
+            "frame_color_rgb": str(editor.get("approval_frame_color_rgb") or "000000"),
+            "table_enabled": bool(editor.get("approval_table_enabled", False)),
+            "table_cells": _parse_approval_table_content(
+                str(editor.get("approval_table_content") or "")
+            ),
+            "table_border_style": str(editor.get("approval_table_border_style") or "single"),
+            "table_border_width_pt": float(editor.get("approval_table_border_width_pt", 0.5)),
         }
     )
     payload["approval_policy"] = approval_policy
 
     # V14B6N_R7B2D11D2_PERSIST_ADMIN_AI_RUNTIME
-    # The ADMIN AI editor remains a UI input surface only. The persisted source
-    # of truth is configuration_payload after the normal DRAFT -> PUBLISHED -> ACTIVE flow.
+    # The ADMIN AI editor's values are persisted with the lesson-plan profile.
     try:
         import streamlit as st
 
@@ -734,13 +941,16 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                 st,
                 key_prefix="admin_lesson_plan_configuration_create",
                 initial_payload={},
+                client=client,
+                allow_subject_date_overrides=create_scope_mode == "Toàn hệ thống",
             )
             change_note = st.text_input(
                 "Ghi chú phiên bản",
                 key="admin_lesson_plan_configuration_create_change_note",
             )
             create_submitted = st.form_submit_button(
-                "Tạo cấu hình và phiên bản nháp"
+                "💾 Lưu và áp dụng ngay",
+                type="primary",
             )
 
         if create_submitted:
@@ -754,21 +964,22 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                     configuration_payload=payload,
                     change_note=change_note or None,
                 )
+                published = service.publish(
+                    configuration_version_id=str(
+                        version.get("configuration_version_id") or ""
+                    )
+                )
+                service.activate_published_version(
+                    profile_id=str(profile.get("profile_id") or ""),
+                    configuration_version_id=str(
+                        published.get("configuration_version_id") or ""
+                    ),
+                )
             except Exception as error:
                 st.error("Không thể tạo cấu hình: " + str(error))
             else:
-                st.success(
-                    "Đã tạo cấu hình DRAFT và phiên bản nháp số 1."
-                )
-                st.json(
-                    {
-                        "profile_id": profile.get("profile_id"),
-                        "configuration_version_id": version.get(
-                            "configuration_version_id"
-                        ),
-                        "version_status": version.get("version_status"),
-                    }
-                )
+                st.success("Đã lưu và áp dụng cấu hình ngay.")
+                st.rerun()
 
     if not profiles:
         st.info(
@@ -832,17 +1043,66 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
         )
         return f"Phiên bản {number} · {status}{current}"
 
-    if versions:
-        st.markdown("**Các phiên bản**")
-        for row in versions:
-            version_id = str(row.get("configuration_version_id") or "")
-            st.write("• " + _version_label(version_id))
-
-    st.markdown("## Quản trị phiên bản")
-    st.caption(
-        "Khu vực kỹ thuật để lưu lịch sử thay đổi cấu hình. "
-        "ADMIN chỉ cần dùng khi muốn tạo, chỉnh sửa, xuất bản hoặc chuyển phiên bản."
+    current_version_id = str(selected_profile.get("current_version_id") or "")
+    current_version = version_by_id.get(current_version_id)
+    current_payload = (
+        current_version.get("configuration_payload")
+        if isinstance(current_version, dict)
+        else None
     )
+    if not isinstance(current_payload, dict):
+        current_payload = (
+            version_by_id[next(reversed(version_by_id))].get("configuration_payload")
+            if version_by_id
+            else {}
+        )
+    if not isinstance(current_payload, dict):
+        current_payload = {}
+
+    st.subheader("Cấu hình sử dụng")
+    st.caption("Chỉnh sửa các mục cần thiết rồi nhấn Lưu. Cấu hình mới có hiệu lực ngay.")
+    with st.form("admin_lesson_plan_configuration_save_active_form"):
+        active_editor = _render_structured_configuration_editor(
+            st,
+            key_prefix="admin_lesson_plan_configuration_active_" + selected_profile_id,
+            initial_payload=current_payload,
+            client=client,
+            allow_subject_date_overrides=not str(selected_profile.get("subject_ref") or "").strip(),
+        )
+        active_change_note = st.text_input(
+            "Ghi chú thay đổi (không bắt buộc)",
+            key="admin_lesson_plan_configuration_active_change_note_" + selected_profile_id,
+        )
+        save_active_submitted = st.form_submit_button(
+            "💾 Lưu",
+            type="primary",
+        )
+    if save_active_submitted:
+        try:
+            active_payload = _build_configuration_payload_from_editor(active_editor)
+            result = service.save_and_activate(
+                profile_id=selected_profile_id,
+                configuration_payload=active_payload,
+                change_note=active_change_note or "ADMIN lưu và áp dụng cấu hình",
+            )
+        except Exception as error:
+            st.error("Không thể lưu và áp dụng cấu hình: " + str(error))
+        else:
+            st.success(
+                "Đã lưu và áp dụng ngay phiên bản "
+                + str(result.current_version.get("version_number") or "")
+                + "."
+            )
+            st.rerun()
+
+    with st.expander("Lịch sử và quản trị phiên bản nâng cao", expanded=False):
+        if versions:
+            st.markdown("**Các phiên bản**")
+            for row in versions:
+                version_id = str(row.get("configuration_version_id") or "")
+                st.write("• " + _version_label(version_id))
+
+    st.markdown("## Quản trị phiên bản (nâng cao)")
     with st.expander("Tạo phiên bản cấu hình mới", expanded=False):
         source_ids = list(version_by_id)
         if source_ids:
@@ -863,17 +1123,19 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                 st,
                 key_prefix="admin_lesson_plan_configuration_new_version",
                 initial_payload=source_payload,
+                client=client,
+                allow_subject_date_overrides=not str(selected_profile.get("subject_ref") or "").strip(),
             )
             change_note = st.text_input(
                 "Ghi chú thay đổi",
                 key="admin_lesson_plan_configuration_new_version_change_note",
             )
-            submitted = st.form_submit_button("Tạo phiên bản DRAFT mới")
+            submitted = st.form_submit_button("💾 Lưu và áp dụng ngay")
 
         if submitted:
             try:
                 payload = _build_configuration_payload_from_editor(editor)
-                version = service.create_next_draft_version(
+                result = service.save_and_activate(
                     profile_id=selected_profile_id,
                     configuration_payload=payload,
                     change_note=change_note or None,
@@ -881,11 +1143,11 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
             except Exception as error:
                 st.error("Không thể tạo phiên bản nháp: " + str(error))
             else:
-                st.success("Đã tạo phiên bản DRAFT mới.")
-                with st.expander("Chi tiết kỹ thuật phiên bản", expanded=False):
-                    st.json(version)
-                # V14B6N_R7B2D11E4F_REFRESH_AFTER_DRAFT_CREATE
-                # Refresh so list_versions() sees the newly created DRAFT.
+                st.success(
+                    "Đã lưu và áp dụng ngay phiên bản "
+                    + str(result.current_version.get("version_number") or "")
+                    + "."
+                )
                 st.rerun()
 
     draft_ids = [
@@ -974,12 +1236,14 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                     st,
                     key_prefix="admin_lesson_plan_configuration_update",
                     initial_payload=draft_payload,
+                    client=client,
+                    allow_subject_date_overrides=not str(selected_profile.get("subject_ref") or "").strip(),
                 )
                 change_note = st.text_input(
                     "Ghi chú cập nhật",
                     key="admin_lesson_plan_configuration_update_change_note",
                 )
-                submitted = st.form_submit_button("Lưu DRAFT")
+                submitted = st.form_submit_button("💾 Lưu và áp dụng ngay")
 
             if submitted:
                 try:
@@ -989,12 +1253,26 @@ def _render_admin_configuration_write_workspace(st, *, client) -> None:
                         configuration_payload=payload,
                         change_note=change_note or None,
                     )
+                    published = service.publish(
+                        configuration_version_id=str(
+                            version.get("configuration_version_id") or ""
+                        )
+                    )
+                    result = service.activate_published_version(
+                        profile_id=selected_profile_id,
+                        configuration_version_id=str(
+                            published.get("configuration_version_id") or ""
+                        ),
+                    )
                 except Exception as error:
                     st.error("Không thể lưu DRAFT: " + str(error))
                 else:
-                    st.success("Đã lưu phiên bản DRAFT.")
-                    with st.expander("Chi tiết kỹ thuật phiên bản", expanded=False):
-                        st.json(version)
+                    st.success(
+                        "Đã lưu và áp dụng ngay phiên bản "
+                        + str(result.current_version.get("version_number") or "")
+                        + "."
+                    )
+                    st.rerun()
 
         with st.expander("Xuất bản phiên bản để sử dụng", expanded=False):
             with st.form("admin_lesson_plan_configuration_publish_form"):
@@ -1081,8 +1359,8 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
     _render_coordination_center_visual_system(st)
     st.title("Trung tâm điều phối giáo án")
     st.caption(
-        "Một trung tâm, ba nhóm cấu hình độc lập. Mỗi chức năng chỉ xuất hiện "
-        "tại một vị trí; thay đổi được lưu DRAFT trước khi Xuất bản và Áp dụng."
+        "Mỗi chức năng có nút Lưu riêng. Khi lưu, cấu hình được áp dụng ngay "
+        "cho lần sử dụng tiếp theo; lịch sử phiên bản vẫn được giữ để tra cứu."
     )
 
     if client is None:
@@ -1128,7 +1406,6 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
             "ADMIN quản lý mẫu giáo án, quy tắc chuẩn hóa, ngày soạn/ngày duyệt "
             "và khối phê duyệt; giáo án cá nhân vẫn thuộc USER."
         )
-        _render_group_save_button(st, group_key="global", group_label="I")
 
     with st.container(border=True):
         st.header("II. Cấu hình giáo án theo môn")
@@ -1152,7 +1429,6 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
 
 
         render_admin_subject_coordination_workspace(client=client)
-        _render_group_save_button(st, group_key="subject", group_label="II")
 
     with st.container(border=True):
         st.header("III. Cấu hình các công cụ")
@@ -1173,4 +1449,3 @@ def render_admin_lesson_plan_coordination_center(st, *, client) -> None:
         render_admin_standardization_ai_settings(st, client=client)
 
         # Compatibility contract only: render_admin_lesson_authoring_ai_settings(st, client=client)
-        _render_group_save_button(st, group_key="tools", group_label="III")

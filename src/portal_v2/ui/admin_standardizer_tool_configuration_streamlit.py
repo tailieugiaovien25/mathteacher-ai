@@ -39,50 +39,24 @@ def _show_configuration_storage_error(st, error: Exception) -> None:
         st.code(message, language="text")
 
 
-def _save_draft(*, admin, service, profile, code, name, subject_ref, payload):
+def _save_and_activate(*, service, profile, code, name, subject_ref, payload):
     if profile is None:
-        return service.create_profile_with_initial_draft(
+        profile, draft = service.create_profile_with_initial_draft(
             profile_code=code, profile_name=name, subject_ref=subject_ref,
             configuration_payload=payload, change_note="ADMIN tool configuration",
-        )[1]
-    versions = admin.list_versions(profile_id=str(profile["profile_id"]))
-    drafts = [row for row in versions if row.get("version_status") == "DRAFT"]
-    if drafts:
-        drafts.sort(key=lambda row: int(row.get("version_number") or 0), reverse=True)
-        return service.update_draft(
-            configuration_version_id=str(drafts[0]["configuration_version_id"]),
-            configuration_payload=payload, change_note="ADMIN tool configuration",
         )
-    return service.create_next_draft_version(
-        profile_id=str(profile["profile_id"]), configuration_payload=payload,
-        change_note="ADMIN tool configuration",
-    )
-
-
-def _publish_and_activate(st, *, admin, service, profile, key):
-    if profile is None:
-        return
-    try:
-        versions = admin.list_versions(profile_id=str(profile["profile_id"]))
-    except Exception as error:
-        _show_configuration_storage_error(st, error)
-        return
-    drafts = [row for row in versions if row.get("version_status") == "DRAFT"]
-    if not drafts:
-        st.caption("Không có phiên bản DRAFT chờ xuất bản.")
-        return
-    drafts.sort(key=lambda row: int(row.get("version_number") or 0), reverse=True)
-    draft = drafts[0]
-    if st.button("Xuất bản và áp dụng", key=key, use_container_width=True):
         published = service.publish(
-            configuration_version_id=str(draft["configuration_version_id"])
+            configuration_version_id=str(draft.get("configuration_version_id") or "")
         )
-        service.activate_published_version(
+        return service.activate_published_version(
             profile_id=str(profile["profile_id"]),
             configuration_version_id=str(published["configuration_version_id"]),
         )
-        st.success("Đã xuất bản và áp dụng cấu hình công cụ.")
-        st.rerun()
+    return service.save_and_activate(
+        profile_id=str(profile["profile_id"]),
+        configuration_payload=payload,
+        change_note="ADMIN tool configuration",
+    )
 
 
 def render_admin_standardizer_tool_configuration(st, *, client) -> None:
@@ -123,10 +97,10 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
         integrity_gate = st.checkbox("Chặn lưu khi kiểm tra toàn vẹn thất bại", value=bool(common_settings.get("integrity_gate", True)), disabled=True)
         preserve_formula = st.checkbox("Giữ nguyên giá trị công thức Toán", value=True, disabled=True)
         system_instruction = st.text_area("Chỉ dẫn bắt buộc cho AI", value=str(common_settings.get("system_instruction") or "Tuân thủ cấu hình ADMIN và không thay đổi nội dung ngoài phạm vi được giao."))
-        save_common = st.form_submit_button("💾 Lưu cấu hình III-A", type="primary", use_container_width=True)
+        save_common = st.form_submit_button("💾 Lưu", type="primary", use_container_width=True)
     if save_common:
         try:
-            _save_draft(admin=admin, service=lifecycle, profile=common_profile, code=COMMON_PROFILE_CODE, name="Công cụ chuẩn giáo án chung", subject_ref="", payload={
+            _save_and_activate(service=lifecycle, profile=common_profile, code=COMMON_PROFILE_CODE, name="Công cụ chuẩn giáo án chung", subject_ref="", payload={
                 "configuration_kind": "STANDARDIZER_TOOL", "tool_common": {
                     "enabled": enabled, "ai_enabled": ai_enabled,
                     "allowed_actions": list(allowed_actions), "confirmation_policy": confirmation,
@@ -137,9 +111,8 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
         except Exception as error:
             _show_configuration_storage_error(st, error)
             return
-        st.success("Đã lưu cấu hình công cụ chung dưới dạng DRAFT.")
+        st.success("Đã lưu và áp dụng cấu hình công cụ chung ngay.")
         st.rerun()
-    _publish_and_activate(st, admin=admin, service=lifecycle, profile=common_profile, key="publish_standardizer_tool_common")
 
     st.markdown("### III-B. Cấu hình Công cụ chuẩn giáo án theo môn")
     subject_ref = st.text_input("Mã môn áp dụng", key="standardizer_tool_subject_ref").strip().upper()
@@ -174,10 +147,10 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
         subject_instruction = st.text_area("Chỉ dẫn AI riêng của môn", value=str(controls.get("subject_instruction") or ""))
         proposal_count = st.number_input("Số phương án AI tối đa", 1, 5, int(controls.get("proposal_count") or 2))
         require_review = st.checkbox("Bắt buộc giáo viên duyệt đề xuất AI", value=bool(controls.get("require_review", True)))
-        save_subject = st.form_submit_button("💾 Lưu cấu hình III-B", type="primary", use_container_width=True)
+        save_subject = st.form_submit_button("💾 Lưu", type="primary", use_container_width=True)
     if save_subject:
         try:
-            _save_draft(admin=admin, service=lifecycle, profile=subject_profile, code=subject_code, name="Công cụ chuẩn giáo án – " + subject_ref, subject_ref=subject_ref, payload={
+            _save_and_activate(service=lifecycle, profile=subject_profile, code=subject_code, name="Công cụ chuẩn giáo án – " + subject_ref, subject_ref=subject_ref, payload={
                 "configuration_kind": "STANDARDIZER_TOOL", "subject_controls": {
                     "enabled": subject_enabled, "allowed_actions": list(subject_actions),
                     "subject_instruction": subject_instruction.strip(),
@@ -187,6 +160,5 @@ def render_admin_standardizer_tool_configuration(st, *, client) -> None:
         except Exception as error:
             _show_configuration_storage_error(st, error)
             return
-        st.success("Đã lưu cấu hình công cụ theo môn dưới dạng DRAFT.")
+        st.success("Đã lưu và áp dụng cấu hình công cụ theo môn ngay.")
         st.rerun()
-    _publish_and_activate(st, admin=admin, service=lifecycle, profile=subject_profile, key="publish_standardizer_tool_subject_" + subject_ref)
