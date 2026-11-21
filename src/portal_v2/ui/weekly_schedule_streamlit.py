@@ -10814,7 +10814,7 @@ def _g1b_v2_ensure_admin_approval_block(
         any(marker in normalize("".join(element.itertext())) for marker in markers)
         for element in document.element.body
     )
-    if existing is not None:
+    if existing:
         cleaned = _mt_remove_approval_block_bytes(content, approval_label=label)
         if cleaned != bytes(content):
             document = Document(BytesIO(cleaned))
@@ -10831,13 +10831,15 @@ def _g1b_v2_ensure_admin_approval_block(
         WD_ALIGN_PARAGRAPH.RIGHT,
     )
     long_date = approval_date.strftime(
-        "Ng\u00e0y %d th\u00e1ng %m n\u0103m %Y"
+        "ng\u00e0y %d th\u00e1ng %m n\u0103m %Y"
     )
-    text_template = str(policy.get("text_template") or "{{approval_date}}\n{{approval_label}}")
+    text_template = str(policy.get("text_template") or "")
     show_date = bool(policy.get("show_date", True))
     text_template = text_template.replace("{{approval_date}}", long_date if show_date else "")
     text_template = text_template.replace("{{approval_label}}", label)
-    lines = text_template.splitlines() or [label]
+    lines = text_template.splitlines()
+    if not lines and not bool(policy.get("table_enabled", False)):
+        lines = [label]
     signature_blanks = max(0, min(8, int(policy.get("signature_blank_lines", 4) or 0)))
 
     frame_enabled = bool(policy.get("frame_enabled", False))
@@ -10915,7 +10917,7 @@ def _g1b_v2_ensure_admin_approval_block(
                 table._tbl.tblPr.append(borders)
             for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
                 element = OxmlElement("w:" + edge)
-                element.set(qn("w:val"), {"single":"single", "double":"double", "dashed":"dashed"}.get(style, "single"))
+                element.set(qn("w:val"), {"none":"nil", "single":"single", "double":"double", "dashed":"dashed"}.get(style, "single"))
                 element.set(qn("w:sz"), str(width_pt))
                 element.set(qn("w:color"), "000000")
                 borders.append(element)
@@ -10923,6 +10925,13 @@ def _g1b_v2_ensure_admin_approval_block(
                 for col_index in range(width):
                     cell = table.cell(row_index, col_index)
                     cell.text = row[col_index] if col_index < len(row) else ""
+                    cell.text = (
+                        cell.text.replace(
+                            "{{approval_date}}", long_date if show_date else ""
+                        )
+                        .replace("{{approval_label}}", label)
+                        .replace("{{drafting_label}}", "Người soạn")
+                    )
                     from docx.oxml import OxmlElement
                     cell_properties = cell._tc.get_or_add_tcPr()
                     cell_shading = cell_properties.find(qn("w:shd"))
@@ -10931,6 +10940,7 @@ def _g1b_v2_ensure_admin_approval_block(
                         cell_properties.append(cell_shading)
                     cell_shading.set(qn("w:fill"), "FFFFFF")
                     for paragraph in cell.paragraphs:
+                        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         for run in paragraph.runs:
                             run.font.name = "Times New Roman"
                             run.font.size = Pt(14)

@@ -196,9 +196,9 @@ def _configuration_editor_defaults(payload: dict | None) -> dict:
             date_policy.get("approval_before_monday_days") or 1
         ),
         "approval_label": str(
-            approval_policy.get("approval_label") or "TỔ CM DUYỆT"
+            approval_policy.get("approval_label") or "Tổ CM kí duyệt"
         ),
-        "alignment": str(approval_policy.get("alignment") or "right"),
+        "alignment": str(approval_policy.get("alignment") or "center"),
         "approval_offset_days": int(
             approval_policy.get(
                 "approval_offset_days",
@@ -208,19 +208,23 @@ def _configuration_editor_defaults(payload: dict | None) -> dict:
         ),
         "approval_text_template": str(
             approval_policy.get("text_template")
-            or "{{approval_date}}\n{{approval_label}}"
+            or ""
         ),
         "approval_show_date": bool(approval_policy.get("show_date", True)),
         "approval_signature_blank_lines": int(
-            approval_policy.get("signature_blank_lines", 4) or 0
+            approval_policy.get("signature_blank_lines", 0) or 0
         ),
         "approval_frame_enabled": bool(approval_policy.get("frame_enabled", False)),
         "approval_frame_style": str(approval_policy.get("frame_style") or "single"),
         "approval_frame_width_pt": float(approval_policy.get("frame_width_pt") or 0.75),
         "approval_frame_color_rgb": str(approval_policy.get("frame_color_rgb") or "000000"),
-        "approval_table_enabled": bool(approval_policy.get("table_enabled", False)),
-        "approval_table_cells": approval_policy.get("table_cells") or [["Tổ trưởng", "Thư ký"], ["", ""]],
-        "approval_table_border_style": str(approval_policy.get("table_border_style") or "single"),
+        "approval_table_enabled": bool(approval_policy.get("table_enabled", True)),
+        "approval_table_cells": approval_policy.get("table_cells") or [
+            ["", "Chà Tở, {{approval_date}}", "Chà Tở, {{approval_date}}"],
+            ["Người soạn", "", "Tổ CM kí duyệt"],
+            ["", "", ""],
+        ],
+        "approval_table_border_style": str(approval_policy.get("table_border_style") or "none"),
         "approval_table_border_width_pt": float(approval_policy.get("table_border_width_pt") or 0.5),
         "date_policy_by_subject": date_policy_by_subject,
         "google_drive_lesson_plan_folder_id": str(_g1b_repo.get("google_drive_lesson_plan_folder_id", "") or "").strip(),
@@ -470,6 +474,29 @@ def _render_structured_configuration_editor(
     with approval_tab:
         st.markdown("### 3. Phê duyệt")
         st.caption("Thiết kế nội dung, khung và bảng của khối phê duyệt cuối giáo án.")
+        if st.button(
+            "Nạp mẫu mặc định theo tệp đính kèm",
+            key=key_prefix + "_approval_load_attached_default",
+            help="Nạp bố cục 3 cột, ngày, người soạn, tổ chuyên môn duyệt và khoảng trống chữ ký.",
+        ):
+            st.session_state.update(
+                {
+                    key_prefix + "_approval_label": "Tổ CM kí duyệt",
+                    key_prefix + "_approval_alignment": "center",
+                    key_prefix + "_approval_text_template": "",
+                    key_prefix + "_approval_show_date": True,
+                    key_prefix + "_approval_signature_blank_lines": 0,
+                    key_prefix + "_approval_frame_enabled": False,
+                    key_prefix + "_approval_table_enabled": True,
+                    key_prefix + "_approval_table_content": (
+                        " | Chà Tở, {{approval_date}} | Chà Tở, {{approval_date}}\n"
+                        "Người soạn |  | Tổ CM kí duyệt\n"
+                        " |  | "
+                    ),
+                    key_prefix + "_approval_table_border_style": "none",
+                }
+            )
+            st.rerun()
         approval_label = st.text_input(
             "Nhãn phê duyệt",
             value=defaults["approval_label"],
@@ -563,11 +590,12 @@ def _render_structured_configuration_editor(
             key=key_prefix + "_approval_table_content",
             help="Tối đa 8 hàng và 4 cột. Để trống một ô nếu cần chừa chỗ ký.",
         )
-        table_border_styles = ["single", "double", "dashed"]
+        table_border_styles = ["none", "single", "double", "dashed"]
         approval_table_border_style = st.selectbox(
             "Kiểu đường viền bảng chữ ký",
             table_border_styles,
-            index=table_border_styles.index(defaults["approval_table_border_style"] if defaults["approval_table_border_style"] in table_border_styles else "single"),
+            index=table_border_styles.index(defaults["approval_table_border_style"] if defaults["approval_table_border_style"] in table_border_styles else "none"),
+            format_func=lambda value: {"none": "Không viền", "single": "Nét liền", "double": "Nét đôi", "dashed": "Nét đứt"}[value],
             disabled=not approval_table_enabled,
             key=key_prefix + "_approval_table_border_style",
         )
@@ -580,7 +608,10 @@ def _render_structured_configuration_editor(
             disabled=not approval_table_enabled,
             key=key_prefix + "_approval_table_border_width_pt",
         )
-        st.caption("Xem trước nội dung: " + approval_text_template.replace("{{approval_date}}", "Ngày … tháng … năm …").replace("{{approval_label}}", approval_label))
+        preview_text = approval_text_template.replace("{{approval_date}}", "ngày … tháng … năm …").replace("{{approval_label}}", approval_label)
+        st.caption("Mẫu mặc định: Chà Tở, ngày … tháng … năm … · Người soạn · Tổ CM kí duyệt · chừa khoảng trống ký")
+        if preview_text.strip():
+            st.caption("Nội dung bổ sung: " + preview_text)
 
     with advanced_tab:
         st.markdown("### 4. Công thức và an toàn")
